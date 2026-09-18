@@ -105,4 +105,16 @@ python -m baken_academia.jra_backfill \
 
 ## 次に必要なもの
 
+### NAR公式データの低負荷取得
+
+NARから許諾を得た運用者向けに、月単位・完全逐次・3〜4秒間隔で取得するバックフィルを用意しています。
+
+```bash
+python -m baken_academia.nar_backfill --year 2019 --month 1 \
+  --output data/raw/nar/nar-2019-01.parquet \
+  --permission-confirmed --continue-on-error
+```
+
+過去分は月間日程から開催日とレース結果をたどり、レース単位のチェックポイントと監査JSONを残します。並列取得は行いません。
+
 利用条件を確認できる過去レースCSVです。列名が異なる場合は、元データを変更せず変換アダプターを追加します。

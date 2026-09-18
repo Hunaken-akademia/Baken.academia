@@ -2,6 +2,7 @@
 __pycache__/
 .pytest_cache/
 *.py[cod]
+*.egg-info/
 .DS_Store
 
 # Raw/licensed data and generated artifacts must not be committed.
@@ -14,4 +15,3 @@ artifacts/*
 *.joblib
 *.parquet
 *.csv
-

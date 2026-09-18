@@ -1,0 +1,57 @@
+name: NAR licensed monthly backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: Year
+        required: true
+        default: "2019"
+      month:
+        description: Month
+        required: true
+        default: "1"
+  push:
+    branches: [main]
+    paths: [.github/nar-backfill-request.json]
+
+permissions:
+  contents: read
+concurrency:
+  group: nar-licensed-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      YEAR: ${{ inputs.year || '2019' }}
+      MONTH: ${{ inputs.month || '1' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Backfill one NAR month sequentially
+        run: >-
+          python -m baken_academia.nar_backfill
+          --year "$YEAR" --month "$MONTH"
+          --output "data/raw/nar/nar-${YEAR}-$(printf '%02d' "$MONTH").parquet"
+          --min-delay 3 --max-delay 4
+          --permission-confirmed --continue-on-error
+      - name: Package result and audit
+        if: always()
+        run: |
+          tar -czf "nar-${YEAR}-$(printf '%02d' "$MONTH").tar.gz" \
+            data/raw/nar/*.parquet data/raw/nar/*.audit.json data/raw/nar/events 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nar-${{ env.YEAR }}-${{ env.MONTH }}
+          path: nar-*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
