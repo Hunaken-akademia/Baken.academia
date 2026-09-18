@@ -44,6 +44,22 @@ pip install -r requirements.txt
 python -m baken_academia.train --input data/raw/races.csv --output artifacts/latest
 ```
 
+日本語列名、CP932、ZIP形式の元データは、先に標準化します。
+
+```bash
+python -m baken_academia.ingest \
+  --input /path/to/download.zip \
+  --output data/processed/races.parquet \
+  --source-name "契約したデータ提供元" \
+  --license-confirmed
+
+python -m baken_academia.train \
+  --input data/processed/races.parquet \
+  --output artifacts/latest
+```
+
+取り込み時に `races.provenance.json` と `races.audit.json` が作られ、原本ハッシュ、取得元、対象期間、レース数、欠損率を確認できます。`--license-confirmed` がないデータは取り込みません。
+
 デフォルトでは、最新20%の日付をテスト、その直前20%を検証、残り60%を学習に使います。同一日の行が別期間へ分裂することはありません。
 
 ## 重要な設計方針

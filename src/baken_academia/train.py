@@ -59,7 +59,11 @@ def evaluate(df: pd.DataFrame, y: pd.Series, probability: np.ndarray) -> dict[st
 def train(input_path: Path, output_dir: Path) -> dict[str, object]:
     import lightgbm as lgb
 
-    raw = pd.read_csv(input_path, low_memory=False)
+    raw = (
+        pd.read_parquet(input_path)
+        if input_path.suffix.lower() in {".parquet", ".pq"}
+        else pd.read_csv(input_path, low_memory=False)
+    )
     df = validate_input(raw)
     x, y, categorical = build_feature_frame(df)
     train_mask, validation_mask, test_mask = split_by_date(df)
