@@ -14,6 +14,10 @@
 
 未許諾サイトからのスクレイピング処理は含めていません。利用権を確認できたCSVを `data/raw/races.csv` に配置します。
 
+JRAから自動取得・保存・機械学習・加工結果の公開について許可を得た運営者向けに、
+低負荷の公式サイト取得処理も用意しています。並列アクセスは行わず、既定で各リクエストの
+間に3〜4秒の待機を入れ、取得済みページはキャッシュして再取得しません。
+
 ## 入力CSV
 
 1行を「1レースに出走した1頭」とし、最低限、次の列が必要です。
@@ -58,6 +62,34 @@ python -m baken_academia.train \
   --output artifacts/latest
 ```
 
+### JRA公式データのバックフィル
+
+まず1開催場・1日だけを取得して構造を確認します。
+
+```bash
+python -m baken_academia.jra_backfill \
+  --start-date 2026-09-13 \
+  --end-date 2026-09-13 \
+  --output data/raw/jra/races-test.parquet \
+  --permission-confirmed \
+  --max-events 1
+```
+
+過去8年分（2019年から2026年）を取得する場合は次のとおりです。
+
+```bash
+python -m baken_academia.jra_backfill \
+  --start-date 2019-01-01 \
+  --end-date 2026-09-18 \
+  --output data/raw/jra/races-2019-2026.parquet \
+  --permission-confirmed
+```
+
+処理は開催場・日単位で `data/raw/jra/events/` に保存されます。中断後に同じコマンドを
+実行すると完了済みの日を飛ばして再開します。`--min-delay` は2秒未満に設定できません。
+同着レースは原本に保持して `is_dead_heat` を付け、1着1頭を前提とする現行モデルの
+学習時だけ除外します。
+
 取り込み時に `races.provenance.json` と `races.audit.json` が作られ、原本ハッシュ、取得元、対象期間、レース数、欠損率を確認できます。`--license-confirmed` がないデータは取り込みません。
 
 デフォルトでは、最新20%の日付をテスト、その直前20%を検証、残り60%を学習に使います。同一日の行が別期間へ分裂することはありません。
@@ -68,6 +100,7 @@ python -m baken_academia.train \
 - 払戻、確定オッズ、上がり順位など結果確定後にしか分からない列は拒否します。
 - `odds` と `popularity` は入力に存在しても既定では学習に使いません。
 - 生データ、モデル、予測ファイルはGitへ保存しません。
+- JRA取得は単一接続・逐次処理とし、429/5xx時は指数バックオフします。
 - 最初は7〜8年分を保管し、原則5年学習＋直近期間検証を想定します。
 
 ## 次に必要なもの

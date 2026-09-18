@@ -1,0 +1,64 @@
+name: JRA licensed eight-year backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: Start date (YYYY-MM-DD)
+        required: true
+        default: "2019-01-01"
+      end_date:
+        description: End date (YYYY-MM-DD)
+        required: true
+        default: "2026-09-18"
+  push:
+    branches: [main]
+    paths:
+      - .github/jra-backfill-request.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jra-licensed-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      START_DATE: ${{ inputs.start_date || '2019-01-01' }}
+      END_DATE: ${{ inputs.end_date || '2026-09-18' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Backfill JRA results sequentially
+        run: >-
+          python -m baken_academia.jra_backfill
+          --start-date "$START_DATE"
+          --end-date "$END_DATE"
+          --output data/raw/jra/races-2019-2026.parquet
+          --min-delay 3
+          --max-delay 4
+          --permission-confirmed
+          --continue-on-error
+      - name: Package result and audit
+        if: always()
+        run: |
+          tar -czf jra-backfill-result.tar.gz \
+            data/raw/jra/*.parquet \
+            data/raw/jra/*.audit.json \
+            data/raw/jra/events 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jra-backfill-2019-2026
+          path: jra-backfill-result.tar.gz
+          if-no-files-found: error
+          retention-days: 3

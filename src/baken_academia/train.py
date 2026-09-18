@@ -64,6 +64,12 @@ def train(input_path: Path, output_dir: Path) -> dict[str, object]:
         if input_path.suffix.lower() in {".parquet", ".pq"}
         else pd.read_csv(input_path, low_memory=False)
     )
+    # A dead heat has multiple correct winners and does not match this model's
+    # one-winner-per-race probability target. Preserve it in raw data, but omit
+    # it from this binary win model.
+    if "is_dead_heat" in raw.columns:
+        dead_heat = raw["is_dead_heat"].fillna(False).astype(bool)
+        raw = raw.loc[~dead_heat].copy()
     df = validate_input(raw)
     x, y, categorical = build_feature_frame(df)
     train_mask, validation_mask, test_mask = split_by_date(df)
