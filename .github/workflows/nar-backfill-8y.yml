@@ -1,0 +1,86 @@
+name: NAR licensed eight-year backfill
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/nar-backfill-8y-request.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nar-licensed-eight-year-backfill
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.months.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - id: months
+        name: Build 2019-01 through 2026-09 month plan
+        shell: python
+        run: |
+          import json, os
+          months = []
+          for year in range(2019, 2027):
+              last_month = 9 if year == 2026 else 12
+              for month in range(1, last_month + 1):
+                  months.append({
+                      "year": year,
+                      "month": month,
+                      "month_padded": f"{month:02d}",
+                  })
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write("matrix=" + json.dumps({"include": months}, separators=(",", ":")) + "\n")
+          print(f"planned months: {len(months)}")
+
+  backfill:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      YEAR: ${{ matrix.year }}
+      MONTH: ${{ matrix.month }}
+      MONTH_PADDED: ${{ matrix.month_padded }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Backfill one NAR month sequentially
+        run: >-
+          python -m baken_academia.nar_backfill
+          --year "$YEAR" --month "$MONTH"
+          --output "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}.parquet"
+          --min-delay 3 --max-delay 4
+          --permission-confirmed --continue-on-error
+      - name: Package result and audit
+        if: always()
+        run: |
+          tar -czf "nar-${YEAR}-${MONTH_PADDED}.tar.gz" \
+            "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}.parquet" \
+            "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}.audit.json" \
+            "data/raw/nar/events/${YEAR}/${MONTH_PADDED}" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nar-${{ env.YEAR }}-${{ env.MONTH_PADDED }}
+          path: nar-${{ env.YEAR }}-${{ env.MONTH_PADDED }}.tar.gz
+          if-no-files-found: error
+          retention-days: 30
