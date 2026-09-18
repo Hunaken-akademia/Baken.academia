@@ -1,0 +1,9 @@
+{
+  "requested_at": "2026-09-19T08:20:00+09:00",
+  "range": "2019-01 through 2026-09",
+  "mode": "sequential-monthly",
+  "max_parallel": 1,
+  "min_delay_seconds": 3,
+  "max_delay_seconds": 4,
+  "permission_confirmed": true
+}
