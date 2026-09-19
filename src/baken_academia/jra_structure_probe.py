@@ -41,6 +41,29 @@ def summarize_tables(payload: bytes) -> list[dict[str, object]]:
     return summaries
 
 
+def summarize_result_links(payload: bytes) -> list[dict[str, str]]:
+    document = html.fromstring(payload.decode("cp932", errors="replace"))
+    summaries: list[dict[str, str]] = []
+    for element in document.xpath("//*[@href or @onclick]"):
+        text = _text(element)[:160]
+        href = element.get("href", "")
+        onclick = element.get("onclick", "")
+        searchable = f"{text} {href} {onclick}"
+        if "pw01" not in searchable and not any(word in text for word in ("払戻", "オッズ", "結果")):
+            continue
+        owner = _first(element, "ancestor::*[@id][1]")
+        summaries.append(
+            {
+                "owner_id": owner.get("id", "") if owner is not None else "",
+                "tag": element.tag,
+                "text": text,
+                "href": href[:300],
+                "onclick": onclick[:500],
+            }
+        )
+    return summaries
+
+
 async def run(args: argparse.Namespace) -> None:
     if not args.permission_confirmed:
         raise ValueError("JRAの許可確認後、--permission-confirmed を付けてください")
@@ -51,6 +74,7 @@ async def run(args: argparse.Namespace) -> None:
         "source_cname": args.cname,
         "network_requests": client.stats.network_requests,
         "tables": summarize_tables(payload),
+        "result_links": summarize_result_links(payload),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
