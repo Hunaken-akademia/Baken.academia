@@ -1,6 +1,6 @@
 {
-  "requested_at": "2026-09-19T14:20:43Z",
+  "requested_at": "2026-09-19T14:24:54Z",
   "state": "paused",
-  "reason": "Stop duplicate run; run #1 already completed five odds chunks and expected-value evaluation",
+  "reason": "Confirm duplicate run is paused; completed five odds chunks and expected-value evaluation remain preserved",
   "preserved_artifacts": 6
 }
