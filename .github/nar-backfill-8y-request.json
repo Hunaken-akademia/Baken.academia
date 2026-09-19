@@ -1,8 +1,8 @@
 {
-  "requested_at": "2026-09-19T08:20:00+09:00",
-  "range": "2019-01 through 2026-09",
-  "mode": "sequential-monthly",
-  "max_parallel": 1,
+  "requested_at": "2026-09-19T13:15:00+09:00",
+  "range": "2019-05 through 2026-09 (2019-01 through 2019-04 already completed)",
+  "mode": "two-month-concurrency; each month remains sequential",
+  "max_parallel": 2,
   "min_delay_seconds": 3,
   "max_delay_seconds": 4,
   "permission_confirmed": true
