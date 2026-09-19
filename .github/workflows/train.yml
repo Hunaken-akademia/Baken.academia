@@ -2,14 +2,26 @@ name: Train model (manual)
 
 on:
   workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: JRA backfill workflow run containing the complete dataset
+        required: true
+        default: "35414533165"
+  push:
+    branches: [main]
+    paths:
+      - .github/train-request.json
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   train:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
+    env:
+      SOURCE_RUN_ID: ${{ inputs.source_run_id || '35414533165' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -17,8 +29,44 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements.txt
-      - run: python -m unittest discover -s tests -v
-      - name: Explain dataset requirement
+      - run: python -m pytest -q
+      - name: Download licensed JRA dataset
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+      - name: Extract dataset
         run: |
-          echo "Tests passed. Training requires a licensed CSV supplied outside Git."
-          echo "Run locally: python -m baken_academia.train --input data/raw/races.csv --output artifacts/latest"
+          tar -xzf .dataset/jra-backfill-result.tar.gz
+          test -s data/raw/jra/races-2019-2026.parquet
+      - name: Train leakage-safe JRA model
+        run: >-
+          python -m baken_academia.train
+          --input data/raw/jra/races-2019-2026.parquet
+          --output artifacts/jra-history-v2
+      - name: Publish evaluation summary
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+          metrics = json.loads(Path("artifacts/jra-history-v2/metrics.json").read_text())
+          test = metrics["test"]
+          summary = [
+              "## JRA model evaluation",
+              "",
+              f"- Test races: {test['races']:,}",
+              f"- Top-1 winner accuracy: {test['top1_winner_accuracy']:.2%}",
+              f"- Top-3 contains winner: {test['top3_contains_winner']:.2%}",
+              f"- AUC: {test['roc_auc']:.4f}",
+              f"- Race log loss: {test['race_log_loss']:.4f}",
+          ]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write("\n".join(summary) + "\n")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jra-history-v2-model
+          path: artifacts/jra-history-v2
+          if-no-files-found: error
+          retention-days: 30

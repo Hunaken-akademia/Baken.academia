@@ -10,6 +10,7 @@ import pandas as pd
 from sklearn.metrics import brier_score_loss, log_loss, roc_auc_score
 
 from .features import build_feature_frame
+from .history_features import add_point_in_time_features
 from .schema import validate_input
 
 
@@ -45,6 +46,13 @@ def evaluate(df: pd.DataFrame, y: pd.Series, probability: np.ndarray) -> dict[st
     evaluation = df[["race_id", "horse_id", "finish_position"]].copy()
     evaluation["probability"] = normalized
     picked = evaluation.loc[evaluation.groupby("race_id")["probability"].idxmax()]
+    winners = evaluation.loc[evaluation["finish_position"] == 1]
+    top3_index = (
+        evaluation.sort_values(["race_id", "probability"], ascending=[True, False])
+        .groupby("race_id", observed=True)
+        .head(3)
+        .index
+    )
 
     return {
         "rows": int(len(df)),
@@ -52,7 +60,10 @@ def evaluate(df: pd.DataFrame, y: pd.Series, probability: np.ndarray) -> dict[st
         "log_loss": float(log_loss(y, np.clip(probability, 1e-7, 1 - 1e-7))),
         "brier_score": float(brier_score_loss(y, probability)),
         "roc_auc": float(roc_auc_score(y, probability)),
+        "race_log_loss": float(-np.log(np.clip(winners["probability"], 1e-9, 1)).mean()),
+        "mean_winner_probability": float(winners["probability"].mean()),
         "top1_winner_accuracy": float((picked["finish_position"] == 1).mean()),
+        "top3_contains_winner": float(winners.index.isin(top3_index).mean()),
     }
 
 
@@ -70,7 +81,7 @@ def train(input_path: Path, output_dir: Path) -> dict[str, object]:
     if "is_dead_heat" in raw.columns:
         dead_heat = raw["is_dead_heat"].fillna(False).astype(bool)
         raw = raw.loc[~dead_heat].copy()
-    df = validate_input(raw)
+    df = add_point_in_time_features(validate_input(raw))
     x, y, categorical = build_feature_frame(df)
     train_mask, validation_mask, test_mask = split_by_date(df)
 

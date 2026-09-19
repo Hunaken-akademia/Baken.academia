@@ -1,0 +1,6 @@
+{
+  "requested_at": "2026-09-19T03:05:00Z",
+  "dataset_run_id": 35414533165,
+  "model": "jra-history-v2",
+  "reason": "Initial private training run with leakage-safe historical factors"
+}
