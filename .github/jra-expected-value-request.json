@@ -1,9 +1,6 @@
 {
-  "requested_at": "2026-09-19T14:12:33Z",
-  "source_run_id": 35414533165,
-  "model_run_id": 35417574150,
-  "max_parallel": 2,
-  "min_delay_seconds": 3,
-  "max_delay_seconds": 4,
-  "reason": "Prioritize JRA final odds with two polite workers; NAR paused"
+  "requested_at": "2026-09-19T14:20:43Z",
+  "state": "paused",
+  "reason": "Stop duplicate run; run #1 already completed five odds chunks and expected-value evaluation",
+  "preserved_artifacts": 6
 }
