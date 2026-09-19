@@ -8,13 +8,38 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
-  group: nar-licensed-eight-year-backfill
+  group: nar-licensed-eight-year-backfill-v2
   cancel-in-progress: false
 
 jobs:
+  transition:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      OLD_RUN_ID: "35405448722"
+      STALE_PENDING_RUN_ID: "35420878965"
+    steps:
+      - name: Wait for April 2019 artifact, then stop the single-worker run
+        run: |
+          for attempt in $(seq 1 120); do
+            if gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${OLD_RUN_ID}/artifacts" \
+              --jq '.artifacts[].name' | grep -qx 'nar-2019-04'; then
+              gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${STALE_PENDING_RUN_ID}/cancel" || true
+              gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${OLD_RUN_ID}/cancel" || true
+              echo "April 2019 is durable; switched to the two-worker run."
+              exit 0
+            fi
+            echo "Waiting for the April 2019 artifact (${attempt}/120)"
+            sleep 60
+          done
+          echo "April 2019 was not saved within two hours. Refusing an unsafe handoff."
+          exit 1
+
   plan:
+    needs: transition
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.months.outputs.matrix }}
