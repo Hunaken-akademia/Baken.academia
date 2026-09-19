@@ -27,7 +27,7 @@ jobs:
           from pathlib import Path
           from baken_academia.jra_backfill import ACCESS_O_URL, PoliteJraClient
           from baken_academia.jra_all_odds_backfill import (
-              merge_odds_cnames, parse_all_odds_cnames, parse_odds_cells, parse_odds_cname
+              fetch_odds_families, parse_all_odds_cnames, parse_odds_cells, parse_odds_cname
           )
 
           async def main():
@@ -36,11 +36,12 @@ jobs:
               output.mkdir(parents=True, exist_ok=True)
               async with PoliteJraClient(output / "cache", 3, 4) as client:
                   result = await client.fetch(result_cname)
+                  # Limit the crawl seed to race 1 while preserving the real result-page links.
                   primary = [c for c in parse_all_odds_cnames(result)
                              if parse_odds_cname(c)["race_no"] == 1]
-                  primary_pages = [await client.fetch(c, endpoint=ACCESS_O_URL) for c in primary]
-                  links = [c for c in merge_odds_cnames(result, *primary_pages)
-                           if parse_odds_cname(c)["race_no"] == 1]
+                  seed = " ".join(primary).encode("ascii")
+                  pages = await fetch_odds_families(client, seed, ACCESS_O_URL)
+                  links = list(pages)
                   kinds = {parse_odds_cname(c)["bet_type"] for c in links}
                   expected = {"win_place", "bracket_quinella", "quinella", "wide",
                               "exacta", "trio", "trifecta"}
@@ -48,7 +49,7 @@ jobs:
                       raise RuntimeError(f"券種リンク不足: found={sorted(kinds)}")
                   summary = []
                   for cname in links:
-                      payload = await client.fetch(cname, endpoint=ACCESS_O_URL)
+                      payload = pages[cname]
                       cells = parse_odds_cells(payload, cname)
                       path = output / f"{parse_odds_cname(cname)['bet_type']}.html.gz"
                       with gzip.open(path, "wb") as stream:

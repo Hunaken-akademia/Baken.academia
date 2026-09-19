@@ -41,6 +41,22 @@ def merge_odds_cnames(*payloads: bytes) -> list[str]:
     ))
 
 
+async def fetch_odds_families(client, result_payload: bytes, endpoint: str) -> dict[str, bytes]:
+    """Follow odds navigation until all reachable bet pages have been fetched once."""
+    payloads: dict[str, bytes] = {}
+    queue = parse_all_odds_cnames(result_payload)
+    while queue:
+        cname = queue.pop(0)
+        if cname in payloads:
+            continue
+        payload = await client.fetch(cname, endpoint=endpoint)
+        payloads[cname] = payload
+        for linked in parse_all_odds_cnames(payload):
+            if linked not in payloads and linked not in queue:
+                queue.append(linked)
+    return payloads
+
+
 def parse_odds_cname(cname: str) -> dict[str, object]:
     matched = ODDS_CNAME_PATTERN.fullmatch(cname)
     if not matched:
@@ -153,21 +169,16 @@ async def backfill(args: argparse.Namespace) -> dict[str, object]:
             try:
                 result_payload = await client.fetch(result_cname)
                 payout_rows.extend(parse_all_payouts(result_payload, result_cname))
-                primary_cnames = parse_all_odds_cnames(result_payload)
-                primary_payloads: dict[str, bytes] = {}
-                for primary_cname in primary_cnames:
-                    primary_payloads[primary_cname] = await client.fetch(
-                        primary_cname, endpoint=ACCESS_O_URL
-                    )
-                odds_cnames = merge_odds_cnames(result_payload, *primary_payloads.values())
+                odds_payloads = await fetch_odds_families(client, result_payload, ACCESS_O_URL)
+                odds_cnames = list(odds_payloads)
                 for cname in odds_cnames:
                     meta = parse_odds_cname(cname)
                     race_date = meta["race_date"]
                     if not start <= race_date <= end:
                         continue
                     raw_path = args.work_dir / "pages" / str(race_date.year) / f"{_digest(cname)}.html.gz"
-                    if cname in primary_payloads:
-                        payload = primary_payloads[cname]
+                    if cname in odds_payloads:
+                        payload = odds_payloads[cname]
                         if not raw_path.exists():
                             _write_gzip(raw_path, payload)
                     elif raw_path.exists():
