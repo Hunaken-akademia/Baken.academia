@@ -1,0 +1,105 @@
+name: JRA trifecta main counter longshot evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      dataset_run_id:
+        description: Complete JRA results workflow run
+        required: true
+        default: "35414533165"
+      model_run_id:
+        description: Leakage-safe JRA model workflow run
+        required: true
+        default: "35417574150"
+  push:
+    branches: [main]
+    paths:
+      - .github/jra-trifecta-request.json
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: jra-trifecta-evaluation
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      DATASET_RUN_ID: ${{ inputs.dataset_run_id || '35414533165' }}
+      MODEL_RUN_ID: ${{ inputs.model_run_id || '35417574150' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Download complete JRA race history
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: ${{ env.DATASET_RUN_ID }}
+      - name: Extract race history
+        run: |
+          tar -xzf .dataset/jra-backfill-result.tar.gz
+          test -s data/raw/jra/races-2019-2026.parquet
+      - name: Download leakage-safe predictions
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-history-v2-model
+          path: .model
+          github-token: ${{ github.token }}
+          run-id: ${{ env.MODEL_RUN_ID }}
+      - name: Fetch official trifecta payouts politely
+        run: >-
+          python -m baken_academia.jra_trifecta_backfill
+          --input data/raw/jra/races-2019-2026.parquet
+          --start-date 2025-03-01 --end-date 2026-09-18
+          --output data/raw/jra-trifecta/payouts.parquet
+          --min-delay 3 --max-delay 4
+          --permission-confirmed --continue-on-error
+      - name: Evaluate main counter and longshot trifectas
+        run: >-
+          python -m baken_academia.trifecta
+          --predictions .model/test_predictions.parquet
+          --races data/raw/jra/races-2019-2026.parquet
+          --payouts data/raw/jra-trifecta/payouts.parquet
+          --output artifacts/jra-trifecta-v1
+          --stake-yen 100
+      - name: Publish summary
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+          report = json.loads(Path("artifacts/jra-trifecta-v1/report.json").read_text())
+          test = report["periods"]["test_2026"]
+          labels = {"main": "本線", "counter": "対抗", "longshot": "穴", "combined": "合算"}
+          lines = ["## JRA三連単 v1", ""]
+          for key in ("main", "counter", "longshot", "combined"):
+              row = test[key]
+              lines.append(
+                  f"- {labels[key]}: {row['average_tickets_per_race']:.1f}点 / "
+                  f"的中率 {row['race_hit_rate']:.2%} / 回収率 {row['return_rate']:.2%} / "
+                  f"収支 {row['profit_yen']:+,.0f}円"
+              )
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write("\n".join(lines) + "\n")
+      - name: Package resumable payout data
+        if: always()
+        run: |
+          tar -czf jra-trifecta-v1.tar.gz \
+            data/raw/jra-trifecta artifacts/jra-trifecta-v1 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jra-trifecta-v1
+          path: jra-trifecta-v1.tar.gz
+          if-no-files-found: error
+          retention-days: 90
