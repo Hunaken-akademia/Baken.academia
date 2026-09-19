@@ -1,4 +1,4 @@
-name: JRA licensed final odds and expected value
+name: JRA licensed final odds and expected value (paused)
 
 on:
   push:
@@ -8,146 +8,14 @@ on:
 
 permissions:
   contents: read
-  actions: read
 
 concurrency:
   group: jra-licensed-final-odds
   cancel-in-progress: true
 
 jobs:
-  plan:
+  pause:
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.ranges.outputs.matrix }}
     steps:
-      - id: ranges
-        shell: python
-        run: |
-          import json, os
-          ranges = [
-              {"name": "2025-03-07", "start": "2025-03-01", "end": "2025-07-31"},
-              {"name": "2025-08-12", "start": "2025-08-01", "end": "2025-12-31"},
-              {"name": "2026-01-03", "start": "2026-01-01", "end": "2026-03-31"},
-              {"name": "2026-04-06", "start": "2026-04-01", "end": "2026-06-30"},
-              {"name": "2026-07-09", "start": "2026-07-01", "end": "2026-09-13"},
-          ]
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
-              out.write("matrix=" + json.dumps({"include": ranges}, separators=(",", ":")) + "\n")
-
-  odds:
-    needs: plan
-    runs-on: ubuntu-latest
-    timeout-minutes: 180
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
-    env:
-      SOURCE_RUN_ID: "35414533165"
-      RANGE_NAME: ${{ matrix.name }}
-      START_DATE: ${{ matrix.start }}
-      END_DATE: ${{ matrix.end }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-      - run: pip install -r requirements.txt
-      - run: python -m pytest -q
-      - name: Download licensed JRA history
-        uses: actions/download-artifact@v4
-        with:
-          name: jra-backfill-2019-2026
-          path: .dataset
-          github-token: ${{ github.token }}
-          run-id: ${{ env.SOURCE_RUN_ID }}
-      - name: Extract history
-        run: |
-          tar -xzf .dataset/jra-backfill-result.tar.gz
-          test -s data/raw/jra/races-2019-2026.parquet
-      - name: Fetch official final win odds sequentially
-        run: >-
-          python -m baken_academia.jra_odds_backfill
-          --input data/raw/jra/races-2019-2026.parquet
-          --start-date "$START_DATE" --end-date "$END_DATE"
-          --output "data/raw/jra-odds/odds-${RANGE_NAME}.parquet"
-          --work-dir "data/raw/jra-odds/${RANGE_NAME}"
-          --min-delay 3 --max-delay 4
-          --permission-confirmed --continue-on-error
-      - name: Package odds and audit
-        if: always()
-        run: |
-          tar -czf "jra-final-odds-${RANGE_NAME}.tar.gz" \
-            data/raw/jra-odds/*.parquet \
-            data/raw/jra-odds/*.audit.json \
-            "data/raw/jra-odds/${RANGE_NAME}/races" 2>/dev/null || true
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: jra-final-odds-${{ env.RANGE_NAME }}
-          path: jra-final-odds-${{ env.RANGE_NAME }}.tar.gz
-          if-no-files-found: error
-          retention-days: 30
-
-  evaluate:
-    needs: odds
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      MODEL_RUN_ID: "35417574150"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-      - run: pip install -r requirements.txt
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: jra-final-odds-*
-          path: .odds
-          merge-multiple: true
-      - name: Extract odds chunks
-        run: |
-          mkdir -p data/merged-odds
-          for archive in .odds/*.tar.gz; do tar -xzf "$archive" -C data/merged-odds; done
-      - name: Download leakage-safe model predictions
-        uses: actions/download-artifact@v4
-        with:
-          name: jra-history-v2-model
-          path: .model
-          github-token: ${{ github.token }}
-          run-id: ${{ env.MODEL_RUN_ID }}
-      - name: Evaluate expected-value policy on untouched 2026 holdout
-        run: >-
-          python -m baken_academia.expected_value
-          --predictions .model/test_predictions.parquet
-          --odds data/merged-odds/data/raw/jra-odds/*.parquet
-          --output artifacts/jra-expected-value-v1
-      - name: Publish honest holdout summary
-        shell: python
-        run: |
-          import json, os
-          from pathlib import Path
-          report = json.loads(Path("artifacts/jra-expected-value-v1/report.json").read_text())
-          test = report["test"]
-          lines = [
-              "## JRA expected-value holdout evaluation",
-              "",
-              f"- Final-odds coverage: {report['coverage']['ratio']:.2%}",
-              f"- EV threshold (chosen on 2025 only): {report['policy']['expected_value_threshold']:.2f}",
-              f"- 2026 bets: {test['bets']:,}",
-              f"- 2026 hit rate: {test['hit_rate']:.2%}",
-              f"- 2026 return rate: {test['return_rate']:.2%}",
-              f"- 2026 profit at 100 yen flat stake: {test['profit_yen']:,.0f} yen",
-              f"- 2026 max drawdown: {test['max_drawdown_yen']:,.0f} yen",
-          ]
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
-              out.write("\n".join(lines) + "\n")
-      - uses: actions/upload-artifact@v4
-        with:
-          name: jra-expected-value-v1
-          path: artifacts/jra-expected-value-v1
-          if-no-files-found: error
-          retention-days: 30
+      - name: Keep duplicate JRA odds run paused
+        run: echo "JRA odds and expected-value artifacts already completed successfully in run #1."
