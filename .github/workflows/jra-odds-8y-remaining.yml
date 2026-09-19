@@ -1,0 +1,126 @@
+name: JRA licensed final odds remaining eight years
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/jra-odds-8y-remaining-request.json
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: jra-licensed-final-odds-remaining-8y
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.ranges.outputs.matrix }}
+    steps:
+      - id: ranges
+        shell: python
+        run: |
+          import calendar
+          import json
+          import os
+
+          ranges = []
+          for year in range(2019, 2025):
+              for quarter in range(1, 5):
+                  first_month = (quarter - 1) * 3 + 1
+                  last_month = first_month + 2
+                  ranges.append({
+                      "name": f"{year}-q{quarter}",
+                      "start": f"{year}-{first_month:02d}-01",
+                      "end": f"{year}-{last_month:02d}-{calendar.monthrange(year, last_month)[1]:02d}",
+                  })
+          ranges.append({
+              "name": "2025-jan-feb",
+              "start": "2025-01-01",
+              "end": "2025-02-28",
+          })
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write("matrix=" + json.dumps({"include": ranges}, separators=(",", ":")) + "\n")
+          print(f"planned chunks: {len(ranges)}")
+
+  odds:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      SOURCE_RUN_ID: "35414533165"
+      RANGE_NAME: ${{ matrix.name }}
+      START_DATE: ${{ matrix.start }}
+      END_DATE: ${{ matrix.end }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+      - name: Download licensed JRA history
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+      - name: Extract history
+        run: |
+          tar -xzf .dataset/jra-backfill-result.tar.gz
+          test -s data/raw/jra/races-2019-2026.parquet
+      - name: Fetch missing official final win odds
+        run: >-
+          python -m baken_academia.jra_odds_backfill
+          --input data/raw/jra/races-2019-2026.parquet
+          --start-date "$START_DATE" --end-date "$END_DATE"
+          --output "data/raw/jra-odds/odds-$RANGE_NAME.parquet"
+          --work-dir "data/raw/jra-odds/$RANGE_NAME"
+          --min-delay 3 --max-delay 4
+          --permission-confirmed --continue-on-error
+      - name: Package odds and audit
+        if: always()
+        run: |
+          tar -czf "jra-final-odds-$RANGE_NAME.tar.gz" \
+            data/raw/jra-odds/*.parquet \
+            data/raw/jra-odds/*.audit.json \
+            "data/raw/jra-odds/$RANGE_NAME/races" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jra-final-odds-${{ env.RANGE_NAME }}
+          path: jra-final-odds-${{ env.RANGE_NAME }}.tar.gz
+          if-no-files-found: error
+          retention-days: 90
+
+  preserve:
+    needs: odds
+    if: always() && needs.odds.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: jra-final-odds-2019-2025-02-v1
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: jra-final-odds-*
+          path: release-assets
+          merge-multiple: true
+      - name: Create durable private-repository release
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "JRA final odds 2019-01 through 2025-02" \
+              --notes "Licensed, low-load backfill. Complements the completed 2025-03 through 2026-09 odds artifacts."
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/*.tar.gz \
+            --repo "$GITHUB_REPOSITORY" --clobber
