@@ -1,0 +1,120 @@
+name: Analyze completed JRA odds v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/jra-odds-analysis-v1-request.json
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: jra-odds-analysis-v1
+  cancel-in-progress: true
+
+jobs:
+  recover-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find successful odds run with evaluation artifact
+        id: locate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          found=""
+          for run_id in $(gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/jra-expected-value.yml/runs?status=success&per_page=100" \
+            --jq '.workflow_runs[].id'); do
+            if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/artifacts" \
+              --jq '.artifacts[].name' | grep -qx 'jra-expected-value-v1'; then
+              found="$run_id"
+              break
+            fi
+          done
+          test -n "$found"
+          echo "run_id=$found" >> "$GITHUB_OUTPUT"
+          echo "Recovered completed odds run: $found"
+
+      - name: Download completed expected-value report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.locate.outputs.run_id }}
+        run: |
+          mkdir -p recovered
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name jra-expected-value-v1 --dir recovered
+
+      - name: Build durable analysis report
+        env:
+          SOURCE_RUN_ID: ${{ steps.locate.outputs.run_id }}
+        shell: python
+        run: |
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          source = Path("recovered/report.json")
+          if not source.exists():
+              matches = list(Path("recovered").rglob("report.json"))
+              if len(matches) != 1:
+                  raise SystemExit(f"Expected one report.json, found {len(matches)}")
+              source = matches[0]
+          report = json.loads(source.read_text(encoding="utf-8"))
+          out = Path("reports/jra-expected-value-v1")
+          out.mkdir(parents=True, exist_ok=True)
+          report["source_workflow_run_id"] = os.environ["SOURCE_RUN_ID"]
+          report["recovered_at"] = datetime.now(timezone.utc).isoformat()
+          (out / "report.json").write_text(
+              json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False),
+              encoding="utf-8",
+          )
+
+          validation = report["validation"]
+          test = report["test"]
+          baseline = report["test_top_probability_baseline"]
+          coverage = report["coverage"]
+          policy = report["policy"]
+          lines = [
+              "# JRA 期待値検証 v1",
+              "",
+              f"- 元ワークフロー: {os.environ['SOURCE_RUN_ID']}",
+              f"- オッズ結合率: {coverage['ratio']:.2%}",
+              f"- 採用期待値閾値: {policy['expected_value_threshold']:.2f}",
+              "",
+              "## 2026年未使用テスト",
+              "",
+              f"- 購入数: {test['bets']:,}",
+              f"- 的中率: {test['hit_rate']:.2%}",
+              f"- 回収率: {test['return_rate']:.2%}",
+              f"- 100円均等時の収支: {test['profit_yen']:,.0f}円",
+              f"- 最大ドローダウン: {test['max_drawdown_yen']:,.0f}円",
+              "",
+              "## 比較",
+              "",
+              f"- 期待値方針の回収率: {test['return_rate']:.2%}",
+              f"- 勝率最大馬ベースライン回収率: {baseline['return_rate']:.2%}",
+              f"- 方針検証期間の回収率: {validation['return_rate']:.2%}",
+              "",
+              "最終オッズは勝率モデルの特徴量には使用せず、買い目選択と事後評価にのみ使用。",
+          ]
+          (out / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+      - name: Commit analysis report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/jra-expected-value-v1
+          git commit -m "data: publish JRA expected-value v1 report"
+          git push
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jra-expected-value-v1-recovered
+          path: reports/jra-expected-value-v1
+          if-no-files-found: error
+          retention-days: 90
