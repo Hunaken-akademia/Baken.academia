@@ -1,9 +1,7 @@
 {
-  "requested_at": "2026-09-19T13:23:00+09:00",
-  "range": "2019-05 through 2026-09 (2019-01 through 2019-04 already completed)",
-  "mode": "wait for 2019-04 artifact, cancel old run, then two-month concurrency; each month remains sequential",
-  "max_parallel": 2,
-  "min_delay_seconds": 3,
-  "max_delay_seconds": 4,
-  "permission_confirmed": true
+  "requested_at": "2026-09-19T14:10:19Z",
+  "state": "paused",
+  "reason": "Prioritize JRA final odds backfill",
+  "durable_completed_range": "2019-01 through 2019-04",
+  "resume_from": "2019-05"
 }
