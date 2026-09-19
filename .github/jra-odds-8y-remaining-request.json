@@ -1,0 +1,11 @@
+{
+  "requested_at": "2026-09-19T14:22:42Z",
+  "range": "2019-01-01 through 2025-02-28",
+  "already_completed": "2025-03-01 through 2026-09-13",
+  "chunks": 25,
+  "max_parallel": 2,
+  "min_delay_seconds": 3,
+  "max_delay_seconds": 4,
+  "permission_confirmed": true,
+  "preservation": "90-day artifacts plus durable GitHub Release"
+}
