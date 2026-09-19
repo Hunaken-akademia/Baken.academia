@@ -64,8 +64,13 @@ jobs:
                                       "cells": len(cells), "bytes": len(payload),
                                       "headings": headings[:40]})
                   (output / "summary.json").write_text(
-                      json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-                  print(json.dumps(summary, ensure_ascii=False, indent=2))
+                      json.dumps(summary, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+                  found = {row["bet_type"] for row in summary}
+                  expected = {"win_place", "bracket_quinella", "quinella", "wide",
+                              "exacta", "trio", "trifecta"}
+                  if found != expected:
+                      raise RuntimeError(f"券種不足: found={sorted(found)}")
+                  print(json.dumps(summary, ensure_ascii=False, indent=2, default=str))
           asyncio.run(main())
       - uses: actions/upload-artifact@v4
         if: always()
