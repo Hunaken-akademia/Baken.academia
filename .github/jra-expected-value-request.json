@@ -1,6 +1,6 @@
 {
-  "requested_at": "2026-09-19T03:48:00Z",
+  "requested_at": "2026-09-19T13:31:47Z",
   "source_run_id": 35414533165,
   "model_run_id": 35417574150,
-  "reason": "Licensed low-load final-win-odds backfill and honest 2026 expected-value holdout"
+  "reason": "Restart licensed low-load final-win-odds backfill after partial-error handling fix"
 }
