@@ -15,17 +15,17 @@ from lxml import html
 
 BET_TYPES = {
     "1": ("win_place", "単勝・複勝"),
-    "2": ("bracket_quinella", "枠連"),
-    "3": ("quinella", "馬連"),
-    "4": ("wide", "ワイド"),
-    "5": ("exacta", "馬単"),
-    "6": ("trio", "三連複"),
-    "7": ("trifecta", "三連単"),
+    "3": ("bracket_quinella", "枠連"),
+    "4": ("quinella", "馬連"),
+    "5": ("wide", "ワイド"),
+    "6": ("exacta", "馬単"),
+    "7": ("trio", "三連複"),
+    "8": ("trifecta", "三連単"),
 }
 
 ODDS_CNAME_PATTERN = re.compile(
-    r"pw15(?P<kind>[1-7])ou10(?P<course>\d{2})(?P<year>\d{4})(?P<meeting>\d{2})"
-    r"(?P<day>\d{2})(?P<race>\d{2})(?P<date>20\d{6})Z/[0-9A-F]{2}"
+    r"pw15(?P<kind>[1345678])ou10(?P<course>\d{2})(?P<year>\d{4})(?P<meeting>\d{2})"
+    r"(?P<day>\d{2})(?P<race>\d{2})(?P<date>20\d{6})Z(?:99)?/[0-9A-F]{2}"
 )
 
 
@@ -42,7 +42,7 @@ def merge_odds_cnames(*payloads: bytes) -> list[str]:
 
 
 async def fetch_odds_families(
-    client, result_payload: bytes, endpoint: str, race_no: int | None = None
+    client, result_payload: bytes, endpoint: str, scope: dict[str, object] | None = None
 ) -> dict[str, bytes]:
     """Follow odds navigation until all reachable bet pages have been fetched once."""
     payloads: dict[str, bytes] = {}
@@ -54,8 +54,10 @@ async def fetch_odds_families(
         payload = await client.fetch(cname, endpoint=endpoint)
         payloads[cname] = payload
         for linked in parse_all_odds_cnames(payload):
-            if race_no is not None and parse_odds_cname(linked)["race_no"] != race_no:
-                continue
+            if scope is not None:
+                meta = parse_odds_cname(linked)
+                if any(meta[key] != scope[key] for key in ("course_code", "race_date", "race_no")):
+                    continue
             if linked not in payloads and linked not in queue:
                 queue.append(linked)
     return payloads

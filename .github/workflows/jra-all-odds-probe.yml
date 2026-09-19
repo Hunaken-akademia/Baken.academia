@@ -43,8 +43,11 @@ jobs:
                   # Limit the crawl seed to race 1 while preserving the real result-page links.
                   primary = [c for c in parse_all_odds_cnames(result)
                              if parse_odds_cname(c)["race_no"] == 1]
-                  seed = " ".join(primary).encode("ascii")
-                  pages = await fetch_odds_families(client, seed, ACCESS_O_URL, race_no=1)
+                  seed_cname = primary[0]
+                  seed = seed_cname.encode("ascii")
+                  pages = await fetch_odds_families(
+                      client, seed, ACCESS_O_URL, scope=parse_odds_cname(seed_cname)
+                  )
                   links = list(pages)
                   summary = []
                   for cname in links:

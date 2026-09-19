@@ -15,7 +15,11 @@ class JraAllOddsBackfillTest(unittest.TestCase):
 
     def test_discovers_all_seven_pages_and_classifies_them(self) -> None:
         result = f"pw151ou{self.tail}".encode()
-        tabs = " ".join(f"pw15{kind}ou{self.tail}" for kind in range(1, 8)).encode()
+        kinds = (1, 3, 4, 5, 6, 7, 8)
+        tabs = " ".join(
+            f"pw15{kind}ou{self.tail.replace('Z/', 'Z99/') if kind == 7 else self.tail}"
+            for kind in kinds
+        ).encode()
         self.assertEqual(len(parse_all_odds_cnames(result)), 1)
         cnames = merge_odds_cnames(result, tabs)
         self.assertEqual(len(cnames), 7)
