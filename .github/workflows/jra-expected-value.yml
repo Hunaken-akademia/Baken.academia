@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: jra-licensed-final-odds
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   plan:
@@ -40,7 +40,7 @@ jobs:
     timeout-minutes: 180
     strategy:
       fail-fast: false
-      max-parallel: 1
+      max-parallel: 2
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       SOURCE_RUN_ID: "35414533165"
