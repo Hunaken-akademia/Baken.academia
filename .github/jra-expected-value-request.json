@@ -1,6 +1,9 @@
 {
-  "requested_at": "2026-09-19T13:31:47Z",
+  "requested_at": "2026-09-19T14:12:33Z",
   "source_run_id": 35414533165,
   "model_run_id": 35417574150,
-  "reason": "Restart licensed low-load final-win-odds backfill after partial-error handling fix"
+  "max_parallel": 2,
+  "min_delay_seconds": 3,
+  "max_delay_seconds": 4,
+  "reason": "Prioritize JRA final odds with two polite workers; NAR paused"
 }
