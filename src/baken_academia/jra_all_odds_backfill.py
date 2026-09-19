@@ -41,7 +41,9 @@ def merge_odds_cnames(*payloads: bytes) -> list[str]:
     ))
 
 
-async def fetch_odds_families(client, result_payload: bytes, endpoint: str) -> dict[str, bytes]:
+async def fetch_odds_families(
+    client, result_payload: bytes, endpoint: str, race_no: int | None = None
+) -> dict[str, bytes]:
     """Follow odds navigation until all reachable bet pages have been fetched once."""
     payloads: dict[str, bytes] = {}
     queue = parse_all_odds_cnames(result_payload)
@@ -52,6 +54,8 @@ async def fetch_odds_families(client, result_payload: bytes, endpoint: str) -> d
         payload = await client.fetch(cname, endpoint=endpoint)
         payloads[cname] = payload
         for linked in parse_all_odds_cnames(payload):
+            if race_no is not None and parse_odds_cname(linked)["race_no"] != race_no:
+                continue
             if linked not in payloads and linked not in queue:
                 queue.append(linked)
     return payloads

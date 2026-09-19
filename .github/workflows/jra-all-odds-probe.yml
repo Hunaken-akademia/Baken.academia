@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: jra-all-bet-types-probe
+  cancel-in-progress: true
+
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -40,7 +44,7 @@ jobs:
                   primary = [c for c in parse_all_odds_cnames(result)
                              if parse_odds_cname(c)["race_no"] == 1]
                   seed = " ".join(primary).encode("ascii")
-                  pages = await fetch_odds_families(client, seed, ACCESS_O_URL)
+                  pages = await fetch_odds_families(client, seed, ACCESS_O_URL, race_no=1)
                   links = list(pages)
                   kinds = {parse_odds_cname(c)["bet_type"] for c in links}
                   expected = {"win_place", "bracket_quinella", "quinella", "wide",
