@@ -25,6 +25,29 @@
 これは勝ち馬順位モデルの評価であり、馬券回収率ではありません。オッズ・払戻を用いた
 期待値モデルは別レイヤーで検証し、未来情報を勝率モデルの特徴量へ混入させません。
 
+### 最終単勝オッズと期待値検証
+
+JRA結果ページが公式にリンクする最終単複オッズだけを差分取得できます。勝率モデルの
+学習には確定オッズを入れず、学習済み確率との積 `勝率 × 単勝オッズ` を馬券選択と
+回収率評価にだけ使います。
+
+```bash
+python -m baken_academia.jra_odds_backfill \
+  --input data/raw/jra/races-2019-2026.parquet \
+  --start-date 2025-03-01 --end-date 2026-09-13 \
+  --output data/raw/jra-odds/final-win-odds.parquet \
+  --permission-confirmed
+
+python -m baken_academia.expected_value \
+  --predictions artifacts/jra-history-v2/test_predictions.parquet \
+  --odds data/raw/jra-odds/final-win-odds.parquet \
+  --output artifacts/jra-expected-value-v1
+```
+
+GitHub Actions版は期間を分割しつつ `max-parallel: 1` で完全逐次実行します。2025年前半で
+確率を較正し、2025年後半だけで期待値閾値を選び、2026年は最後まで未使用のまま
+回収率・的中率・最大ドローダウンを評価します。
+
 未許諾サイトからのスクレイピング処理は含めていません。利用権を確認できたCSVを `data/raw/races.csv` に配置します。
 
 JRAから自動取得・保存・機械学習・加工結果の公開について許可を得た運営者向けに、
