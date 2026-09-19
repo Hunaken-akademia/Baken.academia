@@ -1,0 +1,65 @@
+name: JRA trifecta hit-rate preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/jra-trifecta-hit-rate-request.json
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Download JRA history
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: "35414533165"
+      - run: tar -xzf .dataset/jra-backfill-result.tar.gz
+      - name: Download predictions
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-history-v2-model
+          path: .model
+          github-token: ${{ github.token }}
+          run-id: "35417574150"
+      - name: Evaluate trifecta hit rate without new JRA requests
+        run: >-
+          python -m baken_academia.trifecta_hit_rate
+          --predictions .model/test_predictions.parquet
+          --races data/raw/jra/races-2019-2026.parquet
+          --output artifacts/jra-trifecta-hit-rate-v1
+      - name: Publish summary
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+          report = json.loads(Path("artifacts/jra-trifecta-hit-rate-v1/hit-rate-report.json").read_text())
+          labels = {"main": "本線", "counter": "対抗", "longshot": "穴", "combined": "合算"}
+          lines = ["## JRA三連単 的中率先行検証", ""]
+          for period_name in ("validation", "test_2026"):
+              lines += [f"### {period_name}", ""]
+              for key in ("main", "counter", "longshot", "combined"):
+                  row = report["periods"][period_name][key]
+                  lines.append(f"- {labels[key]}: {row['average_tickets_per_race']:.1f}点 / 的中率 {row['race_hit_rate']:.2%}")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write("\n".join(lines) + "\n")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jra-trifecta-hit-rate-v1
+          path: artifacts/jra-trifecta-hit-rate-v1
+          retention-days: 30

@@ -1,0 +1,63 @@
+name: JRA all bet types one-race probe
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/jra-all-odds-probe-request.json]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest tests.test_jra_all_odds_backfill tests.test_jra_all_payouts -v
+      - name: Fetch one race across all seven odds pages
+        shell: python
+        run: |
+          import asyncio, gzip, json
+          from pathlib import Path
+          from baken_academia.jra_backfill import ACCESS_O_URL, PoliteJraClient
+          from baken_academia.jra_all_odds_backfill import (
+              parse_all_odds_cnames, parse_odds_cells, parse_odds_cname
+          )
+
+          async def main():
+              result_cname = "pw01ses10092026040420260913/5C"
+              output = Path("artifacts/jra-all-odds-probe")
+              output.mkdir(parents=True, exist_ok=True)
+              async with PoliteJraClient(output / "cache", 3, 4) as client:
+                  result = await client.fetch(result_cname)
+                  links = [c for c in parse_all_odds_cnames(result)
+                           if parse_odds_cname(c)["race_no"] == 1]
+                  kinds = {parse_odds_cname(c)["bet_type"] for c in links}
+                  expected = {"win_place", "bracket_quinella", "quinella", "wide",
+                              "exacta", "trio", "trifecta"}
+                  if kinds != expected:
+                      raise RuntimeError(f"券種リンク不足: found={sorted(kinds)}")
+                  summary = []
+                  for cname in links:
+                      payload = await client.fetch(cname, endpoint=ACCESS_O_URL)
+                      cells = parse_odds_cells(payload, cname)
+                      path = output / f"{parse_odds_cname(cname)['bet_type']}.html.gz"
+                      with gzip.open(path, "wb") as stream:
+                          stream.write(payload)
+                      summary.append({**parse_odds_cname(cname), "cname": cname,
+                                      "cells": len(cells), "bytes": len(payload)})
+                  (output / "summary.json").write_text(
+                      json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+                  print(json.dumps(summary, ensure_ascii=False, indent=2))
+          asyncio.run(main())
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jra-all-odds-probe
+          path: artifacts/jra-all-odds-probe
+          retention-days: 3

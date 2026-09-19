@@ -1,0 +1,88 @@
+name: JRA all bet types odds and payouts backfill
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["JRA licensed final odds remaining eight years"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: jra-all-bet-types-backfill
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        period:
+          - {name: 2019-q1, start: 2019-01-01, end: 2019-03-31}
+          - {name: 2019-q2, start: 2019-04-01, end: 2019-06-30}
+          - {name: 2019-q3, start: 2019-07-01, end: 2019-09-30}
+          - {name: 2019-q4, start: 2019-10-01, end: 2019-12-31}
+          - {name: 2020-q1, start: 2020-01-01, end: 2020-03-31}
+          - {name: 2020-q2, start: 2020-04-01, end: 2020-06-30}
+          - {name: 2020-q3, start: 2020-07-01, end: 2020-09-30}
+          - {name: 2020-q4, start: 2020-10-01, end: 2020-12-31}
+          - {name: 2021-q1, start: 2021-01-01, end: 2021-03-31}
+          - {name: 2021-q2, start: 2021-04-01, end: 2021-06-30}
+          - {name: 2021-q3, start: 2021-07-01, end: 2021-09-30}
+          - {name: 2021-q4, start: 2021-10-01, end: 2021-12-31}
+          - {name: 2022-q1, start: 2022-01-01, end: 2022-03-31}
+          - {name: 2022-q2, start: 2022-04-01, end: 2022-06-30}
+          - {name: 2022-q3, start: 2022-07-01, end: 2022-09-30}
+          - {name: 2022-q4, start: 2022-10-01, end: 2022-12-31}
+          - {name: 2023-q1, start: 2023-01-01, end: 2023-03-31}
+          - {name: 2023-q2, start: 2023-04-01, end: 2023-06-30}
+          - {name: 2023-q3, start: 2023-07-01, end: 2023-09-30}
+          - {name: 2023-q4, start: 2023-10-01, end: 2023-12-31}
+          - {name: 2024-q1, start: 2024-01-01, end: 2024-03-31}
+          - {name: 2024-q2, start: 2024-04-01, end: 2024-06-30}
+          - {name: 2024-q3, start: 2024-07-01, end: 2024-09-30}
+          - {name: 2024-q4, start: 2024-10-01, end: 2024-12-31}
+          - {name: 2025-q1, start: 2025-01-01, end: 2025-02-28}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Download JRA race history
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: "35414533165"
+      - run: tar -xzf .dataset/jra-backfill-result.tar.gz
+      - name: Collect every standard bet type
+        run: >-
+          python -m baken_academia.jra_all_odds_backfill
+          --input data/raw/jra/races-2019-2026.parquet
+          --start-date ${{ matrix.period.start }} --end-date ${{ matrix.period.end }}
+          --output-dir data/raw/jra-all-odds/normalized
+          --work-dir data/raw/jra-all-odds
+          --min-delay 3 --max-delay 4
+          --permission-confirmed --continue-on-error
+      - name: Package raw pages and normalized data
+        if: always()
+        run: tar -czf jra-all-odds-${{ matrix.period.name }}.tar.gz data/raw/jra-all-odds
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jra-all-odds-${{ matrix.period.name }}
+          path: jra-all-odds-${{ matrix.period.name }}.tar.gz
+          if-no-files-found: error
+          retention-days: 90
