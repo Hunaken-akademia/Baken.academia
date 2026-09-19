@@ -1,0 +1,39 @@
+name: JRA licensed odds structure probe
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/jra-odds-probe-request.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jra-licensed-odds-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+      - name: Inspect one licensed JRA result page
+        run: >-
+          python -m baken_academia.jra_structure_probe
+          --cname pw01ses10092026040420260913/5C
+          --output artifacts/jra-odds-structure.json
+          --permission-confirmed
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jra-odds-structure
+          path: artifacts/jra-odds-structure.json
+          if-no-files-found: error
+          retention-days: 3
