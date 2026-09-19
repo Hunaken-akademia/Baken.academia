@@ -17,5 +17,5 @@ jobs:
   pause:
     runs-on: ubuntu-latest
     steps:
-      - name: Keep duplicate JRA odds run paused
-        run: echo "JRA odds and expected-value artifacts already completed successfully in run #1."
+      - name: Confirm duplicate JRA odds run is paused
+        run: echo "Duplicate JRA odds run is paused; completed artifacts remain preserved."
