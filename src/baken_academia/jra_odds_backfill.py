@@ -225,7 +225,7 @@ def main() -> None:
     args = parser.parse_args()
     report = asyncio.run(backfill(args))
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    if report["errors"]:
+    if report["errors"] and not args.continue_on_error:
         raise SystemExit(2)
 
 
