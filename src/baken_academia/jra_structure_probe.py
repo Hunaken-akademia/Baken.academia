@@ -7,36 +7,37 @@ from pathlib import Path
 
 from lxml import html
 
-from .jra_backfill import PoliteJraClient, _text
+from .jra_backfill import PoliteJraClient, _first, _text
 
 
 def summarize_tables(payload: bytes) -> list[dict[str, object]]:
     document = html.fromstring(payload.decode("cp932", errors="replace"))
     summaries: list[dict[str, object]] = []
-    for unit in document.xpath("//div[starts-with(@id,'race_result_')]"):
-        tables = []
-        for table in unit.xpath(".//table"):
-            rows = []
-            for row in table.xpath(".//tr"):
-                cells = []
-                for cell in row.xpath("./th|./td"):
-                    cells.append(
-                        {
-                            "tag": cell.tag,
-                            "class": cell.get("class", ""),
-                            "text": _text(cell)[:160],
-                        }
-                    )
-                if cells:
-                    rows.append(cells)
-            tables.append(
-                {
-                    "class": table.get("class", ""),
-                    "summary": table.get("summary", ""),
-                    "rows": rows,
-                }
-            )
-        summaries.append({"unit_id": unit.get("id"), "tables": tables})
+    for table in document.xpath("//table"):
+        rows = []
+        for row in table.xpath(".//tr"):
+            cells = []
+            for cell in row.xpath("./th|./td"):
+                cells.append(
+                    {
+                        "tag": cell.tag,
+                        "class": cell.get("class", ""),
+                        "text": _text(cell)[:160],
+                    }
+                )
+            if cells:
+                rows.append(cells)
+
+        owner = _first(table, "ancestor::*[@id][1]")
+        summaries.append(
+            {
+                "owner_id": owner.get("id", "") if owner is not None else "",
+                "owner_class": owner.get("class", "") if owner is not None else "",
+                "class": table.get("class", ""),
+                "summary": table.get("summary", ""),
+                "rows": rows,
+            }
+        )
     return summaries
 
 

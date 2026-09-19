@@ -8,6 +8,6 @@ def test_summarize_tables_keeps_classes_and_text_without_raw_html():
     </div>
     """.encode("cp932")
     result = summarize_tables(payload)
-    assert result[0]["unit_id"] == "race_result_1"
-    assert result[0]["tables"][0]["class"] == "pay"
-    assert result[0]["tables"][0]["rows"][0][0]["text"] == "単勝"
+    assert result[0]["owner_id"] == "race_result_1"
+    assert result[0]["class"] == "pay"
+    assert result[0]["rows"][0][0]["text"] == "単勝"
