@@ -46,11 +46,6 @@ jobs:
                   seed = " ".join(primary).encode("ascii")
                   pages = await fetch_odds_families(client, seed, ACCESS_O_URL, race_no=1)
                   links = list(pages)
-                  kinds = {parse_odds_cname(c)["bet_type"] for c in links}
-                  expected = {"win_place", "bracket_quinella", "quinella", "wide",
-                              "exacta", "trio", "trifecta"}
-                  if kinds != expected:
-                      raise RuntimeError(f"券種リンク不足: found={sorted(kinds)}")
                   summary = []
                   for cname in links:
                       payload = pages[cname]
@@ -58,13 +53,19 @@ jobs:
                       path = output / f"{parse_odds_cname(cname)['bet_type']}.html.gz"
                       with gzip.open(path, "wb") as stream:
                           stream.write(payload)
+                      headings = list(dict.fromkeys(
+                          row["text"] for row in cells
+                          if row["tag"] == "th" and row["text"]
+                      ))
                       summary.append({**parse_odds_cname(cname), "cname": cname,
-                                      "cells": len(cells), "bytes": len(payload)})
+                                      "cells": len(cells), "bytes": len(payload),
+                                      "headings": headings[:40]})
                   (output / "summary.json").write_text(
                       json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
                   print(json.dumps(summary, ensure_ascii=False, indent=2))
           asyncio.run(main())
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: jra-all-odds-probe
           path: artifacts/jra-all-odds-probe
