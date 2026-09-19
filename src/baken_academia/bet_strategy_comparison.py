@@ -141,13 +141,13 @@ def _role_candidates(runners: pd.DataFrame, blend: float) -> dict[str, pd.DataFr
     values = roles.to_dict("records")
     pair_orders: list[tuple[dict, dict, float]] = []
     for first, second in itertools.permutations(values, 2):
-        denominator = max(1.0 - second["second_probability"], 1e-12)
+        denominator = max(1.0 - first["second_probability"], 1e-12)
         probability = first["first_probability"] * second["second_probability"] / denominator
         pair_orders.append((first, second, probability))
 
     triple_orders: list[tuple[dict, dict, dict, float]] = []
     for first, second, third in itertools.permutations(values, 3):
-        d2 = max(1.0 - second["second_probability"], 1e-12)
+        d2 = max(1.0 - first["second_probability"], 1e-12)
         d3 = max(
             1.0 - first["third_probability"] - second["third_probability"], 1e-12
         )
