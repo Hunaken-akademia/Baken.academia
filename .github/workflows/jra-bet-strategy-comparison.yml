@@ -1,0 +1,69 @@
+name: JRA WAKE vs popularity vs current comparison
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/jra-bet-strategy-comparison-request.json]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Download JRA history
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: "35414533165"
+      - run: tar -xzf .dataset/jra-backfill-result.tar.gz
+      - name: Download held-out predictions
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-history-v2-model
+          path: .model
+          github-token: ${{ github.token }}
+          run-id: "35417574150"
+      - name: Compare ticket strategies
+        run: >-
+          python -m baken_academia.bet_strategy_comparison
+          --predictions .model/test_predictions.parquet
+          --races data/raw/jra/races-2019-2026.parquet
+          --output artifacts/jra-bet-strategy-comparison-v1
+      - name: Publish comparison
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+          report = json.loads(Path("artifacts/jra-bet-strategy-comparison-v1/report.json").read_text())
+          labels = {"win":"単勝","place":"複勝","bracket_quinella":"枠連","quinella":"馬連",
+                    "wide":"ワイド","exacta":"馬単","trio":"三連複","trifecta":"三連単"}
+          methods = {"wake":"WAKE技術移植","popularity":"人気順","current":"従来方式"}
+          lines = ["## 2026年未使用テスト 買い目生成3方式比較", "",
+                   "|券種|方式|本線|対抗|穴|合算|", "|---|---|---:|---:|---:|---:|"]
+          data = report["periods"]["test_2026"]
+          for bet_type, label in labels.items():
+              for method, method_label in methods.items():
+                  row = data[method][bet_type]
+                  value = lambda key: f"{row[key]['average_tickets_per_race']:.1f}点 / {row[key]['race_hit_rate']:.2%}"
+                  lines.append(f"|{label}|{method_label}|{value('main')}|{value('counter')}|{value('longshot')}|{value('combined')}|")
+          lines.extend(["", f"WAKE補正強度: {report['selected_wake_blends']['trifecta']}"])
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write("\n".join(lines) + "\n")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jra-bet-strategy-comparison-v1
+          path: artifacts/jra-bet-strategy-comparison-v1
+          retention-days: 30
