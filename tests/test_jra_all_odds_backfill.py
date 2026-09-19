@@ -2,6 +2,7 @@ import unittest
 
 from baken_academia.jra_all_odds_backfill import (
     parse_all_odds_cnames,
+    merge_odds_cnames,
     parse_odds_cells,
     parse_odds_cname,
     parse_win_place_odds,
@@ -13,8 +14,10 @@ class JraAllOddsBackfillTest(unittest.TestCase):
         self.tail = "1009202604040120260913Z/36"
 
     def test_discovers_all_seven_pages_and_classifies_them(self) -> None:
-        payload = " ".join(f"pw15{kind}ou{self.tail}" for kind in range(1, 8)).encode()
-        cnames = parse_all_odds_cnames(payload)
+        result = f"pw151ou{self.tail}".encode()
+        tabs = " ".join(f"pw15{kind}ou{self.tail}" for kind in range(1, 8)).encode()
+        self.assertEqual(len(parse_all_odds_cnames(result)), 1)
+        cnames = merge_odds_cnames(result, tabs)
         self.assertEqual(len(cnames), 7)
         self.assertEqual(parse_odds_cname(cnames[-1])["bet_type"], "trifecta")
 

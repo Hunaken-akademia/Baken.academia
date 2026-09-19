@@ -27,7 +27,7 @@ jobs:
           from pathlib import Path
           from baken_academia.jra_backfill import ACCESS_O_URL, PoliteJraClient
           from baken_academia.jra_all_odds_backfill import (
-              parse_all_odds_cnames, parse_odds_cells, parse_odds_cname
+              merge_odds_cnames, parse_all_odds_cnames, parse_odds_cells, parse_odds_cname
           )
 
           async def main():
@@ -36,7 +36,10 @@ jobs:
               output.mkdir(parents=True, exist_ok=True)
               async with PoliteJraClient(output / "cache", 3, 4) as client:
                   result = await client.fetch(result_cname)
-                  links = [c for c in parse_all_odds_cnames(result)
+                  primary = [c for c in parse_all_odds_cnames(result)
+                             if parse_odds_cname(c)["race_no"] == 1]
+                  primary_pages = [await client.fetch(c, endpoint=ACCESS_O_URL) for c in primary]
+                  links = [c for c in merge_odds_cnames(result, *primary_pages)
                            if parse_odds_cname(c)["race_no"] == 1]
                   kinds = {parse_odds_cname(c)["bet_type"] for c in links}
                   expected = {"win_place", "bracket_quinella", "quinella", "wide",

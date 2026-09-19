@@ -34,6 +34,13 @@ def parse_all_odds_cnames(payload: bytes) -> list[str]:
     return list(dict.fromkeys(match.group(0) for match in ODDS_CNAME_PATTERN.finditer(decoded)))
 
 
+def merge_odds_cnames(*payloads: bytes) -> list[str]:
+    """Discover result-page links plus the remaining bet tabs on the win/place page."""
+    return list(dict.fromkeys(
+        cname for payload in payloads for cname in parse_all_odds_cnames(payload)
+    ))
+
+
 def parse_odds_cname(cname: str) -> dict[str, object]:
     matched = ODDS_CNAME_PATTERN.fullmatch(cname)
     if not matched:
@@ -146,14 +153,24 @@ async def backfill(args: argparse.Namespace) -> dict[str, object]:
             try:
                 result_payload = await client.fetch(result_cname)
                 payout_rows.extend(parse_all_payouts(result_payload, result_cname))
-                odds_cnames = parse_all_odds_cnames(result_payload)
+                primary_cnames = parse_all_odds_cnames(result_payload)
+                primary_payloads: dict[str, bytes] = {}
+                for primary_cname in primary_cnames:
+                    primary_payloads[primary_cname] = await client.fetch(
+                        primary_cname, endpoint=ACCESS_O_URL
+                    )
+                odds_cnames = merge_odds_cnames(result_payload, *primary_payloads.values())
                 for cname in odds_cnames:
                     meta = parse_odds_cname(cname)
                     race_date = meta["race_date"]
                     if not start <= race_date <= end:
                         continue
                     raw_path = args.work_dir / "pages" / str(race_date.year) / f"{_digest(cname)}.html.gz"
-                    if raw_path.exists():
+                    if cname in primary_payloads:
+                        payload = primary_payloads[cname]
+                        if not raw_path.exists():
+                            _write_gzip(raw_path, payload)
+                    elif raw_path.exists():
                         with gzip.open(raw_path, "rb") as stream:
                             payload = stream.read()
                     else:
