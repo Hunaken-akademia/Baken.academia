@@ -1,0 +1,66 @@
+name: JRA all bet types hit-rate evaluation
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/jra-all-bet-hit-rate-request.json]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Download JRA history
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: "35414533165"
+      - run: tar -xzf .dataset/jra-backfill-result.tar.gz
+      - name: Download predictions
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-history-v2-model
+          path: .model
+          github-token: ${{ github.token }}
+          run-id: "35417574150"
+      - name: Evaluate all bet types
+        run: >-
+          python -m baken_academia.all_bet_hit_rate
+          --predictions .model/test_predictions.parquet
+          --races data/raw/jra/races-2019-2026.parquet
+          --output artifacts/jra-all-bet-hit-rate-v1
+      - name: Publish summary
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+          report = json.loads(Path("artifacts/jra-all-bet-hit-rate-v1/report.json").read_text())
+          labels = {"win":"単勝","place":"複勝","bracket_quinella":"枠連","quinella":"馬連",
+                    "wide":"ワイド","exacta":"馬単","trio":"三連複","trifecta":"三連単"}
+          groups = {"main":"本線","counter":"対抗","longshot":"穴","combined":"合算"}
+          lines = ["## JRA全券種 本線・対抗・穴 的中率", "", "### test_2026", ""]
+          for bet_type, label in labels.items():
+              lines.append(f"#### {label}")
+              for group, group_label in groups.items():
+                  row = report["periods"]["test_2026"][bet_type][group]
+                  lines.append(f"- {group_label}: {row['average_tickets_per_race']:.1f}点 / 的中率 {row['race_hit_rate']:.2%}")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write("\n".join(lines) + "\n")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jra-all-bet-hit-rate-v1
+          path: artifacts/jra-all-bet-hit-rate-v1
+          retention-days: 30
