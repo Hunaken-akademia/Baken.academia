@@ -7,7 +7,7 @@ from pathlib import Path
 
 from lxml import html
 
-from .jra_backfill import PoliteJraClient, _first, _text
+from .jra_backfill import ACCESS_O_URL, ACCESS_S_URL, PoliteJraClient, _first, _text
 
 
 def summarize_tables(payload: bytes) -> list[dict[str, object]]:
@@ -67,11 +67,13 @@ def summarize_result_links(payload: bytes) -> list[dict[str, str]]:
 async def run(args: argparse.Namespace) -> None:
     if not args.permission_confirmed:
         raise ValueError("JRAの許可確認後、--permission-confirmed を付けてください")
+    endpoint = {"results": ACCESS_S_URL, "odds": ACCESS_O_URL}[args.page_kind]
     async with PoliteJraClient(args.cache_dir, 3.0, 4.0) as client:
-        payload = await client.fetch(args.cname, use_cache=False)
+        payload = await client.fetch(args.cname, use_cache=False, endpoint=endpoint)
     summary = {
         "source": "JRA公式",
         "source_cname": args.cname,
+        "page_kind": args.page_kind,
         "network_requests": client.stats.network_requests,
         "tables": summarize_tables(payload),
         "result_links": summarize_result_links(payload),
@@ -83,6 +85,7 @@ async def run(args: argparse.Namespace) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="JRA結果ページの表構造を1ページだけ確認します")
     parser.add_argument("--cname", required=True)
+    parser.add_argument("--page-kind", choices=("results", "odds"), default="results")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--cache-dir", type=Path, default=Path("data/raw/jra/probe-cache"))
     parser.add_argument("--permission-confirmed", action="store_true")

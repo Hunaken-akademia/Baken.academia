@@ -28,7 +28,8 @@ jobs:
       - name: Inspect one licensed JRA result page
         run: >-
           python -m baken_academia.jra_structure_probe
-          --cname pw01ses10092026040420260913/5C
+          --cname pw151ou1009202604040120260913Z/36
+          --page-kind odds
           --output artifacts/jra-odds-structure.json
           --permission-confirmed
       - uses: actions/upload-artifact@v4

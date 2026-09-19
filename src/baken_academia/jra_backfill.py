@@ -19,6 +19,7 @@ from lxml import html
 
 BASE_URL = "https://www.jra.go.jp"
 ACCESS_S_URL = f"{BASE_URL}/JRADB/accessS.html"
+ACCESS_O_URL = f"{BASE_URL}/JRADB/accessO.html"
 ENTRY_CNAME = "pw01skl00999999/B3"
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -298,8 +299,14 @@ class PoliteJraClient:
         if remaining > 0:
             await asyncio.sleep(remaining)
 
-    async def fetch(self, cname: str, use_cache: bool = True) -> bytes:
-        digest = hashlib.sha256(cname.encode()).hexdigest()
+    async def fetch(
+        self,
+        cname: str,
+        use_cache: bool = True,
+        endpoint: str = ACCESS_S_URL,
+    ) -> bytes:
+        cache_key = cname if endpoint == ACCESS_S_URL else f"{endpoint}\n{cname}"
+        digest = hashlib.sha256(cache_key.encode()).hexdigest()
         cache_path = self.cache_dir / digest[:2] / f"{digest}.html.gz"
         if use_cache and cache_path.exists():
             self.stats.cache_hits += 1
@@ -309,7 +316,7 @@ class PoliteJraClient:
         for attempt in range(4):
             await self._wait()
             try:
-                async with self._session.post(ACCESS_S_URL, data={"cname": cname}) as response:
+                async with self._session.post(endpoint, data={"cname": cname}) as response:
                     payload = await response.read()
                     self._last_request_at = asyncio.get_running_loop().time()
                     self.stats.network_requests += 1
