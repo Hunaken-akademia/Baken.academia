@@ -12,9 +12,9 @@ import pandas as pd
 
 @dataclass(frozen=True)
 class TicketPlan:
-    main: int = 40
-    counter: int = 80
-    longshot: int = 120
+    main: int = 30
+    counter: int = 30
+    longshot: int = 30
     main_heads: int = 3
     counter_heads: int = 5
 

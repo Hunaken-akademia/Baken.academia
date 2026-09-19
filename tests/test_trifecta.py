@@ -32,6 +32,21 @@ class TrifectaTest(unittest.TestCase):
             len(tickets), len(tickets.drop_duplicates(["first", "second", "third"]))
         )
 
+    def test_default_plan_caps_each_category_at_thirty(self) -> None:
+        runners = pd.DataFrame({
+            "race_id": ["r1"] * 12,
+            "race_date": ["2026-01-01"] * 12,
+            "horse_number": list(range(1, 13)),
+            "win_probability": [0.18, 0.15, 0.13, 0.11, 0.09, 0.08,
+                                0.07, 0.06, 0.05, 0.04, 0.025, 0.015],
+        })
+        tickets = generate_tickets(runners)
+        counts = tickets.groupby("ticket_type").size().to_dict()
+        self.assertLessEqual(counts["main"], 30)
+        self.assertLessEqual(counts["counter"], 30)
+        self.assertLessEqual(counts["longshot"], 30)
+        self.assertLessEqual(len(tickets), 90)
+
 
 if __name__ == "__main__":
     unittest.main()
