@@ -1,0 +1,9 @@
+{
+  "requested_at": "2026-09-19T14:27:49Z",
+  "source": "latest successful jra-expected-value workflow containing jra-expected-value-v1",
+  "outputs": [
+    "reports/jra-expected-value-v1/report.json",
+    "reports/jra-expected-value-v1/README.md"
+  ],
+  "purpose": "Use completed odds to advance betting-value analysis while eight-year backfill continues"
+}
