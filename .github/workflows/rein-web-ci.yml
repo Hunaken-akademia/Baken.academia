@@ -1,0 +1,50 @@
+name: REIN web build and deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "rein-web/**"
+      - ".github/workflows/rein-web-ci.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download REIN history profile
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 35489116818
+          name: rein-history-profile-v2
+          path: rein-web/data
+
+      - name: Install dependencies
+        working-directory: rein-web
+        run: npm install
+
+      - name: Build
+        working-directory: rein-web
+        run: npm run build
+
+      - name: Deploy to Vercel
+        if: env.VERCEL_TOKEN != ''
+        working-directory: rein-web
+        run: npx vercel deploy --prod --yes --scope hunaken-akademia --token "$VERCEL_TOKEN"
+
+      - name: Explain skipped deployment
+        if: env.VERCEL_TOKEN == ''
+        run: echo "Build succeeded. Add the VERCEL_TOKEN repository secret to enable production deployment."
