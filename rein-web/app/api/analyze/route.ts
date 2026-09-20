@@ -48,6 +48,15 @@ function paceAdjustment(style: string, pace: string) {
 
 function mark(index: number) { return ["◎", "○", "▲", "☆", "△", "注"][index] || (index < 8 ? "・" : "消"); }
 
+function raceClass(text: string) {
+  if (/新馬/.test(text)) return "新馬";
+  if (/未勝利/.test(text)) return "未勝利";
+  if (/1勝|500万/.test(text)) return "1勝クラス";
+  if (/2勝|1000万/.test(text)) return "2勝クラス";
+  if (/3勝|1600万/.test(text)) return "3勝クラス";
+  return "オープン";
+}
+
 export async function GET(request: NextRequest) {
   const raceId = request.nextUrl.searchParams.get("raceId") || "";
   if (!/^\d{10,12}$/.test(raceId)) return NextResponse.json({ error: "レースIDは10〜12桁で入力してください" }, { status: 400 });
@@ -91,6 +100,7 @@ export async function GET(request: NextRequest) {
     const surface = course.match(/^(芝|ダート|障害)/)?.[1] || "芝";
     const distanceM = +(course.match(/(\d{3,4})m/)?.[1] || 0);
     const going = full.match(/馬場[：: ]*(良|稍重|重|不良)/)?.[1] || "未発表";
+    const className = raceClass(full);
 
     const raw = cardRows.map((row) => {
       const cells = row.cells;
@@ -98,6 +108,9 @@ export async function GET(request: NextRequest) {
       const gate = +cells[0] || Math.ceil(number / 2);
       const horseCell = cells[2];
       const name = (horseCell.match(/^([^ ]+)/)?.[1] || horseCell).replace(/牝\d|牡\d|セ\d/, "");
+      const sexAge = horseCell.match(/(牡|牝|セ)\s*(\d+)/) || cells.slice(2, 5).join(" ").match(/(牡|牝|セ)\s*(\d+)/);
+      const carriedText = cells.slice(2, 6).join(" ");
+      const weightCarried = +(carriedText.match(/(?:^|\s)(4[8-9](?:\.\d)?|5\d(?:\.\d)?|6[0-1](?:\.\d)?)(?:\s|$)/)?.[1] || 0);
       const weight = +(cells[6].match(/\d+/)?.[0] || 0);
       const change = +(cells[6].match(/\(([+-]?\d+)\)/)?.[1] || 0);
       const popOdds = cells[7].match(/(\d+)\((\d+(?:\.\d+)?)\)/);
@@ -131,7 +144,11 @@ export async function GET(request: NextRequest) {
         cautions: [...new Set(cautions)].slice(0, 4), weight, weightChange: change, pedigree,
         jockey, trainer, earlyPosition: styleProfile.earlyPosition,
         recentPositions: styleProfile.recentPositions,
-        paceAdjustment: 0,
+        paceAdjustment: 0, horseId, jockeyId, trainerId,
+        age: +(sexAge?.[2] || 0), sex: sexAge?.[1] || "",
+        weightCarried,
+        firstProbability: 0, secondProbability: 0, thirdProbability: 0,
+        firstSuitability: 0, secondSuitability: 0, thirdSuitability: 0,
         historyFactors: [...historical.components]
           .sort((a, b) => Math.abs(b.signal) - Math.abs(a.signal))
           .slice(0, 5)
@@ -148,6 +165,59 @@ export async function GET(request: NextRequest) {
       if (horse.paceAdjustment > 0) horse.positives = [...new Set([...horse.positives, `展開利 +${horse.paceAdjustment}`])].slice(0, 5);
       if (horse.paceAdjustment < 0) horse.cautions = [...new Set([...horse.cautions, `展開不利 ${horse.paceAdjustment}`])].slice(0, 5);
     });
+    let roleModel = { version: "履歴補正フォールバック", feature_count: 0 };
+    try {
+      const modelResponse = await fetch(`${request.nextUrl.origin}/api/rein_score`, {
+        method: "POST", cache: "no-store", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          race: {
+            race_date: `${raceId.slice(0, 4)}-${raceId.slice(4, 6)}-${raceId.slice(6, 8)}`,
+            racecourse, surface, distance_m: distanceM, going, race_class: className,
+          },
+          runners: raw.map((horse) => ({
+            horse_number: horse.number, gate: horse.gate, horse_id: horse.horseId,
+            jockey_id: horse.jockeyId, trainer_id: horse.trainerId,
+            age: horse.age || null, sex: horse.sex || null,
+            weight_carried: horse.weightCarried || null, horse_weight: horse.weight || null,
+            horse_weight_change: horse.weightChange,
+          })),
+        }),
+      });
+      const scored = await modelResponse.json() as { version?: string; feature_count?: number; runners?: Array<{horse_number:number;first_probability:number;second_probability:number;third_probability:number}>; error?:string };
+      if (!modelResponse.ok || !scored.runners?.length) throw new Error(scored.error || "着順モデルの応答が不正です");
+      roleModel = { version: scored.version || "REIN role v4", feature_count: scored.feature_count || 106 };
+      const byNumber = new Map(scored.runners.map((runner) => [runner.horse_number, runner]));
+      const maxima = {
+        first: Math.max(...scored.runners.map((runner) => runner.first_probability)),
+        second: Math.max(...scored.runners.map((runner) => runner.second_probability)),
+        third: Math.max(...scored.runners.map((runner) => runner.third_probability)),
+      };
+      const market = raw.map((horse) => 1 / Math.max(horse.popularity, 1));
+      const marketTotal = market.reduce((sum, value) => sum + value, 0);
+      raw.forEach((horse, index) => {
+        const role = byNumber.get(horse.number);
+        if (!role) return;
+        horse.firstProbability = role.first_probability;
+        horse.secondProbability = role.second_probability;
+        horse.thirdProbability = role.third_probability;
+        horse.firstSuitability = Math.round(100 * role.first_probability / maxima.first);
+        horse.secondSuitability = Math.round(100 * role.second_probability / maxima.second);
+        horse.thirdSuitability = Math.round(100 * role.third_probability / maxima.third);
+        const roleStrength = .5 * role.first_probability + .3 * role.second_probability + .2 * role.third_probability;
+        const blended = .70 * market[index] / marketTotal + .30 * roleStrength;
+        horse.reinScore = Math.round(clamp(50 + blended * raw.length * 35, 45, 98));
+        horse.score = horse.reinScore;
+      });
+    } catch (modelError) {
+      console.error("REIN role model fallback", modelError);
+      const fallback = raw.map((horse) => Math.max(horse.reinScore, 1));
+      const total = fallback.reduce((sum, value) => sum + value, 0);
+      raw.forEach((horse, index) => {
+        const probability = fallback[index] / total;
+        horse.firstProbability = horse.secondProbability = horse.thirdProbability = probability;
+        horse.firstSuitability = horse.secondSuitability = horse.thirdSuitability = Math.round(100 * horse.reinScore / Math.max(...fallback));
+      });
+    }
     raw.sort((a, b) => b.reinScore - a.reinScore || a.popularity - b.popularity);
     raw.forEach((horse, index) => {
       horse.mark = mark(index);
@@ -172,7 +242,7 @@ export async function GET(request: NextRequest) {
     }));
     return NextResponse.json({
       race: { title, course, condition: going, start, updated: `${new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}更新`, raceId },
-      model: { ...history.meta, strategy: "本線=人気順 / 対抗=人気75%+REIN25% / 穴=人気50%+REIN50%", snapshotPolicy: resultRows.length ? "最終オッズから復習用予想を再構成" : "発走前の最新情報で分析" },
+      model: { ...history.meta, version: roleModel.version, featureCount: roleModel.feature_count, strategy: "全券種=人気70%+着順別REIN 30%", snapshotPolicy: resultRows.length ? "最終オッズから復習用予想を再構成" : "発走前の最新情報で分析" },
       pace: { label: pace, detail: paceDetail, leaders, escapeCount, frontCount: frontRunners.length },
       horses: raw,
       tickets: buildTickets(raw),
