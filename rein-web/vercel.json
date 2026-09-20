@@ -1,7 +1,9 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "fluid": true,
   "functions": {
-    "api/rein_score.py": {
-      "maxDuration": 60,
+    "api/**/*.py": {
+      "maxDuration": 300,
       "memory": 2048
     }
   }
