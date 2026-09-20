@@ -14,11 +14,15 @@ function venueSeeds(html: string): VenueSeed[] {
   const section = html.match(/<section[^>]*id="raceflash"[\s\S]*?<\/section>/i)?.[0] || "";
   return [...section.matchAll(/<li[^>]*hr-raceProgress__item[^>]*>([\s\S]*?)<\/li>/gi)].flatMap((match) => {
     const item = match[1];
-    const raceId = item.match(/\/keiba\/race\/index\/(\d{10,12})/)?.[1];
+    const raceId = item.match(/\/keiba\/race\/(?:index|list)\/(\d{8,12})/)?.[1];
     const name = decode(item.match(/hr-raceProgress__title[^>]*>([\s\S]*?)<\/h3>/i)?.[1] || "");
-    const nextRace = +(decode(item.match(/hr-raceProgress__raceTitle[^>]*>([\s\S]*?)<\/span>/i)?.[1] || "0").replace("R", ""));
-    const nextStart = decode(item.match(/hr-raceProgress__info[^>]*>([\s\S]*?)<\/p>/i)?.[1] || "").replace("発走", "");
-    return raceId && name ? [{ name, eventId: raceId.slice(0, -2), nextRace, nextStart }] : [];
+    const itemText = decode(item);
+    const raceNumber = +(decode(item.match(/hr-raceProgress__raceTitle[^>]*>([\s\S]*?)<\/span>/i)?.[1] || "0").replace("R", ""));
+    const finished = itemText.includes("開催終了");
+    const nextRace = finished ? 13 : raceNumber;
+    const nextStart = itemText.match(/(\d{1,2}:\d{2})/)?.[1] || "--:--";
+    const eventId = raceId?.length === 8 ? raceId : raceId?.slice(0, -2);
+    return eventId && name ? [{ name, eventId, nextRace, nextStart }] : [];
   });
 }
 
