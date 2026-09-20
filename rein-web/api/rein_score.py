@@ -9,6 +9,7 @@ import tarfile
 import tempfile
 import threading
 import urllib.request
+import urllib.error
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any
@@ -28,8 +29,12 @@ def _request_bundle(token: str) -> tuple[dict, bytes]:
         BROKER_URL, data=b"{}", method="POST",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        registry = json.load(response)
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            registry = json.load(response)
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")[:1000]
+        raise RuntimeError(f"REIN broker returned {error.code}: {detail}") from error
     with urllib.request.urlopen(registry["bundle_url"], timeout=40) as response:
         bundle = response.read()
     expected = registry["model"]["artifact_sha256"]
