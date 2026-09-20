@@ -40,9 +40,10 @@ CAP_GRIDS = {
     "bracket_quinella": [(2, 2, 2), (2, 3, 3), (3, 3, 3), (3, 4, 3), (3, 4, 4)],
     "quinella": [(3, 3, 3), (3, 4, 4), (4, 5, 5), (5, 5, 5), (5, 6, 5), (5, 6, 6)],
     "wide": [(2, 3, 3), (3, 3, 3), (3, 4, 4), (4, 4, 4), (4, 5, 4), (4, 5, 5)],
-    "exacta": [(4, 5, 5), (5, 6, 6), (6, 8, 8), (8, 8, 8), (8, 10, 8), (8, 10, 10)],
-    "trio": [(5, 6, 6), (6, 8, 8), (8, 10, 10), (10, 10, 10), (10, 12, 10), (10, 12, 12)],
-    "trifecta": [(6, 8, 8), (8, 12, 12), (10, 15, 15), (12, 18, 18), (15, 20, 20), (15, 22, 22)],
+    "exacta": [(4, 5, 5), (5, 6, 6), (6, 8, 8), (8, 8, 8), (8, 10, 8), (8, 10, 9), (8, 10, 10)],
+    "trio": [(5, 6, 6), (6, 8, 8), (8, 10, 10), (10, 10, 10), (10, 12, 10), (10, 12, 11), (10, 12, 12)],
+    "trifecta": [(6, 8, 8), (8, 12, 12), (10, 15, 15), (12, 18, 18), (15, 20, 20),
+                 (15, 22, 20), (15, 22, 21), (15, 22, 22)],
 }
 
 
@@ -155,6 +156,69 @@ def finish(stats: dict[str, float]) -> dict:
     return result
 
 
+def race_result(selections: list[tuple[int, ...]], winners: set, caps: tuple[int, int, int]) -> dict:
+    offsets = (0, caps[0], caps[0] + caps[1], sum(caps))
+    picked = selections[:offsets[-1]]
+    result = {"tickets": len(picked)}
+    for index, group in enumerate(GROUPS):
+        tier = picked[offsets[index]:offsets[index + 1]]
+        result[f"{group}_hit"] = int(any(selection in winners for selection in tier))
+    result["combined_hit"] = int(any(selection in winners for selection in picked))
+    return result
+
+
+def adaptive_metrics(rows: list[dict], reduced: tuple[int, int, int], score_name: str, threshold: float) -> dict:
+    stats = empty_stats()
+    for row in rows:
+        use_reduced = row[score_name] >= threshold
+        result = row["results"][reduced if use_reduced else row["baseline_caps"]]
+        stats["races"] += 1
+        stats["tickets"] += result["tickets"]
+        for group in GROUPS:
+            stats[f"{group}_hits"] += result[f"{group}_hit"]
+        stats["combined_hits"] += result["combined_hit"]
+    return finish(stats)
+
+
+def adaptive_search(rows_2025: dict[str, list[dict]], rows_2026: dict[str, list[dict]],
+                    fixed_metrics: dict[str, dict]) -> tuple[dict, dict]:
+    selected, safe = {}, {}
+    fractions = (.05, .10, .15, .20, .30, .40, .50, .60, .70, .80)
+    for bet_type in BET_TYPES:
+        baseline_key = key(bet_type, "flat", BASE_CAPS[bet_type])
+        baseline_2025 = fixed_metrics["selection_2025"][baseline_key]
+        baseline_2026 = fixed_metrics["audit_2026"][baseline_key]
+        options = []
+        for reduced in CAP_GRIDS[bet_type]:
+            if reduced == BASE_CAPS[bet_type]:
+                continue
+            for score_name in ("coverage", "top_share", "gap"):
+                values = np.array([row[score_name] for row in rows_2025[bet_type]], dtype=float)
+                for fraction in fractions:
+                    threshold = float(np.quantile(values, 1 - fraction))
+                    metric_2025 = adaptive_metrics(rows_2025[bet_type], reduced, score_name, threshold)
+                    metric_2026 = adaptive_metrics(rows_2026[bet_type], reduced, score_name, threshold)
+                    options.append({
+                        "reduced_caps": reduced, "score": score_name,
+                        "selection_fraction": fraction, "threshold": threshold,
+                        "selection_2025": metric_2025, "audit_2026": metric_2026,
+                        "baseline_2025": baseline_2025, "baseline_2026": baseline_2026,
+                    })
+        qualified = [row for row in options
+                     if row["selection_2025"]["combined"]["race_hits"] >= baseline_2025["combined"]["race_hits"]]
+        both = [row for row in qualified
+                if row["audit_2026"]["combined"]["race_hits"] >= baseline_2026["combined"]["race_hits"]]
+        selected[bet_type] = min(qualified, key=lambda row: (
+            row["selection_2025"]["average_tickets_per_race"],
+            -row["selection_2025"]["combined"]["race_hits"],
+        )) if qualified else None
+        safe[bet_type] = min(both, key=lambda row: (
+            row["selection_2025"]["average_tickets_per_race"] + row["audit_2026"]["average_tickets_per_race"],
+            -row["selection_2025"]["combined"]["race_hits"] - row["audit_2026"]["combined"]["race_hits"],
+        )) if both else None
+    return selected, safe
+
+
 def key(bet_type: str, strategy: str, caps: tuple[int, int, int]) -> str:
     return f"{bet_type}|{strategy}|{'-'.join(map(str, caps))}"
 
@@ -222,6 +286,7 @@ def main() -> None:
         "audit_2026": set(runners.loc[runners["race_date"].ge("2026-01-01"), "race_id"]),
     }
     accumulators = {period: defaultdict(empty_stats) for period in periods}
+    adaptive_rows = {period: {bet_type: [] for bet_type in BET_TYPES} for period in periods}
     total = runners["race_id"].nunique()
     for index, (race_id, group) in enumerate(runners.groupby("race_id", observed=True, sort=False), 1):
         clean = group.dropna(subset=["horse_number", "gate", "win_probability"])
@@ -236,6 +301,31 @@ def main() -> None:
             if race_id not in eligible[bet_type]:
                 continue
             winners = outcome_map.get((race_id, bet_type), set())
+            flat_frame = frames[bet_type].sort_values("probability", ascending=False)
+            flat_selections = flat_frame["selection"].tolist()
+            probabilities = flat_frame["probability"].to_numpy(float)
+            baseline_total = sum(BASE_CAPS[bet_type])
+            baseline_mass = float(probabilities[:baseline_total].sum()) or 1e-12
+            second_probability = probabilities[1] if len(probabilities) > 1 else 0.0
+            row = {
+                "baseline_caps": BASE_CAPS[bet_type],
+                "top_share": float(probabilities[0] / baseline_mass) if len(probabilities) else 0.0,
+                "gap": float((probabilities[0] - second_probability) / max(probabilities[0], 1e-12)) if len(probabilities) else 0.0,
+                "results": {},
+            }
+            for caps in CAP_GRIDS[bet_type]:
+                reduced_mass = float(probabilities[:sum(caps)].sum())
+                # Coverage is overwritten below per adaptive option; store each
+                # cap-specific value in a companion mapping.
+                row.setdefault("coverage_by_caps", {})[caps] = reduced_mass / baseline_mass
+                row["results"][caps] = race_result(flat_selections, winners, caps)
+            # The adaptive evaluator reads one scalar. Add cap-specific clones
+            # so every reduced plan uses its own probability-mass coverage.
+            for caps in CAP_GRIDS[bet_type]:
+                clone = dict(row)
+                clone["coverage"] = row["coverage_by_caps"][caps]
+                clone["adaptive_caps"] = caps
+                adaptive_rows[period][bet_type].append(clone)
             for strategy in strategies(bet_type):
                 selections = ordered_selections(frames[bet_type], bet_type, strategy, ranks)
                 for caps in CAP_GRIDS[bet_type]:
@@ -247,6 +337,54 @@ def main() -> None:
         period: {config: finish(stats) for config, stats in values.items()}
         for period, values in accumulators.items()
     }
+    # Keep only the clone matching each plan when adaptive_metrics evaluates it.
+    # Grouping here avoids mixing coverage scores belonging to other caps.
+    adaptive_grouped = {period: {bet_type: {} for bet_type in BET_TYPES} for period in periods}
+    for period in periods:
+        for bet_type in BET_TYPES:
+            for row in adaptive_rows[period][bet_type]:
+                adaptive_grouped[period][bet_type].setdefault(row["adaptive_caps"], []).append(row)
+
+    # adaptive_search expects one row list per bet; execute per reduced cap by
+    # temporarily presenting the matching list and retain the globally best.
+    adaptive_selected_all = {bet_type: [] for bet_type in BET_TYPES}
+    adaptive_safe_all = {bet_type: [] for bet_type in BET_TYPES}
+    for bet_type in BET_TYPES:
+        for reduced in CAP_GRIDS[bet_type]:
+            if reduced == BASE_CAPS[bet_type]:
+                continue
+            rows25 = {name: (adaptive_grouped["selection_2025"][name].get(reduced, []) if name == bet_type else []) for name in BET_TYPES}
+            rows26 = {name: (adaptive_grouped["audit_2026"][name].get(reduced, []) if name == bet_type else []) for name in BET_TYPES}
+            # Inline this bet only; other empty lists are not evaluated.
+            baseline_key = key(bet_type, "flat", BASE_CAPS[bet_type])
+            b25, b26 = metrics["selection_2025"][baseline_key], metrics["audit_2026"][baseline_key]
+            for score_name in ("coverage", "top_share", "gap"):
+                values = np.array([row[score_name] for row in rows25[bet_type]], dtype=float)
+                for fraction in (.05, .10, .15, .20, .30, .40, .50, .60, .70, .80):
+                    threshold = float(np.quantile(values, 1 - fraction))
+                    m25 = adaptive_metrics(rows25[bet_type], reduced, score_name, threshold)
+                    m26 = adaptive_metrics(rows26[bet_type], reduced, score_name, threshold)
+                    option = {"reduced_caps": reduced, "score": score_name, "selection_fraction": fraction,
+                              "threshold": threshold, "selection_2025": m25, "audit_2026": m26,
+                              "baseline_2025": b25, "baseline_2026": b26}
+                    if m25["combined"]["race_hits"] >= b25["combined"]["race_hits"]:
+                        adaptive_selected_all[bet_type].append(option)
+                        if m26["combined"]["race_hits"] >= b26["combined"]["race_hits"]:
+                            adaptive_safe_all[bet_type].append(option)
+
+    adaptive_selected = {
+        bet: (min(rows, key=lambda row: (row["selection_2025"]["average_tickets_per_race"],
+                                         -row["selection_2025"]["combined"]["race_hits"])) if rows else None)
+        for bet, rows in adaptive_selected_all.items()
+    }
+    adaptive_safe = {
+        bet: (min(rows, key=lambda row: (row["selection_2025"]["average_tickets_per_race"]
+                                         + row["audit_2026"]["average_tickets_per_race"],
+                                         -row["selection_2025"]["combined"]["race_hits"]
+                                         -row["audit_2026"]["combined"]["race_hits"])) if rows else None)
+        for bet, rows in adaptive_safe_all.items()
+    }
+
     report = {"scope": "Train <=2024; select 2025; audit 2026", "baseline_caps": BASE_CAPS,
               "periods": metrics, "selection_2025": {}, "retrospective_safe": {}}
     for bet_type in BET_TYPES:
@@ -268,6 +406,8 @@ def main() -> None:
                 "audit_2026": metrics["audit_2026"][config],
                 "baseline_2025": baseline_2025, "baseline_2026": baseline_2026,
             }
+    report["adaptive_selection_2025"] = adaptive_selected
+    report["adaptive_retrospective_safe"] = adaptive_safe
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))
     print("REIN_TICKET_STRUCTURE_V6_JSON_BEGIN", flush=True)
