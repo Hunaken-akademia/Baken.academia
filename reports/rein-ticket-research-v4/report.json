@@ -1,0 +1,4972 @@
+{
+  "scope": "Research only; models train through 2024, strategy selection uses 2025, audit uses 2026.",
+  "caps": {
+    "win": {
+      "main": 1,
+      "counter": 1,
+      "longshot": 1
+    },
+    "place": {
+      "main": 1,
+      "counter": 1,
+      "longshot": 2
+    },
+    "bracket_quinella": {
+      "main": 3,
+      "counter": 4,
+      "longshot": 5
+    },
+    "quinella": {
+      "main": 5,
+      "counter": 6,
+      "longshot": 8
+    },
+    "wide": {
+      "main": 4,
+      "counter": 5,
+      "longshot": 7
+    },
+    "exacta": {
+      "main": 8,
+      "counter": 10,
+      "longshot": 12
+    },
+    "trio": {
+      "main": 10,
+      "counter": 12,
+      "longshot": 15
+    },
+    "trifecta": {
+      "main": 15,
+      "counter": 22,
+      "longshot": 30
+    }
+  },
+  "model_features": [
+    "prior_speed",
+    "recent3_speed",
+    "prior_speed_relative",
+    "recent3_speed_relative",
+    "prior_early_pct",
+    "recent3_early_pct",
+    "prior_late_pct",
+    "recent3_late_pct",
+    "prior_position_gain",
+    "recent3_position_gain",
+    "prior_finish_pct",
+    "recent3_finish_pct",
+    "prior_race_first3_laps",
+    "recent3_race_first3_laps",
+    "prior_past_popularity",
+    "recent3_past_popularity",
+    "prior_won",
+    "recent3_won",
+    "prior_placed",
+    "recent3_placed",
+    "jockey_id_recent90_win",
+    "jockey_id_recent90_place",
+    "trainer_id_recent90_win",
+    "trainer_id_recent90_place",
+    "prior_class_tier",
+    "prior_distance_m",
+    "recent3_distance_m",
+    "prior_closing3f_relative",
+    "recent3_closing3f_relative",
+    "prior_closing3f_z",
+    "recent3_closing3f_z",
+    "recent3_result_strength",
+    "expected_front_count",
+    "relative_early",
+    "class_tier",
+    "class_change",
+    "class_rise",
+    "class_drop",
+    "recent5_max_class",
+    "class_vs_recent_max",
+    "distance_abs_change",
+    "stretching_out",
+    "shortening",
+    "distance_vs_recent3",
+    "recent5_closing3f_relative",
+    "recent5_closing3f_z",
+    "front_style",
+    "stalk_style",
+    "closer_style",
+    "front_pressure_count",
+    "front_pressure_share",
+    "known_style_share",
+    "front_under_pressure",
+    "closer_pressure_help",
+    "relative_late",
+    "closing_pressure_fit"
+  ],
+  "models": {
+    "first": {
+      "iterations": 650
+    },
+    "second": {
+      "iterations": 650
+    },
+    "third": {
+      "iterations": 650
+    }
+  },
+  "mixes": {
+    "current": {
+      "current": 1.0,
+      "market": 0.0,
+      "role_model": 0.0
+    },
+    "rein_role": {
+      "current": 0.0,
+      "market": 0.0,
+      "role_model": 1.0
+    },
+    "current75_role25": {
+      "current": 0.75,
+      "market": 0.0,
+      "role_model": 0.25
+    },
+    "current50_role50": {
+      "current": 0.5,
+      "market": 0.0,
+      "role_model": 0.5
+    },
+    "market70_role30": {
+      "current": 0.0,
+      "market": 0.7,
+      "role_model": 0.3
+    },
+    "market50_current25_role25": {
+      "current": 0.25,
+      "market": 0.5,
+      "role_model": 0.25
+    },
+    "market50_role50": {
+      "current": 0.0,
+      "market": 0.5,
+      "role_model": 0.5
+    }
+  },
+  "selected_by_bet_type": {
+    "win": "market70_role30",
+    "place": "market70_role30",
+    "bracket_quinella": "market70_role30",
+    "quinella": "market70_role30",
+    "wide": "market70_role30",
+    "exacta": "market70_role30",
+    "trio": "market70_role30",
+    "trifecta": "market70_role30"
+  },
+  "periods": {
+    "selection_2025": {
+      "current": {
+        "win": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 706,
+            "race_hit_rate": 0.25,
+            "winning_tickets": 706,
+            "ticket_hit_rate": 0.25
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 490,
+            "race_hit_rate": 0.17351274787535412,
+            "winning_tickets": 490,
+            "ticket_hit_rate": 0.17351274787535412
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 346,
+            "race_hit_rate": 0.12252124645892351,
+            "winning_tickets": 346,
+            "ticket_hit_rate": 0.12252124645892351
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1542,
+            "race_hit_rate": 0.5460339943342776,
+            "winning_tickets": 1542,
+            "ticket_hit_rate": 0.1820113314447592
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1552,
+            "race_hit_rate": 0.5495750708215298,
+            "winning_tickets": 1552,
+            "ticket_hit_rate": 0.5495750708215298
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1237,
+            "race_hit_rate": 0.4380311614730878,
+            "winning_tickets": 1237,
+            "ticket_hit_rate": 0.4380311614730878
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1597,
+            "race_hit_rate": 0.5655099150141643,
+            "winning_tickets": 1848,
+            "ticket_hit_rate": 0.3271954674220963
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2625,
+            "race_hit_rate": 0.9295325779036827,
+            "winning_tickets": 4637,
+            "ticket_hit_rate": 0.41049929178470257
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2617,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 856,
+            "race_hit_rate": 0.32709209017959495,
+            "winning_tickets": 858,
+            "ticket_hit_rate": 0.10928544134505158
+          },
+          "counter": {
+            "races": 2617,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 601,
+            "race_hit_rate": 0.2296522735957203,
+            "winning_tickets": 601,
+            "ticket_hit_rate": 0.057413068398930074
+          },
+          "longshot": {
+            "races": 2617,
+            "average_tickets_per_race": 4.99923576614444,
+            "race_hits": 475,
+            "race_hit_rate": 0.1815055406954528,
+            "winning_tickets": 475,
+            "ticket_hit_rate": 0.03630665749445846
+          },
+          "combined": {
+            "races": 2617,
+            "average_tickets_per_race": 11.99923576614444,
+            "race_hits": 1930,
+            "race_hit_rate": 0.7374856706152082,
+            "winning_tickets": 1934,
+            "ticket_hit_rate": 0.06158843385771607
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 953,
+            "race_hit_rate": 0.33746458923512745,
+            "winning_tickets": 955,
+            "ticket_hit_rate": 0.06763456090651558
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.995042492917847,
+            "race_hits": 520,
+            "race_hit_rate": 0.18413597733711048,
+            "winning_tickets": 520,
+            "ticket_hit_rate": 0.03071470761961016
+          },
+          "longshot": {
+            "races": 2810,
+            "average_tickets_per_race": 7.9644128113879,
+            "race_hits": 409,
+            "race_hit_rate": 0.14555160142348755,
+            "winning_tickets": 409,
+            "ticket_hit_rate": 0.018275245755138517
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 18.9199716713881,
+            "race_hits": 1880,
+            "race_hit_rate": 0.6657223796033994,
+            "winning_tickets": 1884,
+            "ticket_hit_rate": 0.035261089275687815
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1435,
+            "race_hit_rate": 0.5081444759206799,
+            "winning_tickets": 1976,
+            "ticket_hit_rate": 0.17492917847025496
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1209,
+            "race_hit_rate": 0.4281161473087819,
+            "winning_tickets": 1450,
+            "ticket_hit_rate": 0.10269121813031161
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 6.961402266288951,
+            "race_hits": 1094,
+            "race_hit_rate": 0.3873937677053824,
+            "winning_tickets": 1308,
+            "ticket_hit_rate": 0.06653441171982298
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 15.961402266288951,
+            "race_hits": 2334,
+            "race_hit_rate": 0.8264872521246459,
+            "winning_tickets": 4734,
+            "ticket_hit_rate": 0.10502495840266222
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 842,
+            "race_hit_rate": 0.2981586402266289,
+            "winning_tickets": 844,
+            "ticket_hit_rate": 0.037358356940509915
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 506,
+            "race_hit_rate": 0.1791784702549575,
+            "winning_tickets": 506,
+            "ticket_hit_rate": 0.017917847025495752
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 11.950424929178471,
+            "race_hits": 342,
+            "race_hit_rate": 0.12110481586402266,
+            "winning_tickets": 342,
+            "ticket_hit_rate": 0.010133933862747422
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 29.95042492917847,
+            "race_hits": 1689,
+            "race_hit_rate": 0.5980878186968839,
+            "winning_tickets": 1692,
+            "ticket_hit_rate": 0.02000472925041381
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 814,
+            "race_hit_rate": 0.28824362606232296,
+            "winning_tickets": 816,
+            "ticket_hit_rate": 0.028895184135977338
+          },
+          "counter": {
+            "races": 2810,
+            "average_tickets_per_race": 11.982206405693951,
+            "race_hits": 417,
+            "race_hit_rate": 0.14839857651245553,
+            "winning_tickets": 417,
+            "ticket_hit_rate": 0.012384912384912385
+          },
+          "longshot": {
+            "races": 2785,
+            "average_tickets_per_race": 14.959784560143627,
+            "race_hits": 289,
+            "race_hit_rate": 0.10377019748653502,
+            "winning_tickets": 289,
+            "ticket_hit_rate": 0.006936610421717111
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 36.67599150141643,
+            "race_hits": 1519,
+            "race_hit_rate": 0.5378895184135978,
+            "winning_tickets": 1522,
+            "ticket_hit_rate": 0.014694949455939289
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 342,
+            "race_hit_rate": 0.12110481586402266,
+            "winning_tickets": 345,
+            "ticket_hit_rate": 0.008144475920679886
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 308,
+            "race_hit_rate": 0.10906515580736544,
+            "winning_tickets": 308,
+            "ticket_hit_rate": 0.004957507082152974
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 29.96529745042493,
+            "race_hits": 252,
+            "race_hit_rate": 0.08923512747875353,
+            "winning_tickets": 252,
+            "ticket_hit_rate": 0.0029779489967148025
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 66.96529745042493,
+            "race_hits": 900,
+            "race_hit_rate": 0.31869688385269124,
+            "winning_tickets": 905,
+            "ticket_hit_rate": 0.004785574533340384
+          }
+        }
+      },
+      "rein_role": {
+        "win": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 779,
+            "race_hit_rate": 0.27584985835694054,
+            "winning_tickets": 779,
+            "ticket_hit_rate": 0.27584985835694054
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 561,
+            "race_hit_rate": 0.1986543909348442,
+            "winning_tickets": 561,
+            "ticket_hit_rate": 0.1986543909348442
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 331,
+            "race_hit_rate": 0.11720963172804533,
+            "winning_tickets": 331,
+            "ticket_hit_rate": 0.11720963172804533
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1671,
+            "race_hit_rate": 0.59171388101983,
+            "winning_tickets": 1671,
+            "ticket_hit_rate": 0.19723796033994334
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1664,
+            "race_hit_rate": 0.5892351274787535,
+            "winning_tickets": 1664,
+            "ticket_hit_rate": 0.5892351274787535
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1305,
+            "race_hit_rate": 0.4621104815864023,
+            "winning_tickets": 1305,
+            "ticket_hit_rate": 0.4621104815864023
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1732,
+            "race_hit_rate": 0.613314447592068,
+            "winning_tickets": 2020,
+            "ticket_hit_rate": 0.3576487252124646
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2670,
+            "race_hit_rate": 0.9454674220963173,
+            "winning_tickets": 4989,
+            "ticket_hit_rate": 0.44166076487252126
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2617,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 919,
+            "race_hit_rate": 0.3511654566297287,
+            "winning_tickets": 920,
+            "ticket_hit_rate": 0.11718252451916954
+          },
+          "counter": {
+            "races": 2617,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 664,
+            "race_hit_rate": 0.253725640045854,
+            "winning_tickets": 665,
+            "ticket_hit_rate": 0.06352693924340848
+          },
+          "longshot": {
+            "races": 2617,
+            "average_tickets_per_race": 4.99923576614444,
+            "race_hits": 427,
+            "race_hit_rate": 0.16316392816201758,
+            "winning_tickets": 427,
+            "ticket_hit_rate": 0.03263777421080792
+          },
+          "combined": {
+            "races": 2617,
+            "average_tickets_per_race": 11.99923576614444,
+            "race_hits": 2006,
+            "race_hit_rate": 0.7665265571264807,
+            "winning_tickets": 2012,
+            "ticket_hit_rate": 0.06407235207948539
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1085,
+            "race_hit_rate": 0.38420679886685555,
+            "winning_tickets": 1087,
+            "ticket_hit_rate": 0.07698300283286119
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.995042492917847,
+            "race_hits": 535,
+            "race_hit_rate": 0.18944759206798867,
+            "winning_tickets": 535,
+            "ticket_hit_rate": 0.031600708800945065
+          },
+          "longshot": {
+            "races": 2810,
+            "average_tickets_per_race": 7.9644128113879,
+            "race_hits": 406,
+            "race_hit_rate": 0.14448398576512456,
+            "winning_tickets": 406,
+            "ticket_hit_rate": 0.01814119749776586
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 18.9199716713881,
+            "race_hits": 2023,
+            "race_hit_rate": 0.7163597733711048,
+            "winning_tickets": 2028,
+            "ticket_hit_rate": 0.03795620437956204
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1587,
+            "race_hit_rate": 0.5619688385269122,
+            "winning_tickets": 2259,
+            "ticket_hit_rate": 0.19998229461756373
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1295,
+            "race_hit_rate": 0.4585694050991501,
+            "winning_tickets": 1555,
+            "ticket_hit_rate": 0.11012747875354108
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 6.961402266288951,
+            "race_hits": 1132,
+            "race_hit_rate": 0.40084985835694054,
+            "winning_tickets": 1355,
+            "ticket_hit_rate": 0.06892517422045882
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 15.961402266288951,
+            "race_hits": 2442,
+            "race_hit_rate": 0.8647308781869688,
+            "winning_tickets": 5169,
+            "ticket_hit_rate": 0.11467554076539102
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 928,
+            "race_hit_rate": 0.3286118980169972,
+            "winning_tickets": 929,
+            "ticket_hit_rate": 0.041120750708215296
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 530,
+            "race_hit_rate": 0.18767705382436262,
+            "winning_tickets": 531,
+            "ticket_hit_rate": 0.01880311614730878
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 11.950424929178471,
+            "race_hits": 377,
+            "race_hit_rate": 0.1334985835694051,
+            "winning_tickets": 377,
+            "ticket_hit_rate": 0.011171032357473035
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 29.95042492917847,
+            "race_hits": 1833,
+            "race_hit_rate": 0.6490793201133145,
+            "winning_tickets": 1837,
+            "ticket_hit_rate": 0.021719082525419722
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 967,
+            "race_hit_rate": 0.34242209631728043,
+            "winning_tickets": 970,
+            "ticket_hit_rate": 0.03434844192634561
+          },
+          "counter": {
+            "races": 2810,
+            "average_tickets_per_race": 11.982206405693951,
+            "race_hits": 423,
+            "race_hit_rate": 0.1505338078291815,
+            "winning_tickets": 423,
+            "ticket_hit_rate": 0.012563112563112563
+          },
+          "longshot": {
+            "races": 2785,
+            "average_tickets_per_race": 14.959784560143627,
+            "race_hits": 294,
+            "race_hit_rate": 0.10556552962298026,
+            "winning_tickets": 294,
+            "ticket_hit_rate": 0.007056620982646473
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 36.67599150141643,
+            "race_hits": 1684,
+            "race_hit_rate": 0.5963172804532578,
+            "winning_tickets": 1687,
+            "ticket_hit_rate": 0.01628802873335715
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 402,
+            "race_hit_rate": 0.1423512747875354,
+            "winning_tickets": 404,
+            "ticket_hit_rate": 0.009537299338999055
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 320,
+            "race_hit_rate": 0.11331444759206799,
+            "winning_tickets": 320,
+            "ticket_hit_rate": 0.0051506567087303634
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 29.96529745042493,
+            "race_hits": 293,
+            "race_hit_rate": 0.10375354107648725,
+            "winning_tickets": 293,
+            "ticket_hit_rate": 0.003462456571577131
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 66.96529745042493,
+            "race_hits": 1013,
+            "race_hit_rate": 0.35871104815864024,
+            "winning_tickets": 1017,
+            "ticket_hit_rate": 0.005377822431389139
+          }
+        }
+      },
+      "current75_role25": {
+        "win": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 733,
+            "race_hit_rate": 0.2595609065155807,
+            "winning_tickets": 733,
+            "ticket_hit_rate": 0.2595609065155807
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 523,
+            "race_hit_rate": 0.18519830028328613,
+            "winning_tickets": 523,
+            "ticket_hit_rate": 0.18519830028328613
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 347,
+            "race_hit_rate": 0.12287535410764873,
+            "winning_tickets": 347,
+            "ticket_hit_rate": 0.12287535410764873
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1603,
+            "race_hit_rate": 0.5676345609065155,
+            "winning_tickets": 1603,
+            "ticket_hit_rate": 0.18921152030217187
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1598,
+            "race_hit_rate": 0.5658640226628895,
+            "winning_tickets": 1598,
+            "ticket_hit_rate": 0.5658640226628895
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1245,
+            "race_hit_rate": 0.44086402266288954,
+            "winning_tickets": 1245,
+            "ticket_hit_rate": 0.44086402266288954
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1658,
+            "race_hit_rate": 0.5871104815864022,
+            "winning_tickets": 1911,
+            "ticket_hit_rate": 0.33834985835694054
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2653,
+            "race_hit_rate": 0.9394475920679887,
+            "winning_tickets": 4754,
+            "ticket_hit_rate": 0.420856940509915
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2617,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 883,
+            "race_hit_rate": 0.33740924722965226,
+            "winning_tickets": 885,
+            "ticket_hit_rate": 0.11272449369507069
+          },
+          "counter": {
+            "races": 2617,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 617,
+            "race_hit_rate": 0.2357661444401987,
+            "winning_tickets": 617,
+            "ticket_hit_rate": 0.05894153611004967
+          },
+          "longshot": {
+            "races": 2617,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 463,
+            "race_hit_rate": 0.176920137562094,
+            "winning_tickets": 463,
+            "ticket_hit_rate": 0.0353840275124188
+          },
+          "combined": {
+            "races": 2617,
+            "average_tickets_per_race": 12.0,
+            "race_hits": 1961,
+            "race_hit_rate": 0.7493312953763852,
+            "winning_tickets": 1965,
+            "ticket_hit_rate": 0.06257164692395874
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1013,
+            "race_hit_rate": 0.35871104815864024,
+            "winning_tickets": 1015,
+            "ticket_hit_rate": 0.07188385269121814
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.995042492917847,
+            "race_hits": 516,
+            "race_hit_rate": 0.18271954674220964,
+            "winning_tickets": 516,
+            "ticket_hit_rate": 0.03047844063792085
+          },
+          "longshot": {
+            "races": 2810,
+            "average_tickets_per_race": 7.9644128113879,
+            "race_hits": 404,
+            "race_hit_rate": 0.14377224199288255,
+            "winning_tickets": 404,
+            "ticket_hit_rate": 0.01805183199285076
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 18.9199716713881,
+            "race_hits": 1931,
+            "race_hit_rate": 0.6837818696883853,
+            "winning_tickets": 1935,
+            "ticket_hit_rate": 0.03621560920830994
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1483,
+            "race_hit_rate": 0.5251416430594901,
+            "winning_tickets": 2065,
+            "ticket_hit_rate": 0.18280807365439095
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1246,
+            "race_hit_rate": 0.4412181303116147,
+            "winning_tickets": 1491,
+            "ticket_hit_rate": 0.10559490084985836
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 6.961402266288951,
+            "race_hits": 1130,
+            "race_hit_rate": 0.40014164305949007,
+            "winning_tickets": 1360,
+            "ticket_hit_rate": 0.06917951065669668
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 15.961402266288951,
+            "race_hits": 2376,
+            "race_hit_rate": 0.8413597733711048,
+            "winning_tickets": 4916,
+            "ticket_hit_rate": 0.1090626733222407
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 908,
+            "race_hit_rate": 0.32152974504249293,
+            "winning_tickets": 910,
+            "ticket_hit_rate": 0.04027974504249292
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 485,
+            "race_hit_rate": 0.17174220963172804,
+            "winning_tickets": 485,
+            "ticket_hit_rate": 0.017174220963172806
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 11.950424929178471,
+            "race_hits": 379,
+            "race_hit_rate": 0.13420679886685552,
+            "winning_tickets": 379,
+            "ticket_hit_rate": 0.011230295128600213
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 29.95042492917847,
+            "race_hits": 1771,
+            "race_hit_rate": 0.6271246458923513,
+            "winning_tickets": 1774,
+            "ticket_hit_rate": 0.020974225585244737
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 864,
+            "race_hit_rate": 0.3059490084985836,
+            "winning_tickets": 866,
+            "ticket_hit_rate": 0.0306657223796034
+          },
+          "counter": {
+            "races": 2810,
+            "average_tickets_per_race": 11.982206405693951,
+            "race_hits": 431,
+            "race_hit_rate": 0.15338078291814947,
+            "winning_tickets": 431,
+            "ticket_hit_rate": 0.0128007128007128
+          },
+          "longshot": {
+            "races": 2785,
+            "average_tickets_per_race": 14.959784560143627,
+            "race_hits": 275,
+            "race_hit_rate": 0.09874326750448834,
+            "winning_tickets": 275,
+            "ticket_hit_rate": 0.006600580851114898
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 36.67599150141643,
+            "race_hits": 1569,
+            "race_hit_rate": 0.5555949008498584,
+            "winning_tickets": 1572,
+            "ticket_hit_rate": 0.01517770075212652
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 388,
+            "race_hit_rate": 0.13739376770538245,
+            "winning_tickets": 391,
+            "ticket_hit_rate": 0.009230406043437205
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 315,
+            "race_hit_rate": 0.11154390934844192,
+            "winning_tickets": 315,
+            "ticket_hit_rate": 0.005070177697656451
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 29.96529745042493,
+            "race_hits": 271,
+            "race_hit_rate": 0.09596317280453258,
+            "winning_tickets": 271,
+            "ticket_hit_rate": 0.0032024768972607597
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 66.96529745042493,
+            "race_hits": 972,
+            "race_hit_rate": 0.34419263456090654,
+            "winning_tickets": 977,
+            "ticket_hit_rate": 0.005166305324943154
+          }
+        }
+      },
+      "current50_role50": {
+        "win": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 754,
+            "race_hit_rate": 0.2669971671388102,
+            "winning_tickets": 754,
+            "ticket_hit_rate": 0.2669971671388102
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 540,
+            "race_hit_rate": 0.19121813031161472,
+            "winning_tickets": 540,
+            "ticket_hit_rate": 0.19121813031161472
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 355,
+            "race_hit_rate": 0.12570821529745044,
+            "winning_tickets": 355,
+            "ticket_hit_rate": 0.12570821529745044
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1649,
+            "race_hit_rate": 0.5839235127478754,
+            "winning_tickets": 1649,
+            "ticket_hit_rate": 0.19464117091595845
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1624,
+            "race_hit_rate": 0.5750708215297451,
+            "winning_tickets": 1624,
+            "ticket_hit_rate": 0.5750708215297451
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1294,
+            "race_hit_rate": 0.45821529745042494,
+            "winning_tickets": 1294,
+            "ticket_hit_rate": 0.45821529745042494
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1680,
+            "race_hit_rate": 0.5949008498583569,
+            "winning_tickets": 1942,
+            "ticket_hit_rate": 0.3438385269121813
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2670,
+            "race_hit_rate": 0.9454674220963173,
+            "winning_tickets": 4860,
+            "ticket_hit_rate": 0.4302407932011331
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2617,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 917,
+            "race_hit_rate": 0.3504012227741689,
+            "winning_tickets": 919,
+            "ticket_hit_rate": 0.11705515220990957
+          },
+          "counter": {
+            "races": 2617,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 615,
+            "race_hit_rate": 0.2350019105846389,
+            "winning_tickets": 615,
+            "ticket_hit_rate": 0.058750477646159725
+          },
+          "longshot": {
+            "races": 2617,
+            "average_tickets_per_race": 4.99923576614444,
+            "race_hits": 457,
+            "race_hit_rate": 0.1746274359954146,
+            "winning_tickets": 458,
+            "ticket_hit_rate": 0.03500726133149889
+          },
+          "combined": {
+            "races": 2617,
+            "average_tickets_per_race": 11.99923576614444,
+            "race_hits": 1987,
+            "race_hit_rate": 0.7592663354986626,
+            "winning_tickets": 1992,
+            "ticket_hit_rate": 0.0634354499713394
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1053,
+            "race_hit_rate": 0.3728753541076487,
+            "winning_tickets": 1055,
+            "ticket_hit_rate": 0.07471671388101983
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.995042492917847,
+            "race_hits": 529,
+            "race_hit_rate": 0.18732294617563738,
+            "winning_tickets": 529,
+            "ticket_hit_rate": 0.031246308328411104
+          },
+          "longshot": {
+            "races": 2810,
+            "average_tickets_per_race": 7.9644128113879,
+            "race_hits": 412,
+            "race_hit_rate": 0.14661921708185052,
+            "winning_tickets": 413,
+            "ticket_hit_rate": 0.01845397676496872
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 18.9199716713881,
+            "race_hits": 1992,
+            "race_hit_rate": 0.7053824362606232,
+            "winning_tickets": 1997,
+            "ticket_hit_rate": 0.03737600598914467
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1542,
+            "race_hit_rate": 0.5460339943342776,
+            "winning_tickets": 2179,
+            "ticket_hit_rate": 0.1929001416430595
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1273,
+            "race_hit_rate": 0.45077903682719545,
+            "winning_tickets": 1508,
+            "ticket_hit_rate": 0.10679886685552407
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 6.961402266288951,
+            "race_hits": 1152,
+            "race_hit_rate": 0.40793201133144474,
+            "winning_tickets": 1367,
+            "ticket_hit_rate": 0.06953558166742968
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 15.961402266288951,
+            "race_hits": 2413,
+            "race_hit_rate": 0.8544617563739377,
+            "winning_tickets": 5054,
+            "ticket_hit_rate": 0.11212423738214088
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 947,
+            "race_hit_rate": 0.3353399433427762,
+            "winning_tickets": 949,
+            "ticket_hit_rate": 0.04200601983002833
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 506,
+            "race_hit_rate": 0.1791784702549575,
+            "winning_tickets": 507,
+            "ticket_hit_rate": 0.01795325779036827
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 11.950424929178471,
+            "race_hits": 365,
+            "race_hit_rate": 0.12924929178470254,
+            "winning_tickets": 365,
+            "ticket_hit_rate": 0.010815455730709968
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 29.95042492917847,
+            "race_hits": 1816,
+            "race_hit_rate": 0.6430594900849859,
+            "winning_tickets": 1821,
+            "ticket_hit_rate": 0.021529912508867346
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 913,
+            "race_hit_rate": 0.323300283286119,
+            "winning_tickets": 915,
+            "ticket_hit_rate": 0.032400849858356943
+          },
+          "counter": {
+            "races": 2810,
+            "average_tickets_per_race": 11.982206405693951,
+            "race_hits": 427,
+            "race_hit_rate": 0.15195729537366548,
+            "winning_tickets": 427,
+            "ticket_hit_rate": 0.012681912681912683
+          },
+          "longshot": {
+            "races": 2785,
+            "average_tickets_per_race": 14.959784560143627,
+            "race_hits": 296,
+            "race_hit_rate": 0.10628366247755835,
+            "winning_tickets": 296,
+            "ticket_hit_rate": 0.0071046252070182175
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 36.67599150141643,
+            "race_hits": 1635,
+            "race_hit_rate": 0.5789660056657224,
+            "winning_tickets": 1638,
+            "ticket_hit_rate": 0.015814932463093664
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 412,
+            "race_hit_rate": 0.14589235127478753,
+            "winning_tickets": 414,
+            "ticket_hit_rate": 0.009773371104815864
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 321,
+            "race_hit_rate": 0.1136685552407932,
+            "winning_tickets": 323,
+            "ticket_hit_rate": 0.00519894411537471
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 29.96529745042493,
+            "race_hits": 287,
+            "race_hit_rate": 0.10162889518413598,
+            "winning_tickets": 287,
+            "ticket_hit_rate": 0.0033915530240363027
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 66.96529745042493,
+            "race_hits": 1019,
+            "race_hit_rate": 0.36083569405099153,
+            "winning_tickets": 1024,
+            "ticket_hit_rate": 0.005414837925017186
+          }
+        }
+      },
+      "market70_role30": {
+        "win": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 932,
+            "race_hit_rate": 0.330028328611898,
+            "winning_tickets": 932,
+            "ticket_hit_rate": 0.330028328611898
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 588,
+            "race_hit_rate": 0.20821529745042494,
+            "winning_tickets": 588,
+            "ticket_hit_rate": 0.20821529745042494
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 343,
+            "race_hit_rate": 0.12145892351274788,
+            "winning_tickets": 343,
+            "ticket_hit_rate": 0.12145892351274788
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1863,
+            "race_hit_rate": 0.6597025495750708,
+            "winning_tickets": 1863,
+            "ticket_hit_rate": 0.21990084985835695
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1824,
+            "race_hit_rate": 0.6458923512747875,
+            "winning_tickets": 1824,
+            "ticket_hit_rate": 0.6458923512747875
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1477,
+            "race_hit_rate": 0.5230169971671388,
+            "winning_tickets": 1477,
+            "ticket_hit_rate": 0.5230169971671388
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1781,
+            "race_hit_rate": 0.6306657223796034,
+            "winning_tickets": 2058,
+            "ticket_hit_rate": 0.36437677053824363
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2729,
+            "race_hit_rate": 0.9663597733711048,
+            "winning_tickets": 5359,
+            "ticket_hit_rate": 0.4744157223796034
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2617,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1086,
+            "race_hit_rate": 0.4149789835689721,
+            "winning_tickets": 1087,
+            "ticket_hit_rate": 0.138453700165584
+          },
+          "counter": {
+            "races": 2617,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 635,
+            "race_hit_rate": 0.2426442491402369,
+            "winning_tickets": 636,
+            "ticket_hit_rate": 0.0607565915170042
+          },
+          "longshot": {
+            "races": 2617,
+            "average_tickets_per_race": 4.99847153228888,
+            "race_hits": 455,
+            "race_hit_rate": 0.1738632021398548,
+            "winning_tickets": 455,
+            "ticket_hit_rate": 0.03478327345004205
+          },
+          "combined": {
+            "races": 2617,
+            "average_tickets_per_race": 11.99847153228888,
+            "race_hits": 2172,
+            "race_hit_rate": 0.8299579671379442,
+            "winning_tickets": 2178,
+            "ticket_hit_rate": 0.06936305732484077
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1238,
+            "race_hit_rate": 0.438385269121813,
+            "winning_tickets": 1240,
+            "ticket_hit_rate": 0.08781869688385269
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.995042492917847,
+            "race_hits": 579,
+            "race_hit_rate": 0.20502832861189801,
+            "winning_tickets": 579,
+            "ticket_hit_rate": 0.03419964559952746
+          },
+          "longshot": {
+            "races": 2810,
+            "average_tickets_per_race": 7.9644128113879,
+            "race_hits": 391,
+            "race_hit_rate": 0.1391459074733096,
+            "winning_tickets": 391,
+            "ticket_hit_rate": 0.017470956210902593
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 18.9199716713881,
+            "race_hits": 2206,
+            "race_hit_rate": 0.7811614730878187,
+            "winning_tickets": 2210,
+            "ticket_hit_rate": 0.0413625304136253
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1742,
+            "race_hit_rate": 0.6168555240793201,
+            "winning_tickets": 2600,
+            "ticket_hit_rate": 0.2301699716713881
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1472,
+            "race_hit_rate": 0.5212464589235127,
+            "winning_tickets": 1651,
+            "ticket_hit_rate": 0.11692634560906516
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 6.961402266288951,
+            "race_hits": 1242,
+            "race_hit_rate": 0.4398016997167139,
+            "winning_tickets": 1405,
+            "ticket_hit_rate": 0.07146853858283737
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 15.961402266288951,
+            "race_hits": 2530,
+            "race_hit_rate": 0.8958923512747875,
+            "winning_tickets": 5656,
+            "ticket_hit_rate": 0.12547975596228508
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 1142,
+            "race_hit_rate": 0.40439093484419264,
+            "winning_tickets": 1144,
+            "ticket_hit_rate": 0.05063739376770538
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 544,
+            "race_hit_rate": 0.19263456090651557,
+            "winning_tickets": 544,
+            "ticket_hit_rate": 0.019263456090651557
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 11.950424929178471,
+            "race_hits": 371,
+            "race_hit_rate": 0.13137393767705383,
+            "winning_tickets": 371,
+            "ticket_hit_rate": 0.010993244044091502
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 29.95042492917847,
+            "race_hits": 2055,
+            "race_hit_rate": 0.7276912181303116,
+            "winning_tickets": 2059,
+            "ticket_hit_rate": 0.024343816505083944
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 1131,
+            "race_hit_rate": 0.4004957507082153,
+            "winning_tickets": 1134,
+            "ticket_hit_rate": 0.04015580736543909
+          },
+          "counter": {
+            "races": 2810,
+            "average_tickets_per_race": 11.982206405693951,
+            "race_hits": 467,
+            "race_hit_rate": 0.16619217081850535,
+            "winning_tickets": 467,
+            "ticket_hit_rate": 0.01386991386991387
+          },
+          "longshot": {
+            "races": 2785,
+            "average_tickets_per_race": 14.959784560143627,
+            "race_hits": 258,
+            "race_hit_rate": 0.0926391382405745,
+            "winning_tickets": 258,
+            "ticket_hit_rate": 0.006192544943955068
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 36.67599150141643,
+            "race_hits": 1854,
+            "race_hit_rate": 0.6565155807365439,
+            "winning_tickets": 1859,
+            "ticket_hit_rate": 0.01794869319224122
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 588,
+            "race_hit_rate": 0.20821529745042494,
+            "winning_tickets": 592,
+            "ticket_hit_rate": 0.013975448536355052
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 374,
+            "race_hit_rate": 0.13243626062322947,
+            "winning_tickets": 374,
+            "ticket_hit_rate": 0.0060198300283286115
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 29.96529745042493,
+            "race_hits": 309,
+            "race_hit_rate": 0.10941926345609065,
+            "winning_tickets": 309,
+            "ticket_hit_rate": 0.003651532698352674
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 66.96529745042493,
+            "race_hits": 1268,
+            "race_hit_rate": 0.4490084985835694,
+            "winning_tickets": 1275,
+            "ticket_hit_rate": 0.006742107767965734
+          }
+        }
+      },
+      "market50_current25_role25": {
+        "win": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 923,
+            "race_hit_rate": 0.3268413597733711,
+            "winning_tickets": 923,
+            "ticket_hit_rate": 0.3268413597733711
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 557,
+            "race_hit_rate": 0.19723796033994334,
+            "winning_tickets": 557,
+            "ticket_hit_rate": 0.19723796033994334
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 353,
+            "race_hit_rate": 0.125,
+            "winning_tickets": 353,
+            "ticket_hit_rate": 0.125
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1833,
+            "race_hit_rate": 0.6490793201133145,
+            "winning_tickets": 1833,
+            "ticket_hit_rate": 0.21635977337110482
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1823,
+            "race_hit_rate": 0.6455382436260623,
+            "winning_tickets": 1823,
+            "ticket_hit_rate": 0.6455382436260623
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1433,
+            "race_hit_rate": 0.5074362606232294,
+            "winning_tickets": 1433,
+            "ticket_hit_rate": 0.5074362606232294
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1730,
+            "race_hit_rate": 0.6126062322946175,
+            "winning_tickets": 2006,
+            "ticket_hit_rate": 0.3551699716713881
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2728,
+            "race_hit_rate": 0.9660056657223796,
+            "winning_tickets": 5262,
+            "ticket_hit_rate": 0.465828611898017
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2617,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1065,
+            "race_hit_rate": 0.4069545280855942,
+            "winning_tickets": 1066,
+            "ticket_hit_rate": 0.1357788816711247
+          },
+          "counter": {
+            "races": 2617,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 629,
+            "race_hit_rate": 0.2403515475735575,
+            "winning_tickets": 629,
+            "ticket_hit_rate": 0.060087886893389376
+          },
+          "longshot": {
+            "races": 2617,
+            "average_tickets_per_race": 4.99847153228888,
+            "race_hits": 449,
+            "race_hit_rate": 0.17157050057317538,
+            "winning_tickets": 449,
+            "ticket_hit_rate": 0.0343245929210305
+          },
+          "combined": {
+            "races": 2617,
+            "average_tickets_per_race": 11.99847153228888,
+            "race_hits": 2138,
+            "race_hit_rate": 0.8169659915934276,
+            "winning_tickets": 2144,
+            "ticket_hit_rate": 0.06828025477707006
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1208,
+            "race_hit_rate": 0.42776203966005666,
+            "winning_tickets": 1210,
+            "ticket_hit_rate": 0.08569405099150142
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.995042492917847,
+            "race_hits": 575,
+            "race_hit_rate": 0.20361189801699717,
+            "winning_tickets": 575,
+            "ticket_hit_rate": 0.03396337861783816
+          },
+          "longshot": {
+            "races": 2810,
+            "average_tickets_per_race": 7.9644128113879,
+            "race_hits": 397,
+            "race_hit_rate": 0.1412811387900356,
+            "winning_tickets": 397,
+            "ticket_hit_rate": 0.0177390527256479
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 18.9199716713881,
+            "race_hits": 2178,
+            "race_hit_rate": 0.7712464589235127,
+            "winning_tickets": 2182,
+            "ticket_hit_rate": 0.04083848025453865
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1735,
+            "race_hit_rate": 0.6143767705382436,
+            "winning_tickets": 2559,
+            "ticket_hit_rate": 0.22654036827195467
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1392,
+            "race_hit_rate": 0.49291784702549574,
+            "winning_tickets": 1601,
+            "ticket_hit_rate": 0.11338526912181303
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 6.961402266288951,
+            "race_hits": 1222,
+            "race_hit_rate": 0.43271954674220964,
+            "winning_tickets": 1405,
+            "ticket_hit_rate": 0.07146853858283737
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 15.961402266288951,
+            "race_hits": 2526,
+            "race_hit_rate": 0.8944759206798867,
+            "winning_tickets": 5565,
+            "ticket_hit_rate": 0.12346089850249584
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 1125,
+            "race_hit_rate": 0.398371104815864,
+            "winning_tickets": 1127,
+            "ticket_hit_rate": 0.049884915014164304
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 532,
+            "race_hit_rate": 0.18838526912181303,
+            "winning_tickets": 532,
+            "ticket_hit_rate": 0.018838526912181304
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 11.950424929178471,
+            "race_hits": 369,
+            "race_hit_rate": 0.1306657223796034,
+            "winning_tickets": 369,
+            "ticket_hit_rate": 0.010933981272964324
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 29.95042492917847,
+            "race_hits": 2024,
+            "race_hit_rate": 0.71671388101983,
+            "winning_tickets": 2028,
+            "ticket_hit_rate": 0.023977299598013715
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 1116,
+            "race_hit_rate": 0.3951841359773371,
+            "winning_tickets": 1119,
+            "ticket_hit_rate": 0.039624645892351276
+          },
+          "counter": {
+            "races": 2810,
+            "average_tickets_per_race": 11.982206405693951,
+            "race_hits": 428,
+            "race_hit_rate": 0.15231316725978647,
+            "winning_tickets": 428,
+            "ticket_hit_rate": 0.012711612711612712
+          },
+          "longshot": {
+            "races": 2785,
+            "average_tickets_per_race": 14.959784560143627,
+            "race_hits": 282,
+            "race_hit_rate": 0.10125673249551168,
+            "winning_tickets": 282,
+            "ticket_hit_rate": 0.006768595636416005
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 36.67599150141643,
+            "race_hits": 1825,
+            "race_hit_rate": 0.6462464589235127,
+            "winning_tickets": 1829,
+            "ticket_hit_rate": 0.017659042414528883
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 557,
+            "race_hit_rate": 0.19723796033994334,
+            "winning_tickets": 561,
+            "ticket_hit_rate": 0.013243626062322947
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 371,
+            "race_hit_rate": 0.13137393767705383,
+            "winning_tickets": 371,
+            "ticket_hit_rate": 0.005971542621684265
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 29.96529745042493,
+            "race_hits": 315,
+            "race_hit_rate": 0.11154390934844192,
+            "winning_tickets": 315,
+            "ticket_hit_rate": 0.003722436245893503
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 66.96529745042493,
+            "race_hits": 1240,
+            "race_hit_rate": 0.43909348441926344,
+            "winning_tickets": 1247,
+            "ticket_hit_rate": 0.006594045793453546
+          }
+        }
+      },
+      "market50_role50": {
+        "win": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 920,
+            "race_hit_rate": 0.32577903682719545,
+            "winning_tickets": 920,
+            "ticket_hit_rate": 0.32577903682719545
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 554,
+            "race_hit_rate": 0.1961756373937677,
+            "winning_tickets": 554,
+            "ticket_hit_rate": 0.1961756373937677
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 345,
+            "race_hit_rate": 0.1221671388101983,
+            "winning_tickets": 345,
+            "ticket_hit_rate": 0.1221671388101983
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1819,
+            "race_hit_rate": 0.6441218130311614,
+            "winning_tickets": 1819,
+            "ticket_hit_rate": 0.21470727101038717
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1825,
+            "race_hit_rate": 0.6462464589235127,
+            "winning_tickets": 1825,
+            "ticket_hit_rate": 0.6462464589235127
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1444,
+            "race_hit_rate": 0.5113314447592068,
+            "winning_tickets": 1444,
+            "ticket_hit_rate": 0.5113314447592068
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1743,
+            "race_hit_rate": 0.6172096317280453,
+            "winning_tickets": 2002,
+            "ticket_hit_rate": 0.3544617563739377
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2721,
+            "race_hit_rate": 0.9635269121813032,
+            "winning_tickets": 5271,
+            "ticket_hit_rate": 0.4666253541076487
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2617,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1068,
+            "race_hit_rate": 0.40810087886893387,
+            "winning_tickets": 1069,
+            "ticket_hit_rate": 0.1361609985989046
+          },
+          "counter": {
+            "races": 2617,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 660,
+            "race_hit_rate": 0.25219717233473443,
+            "winning_tickets": 661,
+            "ticket_hit_rate": 0.06314482231562858
+          },
+          "longshot": {
+            "races": 2617,
+            "average_tickets_per_race": 4.99923576614444,
+            "race_hits": 427,
+            "race_hit_rate": 0.16316392816201758,
+            "winning_tickets": 427,
+            "ticket_hit_rate": 0.03263777421080792
+          },
+          "combined": {
+            "races": 2617,
+            "average_tickets_per_race": 11.99923576614444,
+            "race_hits": 2151,
+            "race_hit_rate": 0.8219335116545663,
+            "winning_tickets": 2157,
+            "ticket_hit_rate": 0.06868989236354373
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1222,
+            "race_hit_rate": 0.43271954674220964,
+            "winning_tickets": 1224,
+            "ticket_hit_rate": 0.086685552407932
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.995042492917847,
+            "race_hits": 593,
+            "race_hit_rate": 0.209985835694051,
+            "winning_tickets": 593,
+            "ticket_hit_rate": 0.03502658003544005
+          },
+          "longshot": {
+            "races": 2810,
+            "average_tickets_per_race": 7.9644128113879,
+            "race_hits": 361,
+            "race_hit_rate": 0.1284697508896797,
+            "winning_tickets": 361,
+            "ticket_hit_rate": 0.01613047363717605
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 18.9199716713881,
+            "race_hits": 2174,
+            "race_hit_rate": 0.7698300283286119,
+            "winning_tickets": 2178,
+            "ticket_hit_rate": 0.040763615946097696
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1744,
+            "race_hit_rate": 0.6175637393767706,
+            "winning_tickets": 2578,
+            "ticket_hit_rate": 0.22822237960339944
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1425,
+            "race_hit_rate": 0.5046033994334278,
+            "winning_tickets": 1644,
+            "ticket_hit_rate": 0.11643059490084987
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 6.961402266288951,
+            "race_hits": 1217,
+            "race_hit_rate": 0.4309490084985836,
+            "winning_tickets": 1389,
+            "ticket_hit_rate": 0.07065466198687624
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 15.961402266288951,
+            "race_hits": 2524,
+            "race_hit_rate": 0.8937677053824362,
+            "winning_tickets": 5611,
+            "ticket_hit_rate": 0.1244814198557959
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 1125,
+            "race_hit_rate": 0.398371104815864,
+            "winning_tickets": 1127,
+            "ticket_hit_rate": 0.049884915014164304
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 537,
+            "race_hit_rate": 0.1901558073654391,
+            "winning_tickets": 537,
+            "ticket_hit_rate": 0.01901558073654391
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 11.950424929178471,
+            "race_hits": 370,
+            "race_hit_rate": 0.13101983002832862,
+            "winning_tickets": 370,
+            "ticket_hit_rate": 0.010963612658527912
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 29.95042492917847,
+            "race_hits": 2030,
+            "race_hit_rate": 0.7188385269121813,
+            "winning_tickets": 2034,
+            "ticket_hit_rate": 0.024048238354220857
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 1138,
+            "race_hit_rate": 0.40297450424929177,
+            "winning_tickets": 1141,
+            "ticket_hit_rate": 0.040403682719546745
+          },
+          "counter": {
+            "races": 2810,
+            "average_tickets_per_race": 11.982206405693951,
+            "race_hits": 444,
+            "race_hit_rate": 0.15800711743772242,
+            "winning_tickets": 444,
+            "ticket_hit_rate": 0.013186813186813187
+          },
+          "longshot": {
+            "races": 2785,
+            "average_tickets_per_race": 14.959784560143627,
+            "race_hits": 255,
+            "race_hit_rate": 0.09156193895870736,
+            "winning_tickets": 255,
+            "ticket_hit_rate": 0.006120538607397451
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 36.67599150141643,
+            "race_hits": 1836,
+            "race_hit_rate": 0.6501416430594901,
+            "winning_tickets": 1840,
+            "ticket_hit_rate": 0.017765247699690075
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 555,
+            "race_hit_rate": 0.19652974504249293,
+            "winning_tickets": 559,
+            "ticket_hit_rate": 0.013196411709159585
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 380,
+            "race_hit_rate": 0.13456090651558072,
+            "winning_tickets": 381,
+            "ticket_hit_rate": 0.006132500643832088
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 29.96529745042493,
+            "race_hits": 323,
+            "race_hit_rate": 0.11437677053824363,
+            "winning_tickets": 323,
+            "ticket_hit_rate": 0.0038169743092812745
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 66.96529745042493,
+            "race_hits": 1257,
+            "race_hit_rate": 0.44511331444759206,
+            "winning_tickets": 1263,
+            "ticket_hit_rate": 0.006678652636031939
+          }
+        }
+      },
+      "popularity": {
+        "win": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 933,
+            "race_hit_rate": 0.33038243626062325,
+            "winning_tickets": 933,
+            "ticket_hit_rate": 0.33038243626062325
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 590,
+            "race_hit_rate": 0.20892351274787535,
+            "winning_tickets": 590,
+            "ticket_hit_rate": 0.20892351274787535
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 358,
+            "race_hit_rate": 0.12677053824362605,
+            "winning_tickets": 358,
+            "ticket_hit_rate": 0.12677053824362605
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1881,
+            "race_hit_rate": 0.6660764872521246,
+            "winning_tickets": 1881,
+            "ticket_hit_rate": 0.2220254957507082
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1824,
+            "race_hit_rate": 0.6458923512747875,
+            "winning_tickets": 1824,
+            "ticket_hit_rate": 0.6458923512747875
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1479,
+            "race_hit_rate": 0.5237252124645893,
+            "winning_tickets": 1479,
+            "ticket_hit_rate": 0.5237252124645893
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1786,
+            "race_hit_rate": 0.6324362606232294,
+            "winning_tickets": 2072,
+            "ticket_hit_rate": 0.3668555240793201
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2724,
+            "race_hit_rate": 0.9645892351274787,
+            "winning_tickets": 5375,
+            "ticket_hit_rate": 0.47583215297450426
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2617,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1087,
+            "race_hit_rate": 0.415361100496752,
+            "winning_tickets": 1088,
+            "ticket_hit_rate": 0.13858107247484397
+          },
+          "counter": {
+            "races": 2617,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 567,
+            "race_hit_rate": 0.21666029805120368,
+            "winning_tickets": 567,
+            "ticket_hit_rate": 0.05416507451280092
+          },
+          "longshot": {
+            "races": 2617,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 364,
+            "race_hit_rate": 0.13909056171188383,
+            "winning_tickets": 364,
+            "ticket_hit_rate": 0.02781811234237677
+          },
+          "combined": {
+            "races": 2617,
+            "average_tickets_per_race": 12.0,
+            "race_hits": 2015,
+            "race_hit_rate": 0.7699656094764998,
+            "winning_tickets": 2019,
+            "ticket_hit_rate": 0.06429117309896829
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1210,
+            "race_hit_rate": 0.42847025495750707,
+            "winning_tickets": 1212,
+            "ticket_hit_rate": 0.0858356940509915
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.995042492917847,
+            "race_hits": 540,
+            "race_hit_rate": 0.19121813031161472,
+            "winning_tickets": 540,
+            "ticket_hit_rate": 0.0318960425280567
+          },
+          "longshot": {
+            "races": 2810,
+            "average_tickets_per_race": 7.965836298932384,
+            "race_hits": 260,
+            "race_hit_rate": 0.09252669039145907,
+            "winning_tickets": 260,
+            "ticket_hit_rate": 0.011615439599714082
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 18.921388101983002,
+            "race_hits": 2008,
+            "race_hit_rate": 0.7110481586402266,
+            "winning_tickets": 2012,
+            "ticket_hit_rate": 0.037653928210502674
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1693,
+            "race_hit_rate": 0.5995042492917847,
+            "winning_tickets": 2559,
+            "ticket_hit_rate": 0.22654036827195467
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1520,
+            "race_hit_rate": 0.5382436260623229,
+            "winning_tickets": 1657,
+            "ticket_hit_rate": 0.11735127478753542
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 6.961756373937677,
+            "race_hits": 730,
+            "race_hit_rate": 0.2584985835694051,
+            "winning_tickets": 785,
+            "ticket_hit_rate": 0.03992878942014242
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 15.961756373937677,
+            "race_hits": 2281,
+            "race_hit_rate": 0.8077195467422096,
+            "winning_tickets": 5001,
+            "ticket_hit_rate": 0.1109459579377052
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 1131,
+            "race_hit_rate": 0.4004957507082153,
+            "winning_tickets": 1133,
+            "ticket_hit_rate": 0.050150495750708214
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 518,
+            "race_hit_rate": 0.18342776203966005,
+            "winning_tickets": 518,
+            "ticket_hit_rate": 0.018342776203966005
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 11.950424929178471,
+            "race_hits": 188,
+            "race_hit_rate": 0.06657223796033994,
+            "winning_tickets": 188,
+            "ticket_hit_rate": 0.005570700485954723
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 29.95042492917847,
+            "race_hits": 1836,
+            "race_hit_rate": 0.6501416430594901,
+            "winning_tickets": 1839,
+            "ticket_hit_rate": 0.021742728777488767
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 1115,
+            "race_hit_rate": 0.3948300283286119,
+            "winning_tickets": 1118,
+            "ticket_hit_rate": 0.03958923512747875
+          },
+          "counter": {
+            "races": 2810,
+            "average_tickets_per_race": 11.982918149466192,
+            "race_hits": 420,
+            "race_hit_rate": 0.1494661921708185,
+            "winning_tickets": 420,
+            "ticket_hit_rate": 0.012473271560940842
+          },
+          "longshot": {
+            "races": 2786,
+            "average_tickets_per_race": 14.962670495333812,
+            "race_hits": 189,
+            "race_hit_rate": 0.0678391959798995,
+            "winning_tickets": 189,
+            "ticket_hit_rate": 0.004533896272129732
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 36.684844192634564,
+            "race_hits": 1723,
+            "race_hit_rate": 0.6101274787535411,
+            "winning_tickets": 1727,
+            "ticket_hit_rate": 0.016670205988532596
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2824,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 565,
+            "race_hit_rate": 0.20007082152974504,
+            "winning_tickets": 568,
+            "ticket_hit_rate": 0.013408876298394712
+          },
+          "counter": {
+            "races": 2824,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 387,
+            "race_hit_rate": 0.13703966005665721,
+            "winning_tickets": 388,
+            "ticket_hit_rate": 0.006245171259335565
+          },
+          "longshot": {
+            "races": 2824,
+            "average_tickets_per_race": 29.96529745042493,
+            "race_hits": 210,
+            "race_hit_rate": 0.07436260623229461,
+            "winning_tickets": 210,
+            "ticket_hit_rate": 0.002481624163929002
+          },
+          "combined": {
+            "races": 2824,
+            "average_tickets_per_race": 66.96529745042493,
+            "race_hits": 1158,
+            "race_hit_rate": 0.41005665722379603,
+            "winning_tickets": 1166,
+            "ticket_hit_rate": 0.006165723652900429
+          }
+        }
+      }
+    },
+    "audit_2026": {
+      "current": {
+        "win": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 563,
+            "race_hit_rate": 0.23419301164725456,
+            "winning_tickets": 563,
+            "ticket_hit_rate": 0.23419301164725456
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 420,
+            "race_hit_rate": 0.17470881863560733,
+            "winning_tickets": 420,
+            "ticket_hit_rate": 0.17470881863560733
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 306,
+            "race_hit_rate": 0.12728785357737105,
+            "winning_tickets": 306,
+            "ticket_hit_rate": 0.12728785357737105
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1289,
+            "race_hit_rate": 0.5361896838602329,
+            "winning_tickets": 1289,
+            "ticket_hit_rate": 0.17872989462007766
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1290,
+            "race_hit_rate": 0.5366056572379367,
+            "winning_tickets": 1290,
+            "ticket_hit_rate": 0.5366056572379367
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1118,
+            "race_hit_rate": 0.4650582362728785,
+            "winning_tickets": 1118,
+            "ticket_hit_rate": 0.4650582362728785
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1429,
+            "race_hit_rate": 0.5944259567387687,
+            "winning_tickets": 1661,
+            "ticket_hit_rate": 0.3454658901830283
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2264,
+            "race_hit_rate": 0.9417637271214643,
+            "winning_tickets": 4069,
+            "ticket_hit_rate": 0.423148918469218
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2267,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 759,
+            "race_hit_rate": 0.33480370533745035,
+            "winning_tickets": 759,
+            "ticket_hit_rate": 0.11160123511248346
+          },
+          "counter": {
+            "races": 2267,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 528,
+            "race_hit_rate": 0.2329069254521394,
+            "winning_tickets": 528,
+            "ticket_hit_rate": 0.05822673136303485
+          },
+          "longshot": {
+            "races": 2267,
+            "average_tickets_per_race": 4.9991177767975294,
+            "race_hits": 391,
+            "race_hit_rate": 0.17247463608292898,
+            "winning_tickets": 392,
+            "ticket_hit_rate": 0.034589252625077206
+          },
+          "combined": {
+            "races": 2267,
+            "average_tickets_per_race": 11.99911777679753,
+            "race_hits": 1678,
+            "race_hit_rate": 0.7401852668725187,
+            "winning_tickets": 1679,
+            "ticket_hit_rate": 0.061723402690978604
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 782,
+            "race_hit_rate": 0.32529118136439267,
+            "winning_tickets": 783,
+            "ticket_hit_rate": 0.0651414309484193
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.997920133111481,
+            "race_hits": 475,
+            "race_hit_rate": 0.1975873544093178,
+            "winning_tickets": 475,
+            "ticket_hit_rate": 0.03294264512102087
+          },
+          "longshot": {
+            "races": 2399,
+            "average_tickets_per_race": 7.9799916631929975,
+            "race_hits": 382,
+            "race_hit_rate": 0.15923301375573157,
+            "winning_tickets": 382,
+            "ticket_hit_rate": 0.019954032595068952
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 18.961314475873543,
+            "race_hits": 1638,
+            "race_hit_rate": 0.6813643926788685,
+            "winning_tickets": 1640,
+            "ticket_hit_rate": 0.03597832525283549
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1231,
+            "race_hit_rate": 0.512063227953411,
+            "winning_tickets": 1705,
+            "ticket_hit_rate": 0.17730865224625625
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1079,
+            "race_hit_rate": 0.4488352745424293,
+            "winning_tickets": 1284,
+            "ticket_hit_rate": 0.10682196339434276
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 6.982529118136439,
+            "race_hits": 1017,
+            "race_hit_rate": 0.423044925124792,
+            "winning_tickets": 1202,
+            "ticket_hit_rate": 0.07160729179077803
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 15.982529118136439,
+            "race_hits": 2042,
+            "race_hit_rate": 0.8494176372712147,
+            "winning_tickets": 4191,
+            "ticket_hit_rate": 0.10907813232002499
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 682,
+            "race_hit_rate": 0.28369384359401,
+            "winning_tickets": 683,
+            "ticket_hit_rate": 0.03551372712146423
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 455,
+            "race_hit_rate": 0.18926788685524126,
+            "winning_tickets": 455,
+            "ticket_hit_rate": 0.018926788685524127
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 11.979201331114808,
+            "race_hits": 316,
+            "race_hit_rate": 0.1314475873544093,
+            "winning_tickets": 317,
+            "ticket_hit_rate": 0.011007708868671435
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 29.97920133111481,
+            "race_hits": 1453,
+            "race_hit_rate": 0.6044093178036606,
+            "winning_tickets": 1455,
+            "ticket_hit_rate": 0.02018870542528098
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 715,
+            "race_hit_rate": 0.2974209650582363,
+            "winning_tickets": 717,
+            "ticket_hit_rate": 0.029825291181364393
+          },
+          "counter": {
+            "races": 2399,
+            "average_tickets_per_race": 11.989995831596499,
+            "race_hits": 363,
+            "race_hit_rate": 0.15131304710295956,
+            "winning_tickets": 363,
+            "ticket_hit_rate": 0.01261994159365874
+          },
+          "longshot": {
+            "races": 2387,
+            "average_tickets_per_race": 14.969836614997906,
+            "race_hits": 282,
+            "race_hit_rate": 0.11813992459153749,
+            "winning_tickets": 282,
+            "ticket_hit_rate": 0.007891864662916631
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 36.82903494176373,
+            "race_hits": 1360,
+            "race_hit_rate": 0.5657237936772047,
+            "winning_tickets": 1362,
+            "ticket_hit_rate": 0.01538339903091363
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 299,
+            "race_hit_rate": 0.12437603993344426,
+            "winning_tickets": 299,
+            "ticket_hit_rate": 0.008291735995562951
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 251,
+            "race_hit_rate": 0.10440931780366057,
+            "winning_tickets": 252,
+            "ticket_hit_rate": 0.004764785962789291
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 29.985440931780367,
+            "race_hits": 223,
+            "race_hit_rate": 0.09276206322795341,
+            "winning_tickets": 223,
+            "ticket_hit_rate": 0.003093570090864951
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 66.98544093178036,
+            "race_hits": 771,
+            "race_hit_rate": 0.3207154742096506,
+            "winning_tickets": 774,
+            "ticket_hit_rate": 0.004806468239429185
+          }
+        }
+      },
+      "rein_role": {
+        "win": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 609,
+            "race_hit_rate": 0.2533277870216306,
+            "winning_tickets": 609,
+            "ticket_hit_rate": 0.2533277870216306
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 446,
+            "race_hit_rate": 0.18552412645590682,
+            "winning_tickets": 446,
+            "ticket_hit_rate": 0.18552412645590682
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 332,
+            "race_hit_rate": 0.13810316139767054,
+            "winning_tickets": 332,
+            "ticket_hit_rate": 0.13810316139767054
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1387,
+            "race_hit_rate": 0.576955074875208,
+            "winning_tickets": 1387,
+            "ticket_hit_rate": 0.192318358291736
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1396,
+            "race_hit_rate": 0.5806988352745425,
+            "winning_tickets": 1396,
+            "ticket_hit_rate": 0.5806988352745425
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1177,
+            "race_hit_rate": 0.48960066555740434,
+            "winning_tickets": 1177,
+            "ticket_hit_rate": 0.48960066555740434
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1511,
+            "race_hit_rate": 0.6285357737104825,
+            "winning_tickets": 1721,
+            "ticket_hit_rate": 0.3579450915141431
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2299,
+            "race_hit_rate": 0.9563227953410982,
+            "winning_tickets": 4294,
+            "ticket_hit_rate": 0.44654742096505823
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2267,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 822,
+            "race_hit_rate": 0.3625937362152625,
+            "winning_tickets": 822,
+            "ticket_hit_rate": 0.12086457873842082
+          },
+          "counter": {
+            "races": 2267,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 539,
+            "race_hit_rate": 0.23775915306572562,
+            "winning_tickets": 539,
+            "ticket_hit_rate": 0.059439788266431405
+          },
+          "longshot": {
+            "races": 2267,
+            "average_tickets_per_race": 4.996912218791354,
+            "race_hits": 399,
+            "race_hit_rate": 0.17600352889280987,
+            "winning_tickets": 400,
+            "ticket_hit_rate": 0.03531073446327684
+          },
+          "combined": {
+            "races": 2267,
+            "average_tickets_per_race": 11.996912218791355,
+            "race_hits": 1759,
+            "race_hit_rate": 0.7759153065725629,
+            "winning_tickets": 1761,
+            "ticket_hit_rate": 0.06474978857962276
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 890,
+            "race_hit_rate": 0.370216306156406,
+            "winning_tickets": 891,
+            "ticket_hit_rate": 0.07412645590682196
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.997920133111481,
+            "race_hits": 476,
+            "race_hit_rate": 0.19800332778702162,
+            "winning_tickets": 476,
+            "ticket_hit_rate": 0.03301199805811776
+          },
+          "longshot": {
+            "races": 2399,
+            "average_tickets_per_race": 7.9799916631929975,
+            "race_hits": 359,
+            "race_hit_rate": 0.149645685702376,
+            "winning_tickets": 359,
+            "ticket_hit_rate": 0.01875261178437108
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 18.961314475873543,
+            "race_hits": 1724,
+            "race_hit_rate": 0.7171381031613977,
+            "winning_tickets": 1726,
+            "ticket_hit_rate": 0.03786499352828906
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1344,
+            "race_hit_rate": 0.5590682196339434,
+            "winning_tickets": 1926,
+            "ticket_hit_rate": 0.20029118136439267
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1140,
+            "race_hit_rate": 0.47420965058236275,
+            "winning_tickets": 1377,
+            "ticket_hit_rate": 0.11455906821963395
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 6.982529118136439,
+            "race_hits": 992,
+            "race_hit_rate": 0.41264559068219636,
+            "winning_tickets": 1169,
+            "ticket_hit_rate": 0.06964136780650543
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 15.982529118136439,
+            "race_hits": 2104,
+            "race_hit_rate": 0.8752079866888519,
+            "winning_tickets": 4472,
+            "ticket_hit_rate": 0.11639165061683411
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 761,
+            "race_hit_rate": 0.3165557404326123,
+            "winning_tickets": 761,
+            "ticket_hit_rate": 0.03956946755407654
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 464,
+            "race_hit_rate": 0.1930116472545757,
+            "winning_tickets": 464,
+            "ticket_hit_rate": 0.01930116472545757
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 11.979201331114808,
+            "race_hits": 329,
+            "race_hit_rate": 0.13685524126455906,
+            "winning_tickets": 329,
+            "ticket_hit_rate": 0.011424404472532814
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 29.97920133111481,
+            "race_hits": 1552,
+            "race_hit_rate": 0.6455906821963394,
+            "winning_tickets": 1554,
+            "ticket_hit_rate": 0.021562369918135146
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 828,
+            "race_hit_rate": 0.34442595673876875,
+            "winning_tickets": 830,
+            "ticket_hit_rate": 0.034525790349417634
+          },
+          "counter": {
+            "races": 2399,
+            "average_tickets_per_race": 11.989995831596499,
+            "race_hits": 391,
+            "race_hit_rate": 0.1629845769070446,
+            "winning_tickets": 391,
+            "ticket_hit_rate": 0.013593380614657211
+          },
+          "longshot": {
+            "races": 2387,
+            "average_tickets_per_race": 14.969836614997906,
+            "race_hits": 235,
+            "race_hit_rate": 0.09844993715961457,
+            "winning_tickets": 235,
+            "ticket_hit_rate": 0.00657655388576386
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 36.82903494176373,
+            "race_hits": 1452,
+            "race_hit_rate": 0.6039933444259568,
+            "winning_tickets": 1456,
+            "ticket_hit_rate": 0.016445102047731457
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 323,
+            "race_hit_rate": 0.1343594009983361,
+            "winning_tickets": 323,
+            "ticket_hit_rate": 0.008957293399889073
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 277,
+            "race_hit_rate": 0.11522462562396006,
+            "winning_tickets": 277,
+            "ticket_hit_rate": 0.0052374829829072754
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 29.985440931780367,
+            "race_hits": 242,
+            "race_hit_rate": 0.10066555740432612,
+            "winning_tickets": 243,
+            "ticket_hit_rate": 0.0033710203232295206
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 66.98544093178036,
+            "race_hits": 839,
+            "race_hit_rate": 0.34900166389351084,
+            "winning_tickets": 843,
+            "ticket_hit_rate": 0.005234951842168997
+          }
+        }
+      },
+      "current75_role25": {
+        "win": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 585,
+            "race_hit_rate": 0.24334442595673877,
+            "winning_tickets": 585,
+            "ticket_hit_rate": 0.24334442595673877
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 447,
+            "race_hit_rate": 0.18594009983361065,
+            "winning_tickets": 447,
+            "ticket_hit_rate": 0.18594009983361065
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 315,
+            "race_hit_rate": 0.13103161397670549,
+            "winning_tickets": 315,
+            "ticket_hit_rate": 0.13103161397670549
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1347,
+            "race_hit_rate": 0.5603161397670549,
+            "winning_tickets": 1347,
+            "ticket_hit_rate": 0.1867720465890183
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1329,
+            "race_hit_rate": 0.552828618968386,
+            "winning_tickets": 1329,
+            "ticket_hit_rate": 0.552828618968386
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1153,
+            "race_hit_rate": 0.4796173044925125,
+            "winning_tickets": 1153,
+            "ticket_hit_rate": 0.4796173044925125
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1443,
+            "race_hit_rate": 0.6002495840266223,
+            "winning_tickets": 1670,
+            "ticket_hit_rate": 0.34733777038269553
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2277,
+            "race_hit_rate": 0.947171381031614,
+            "winning_tickets": 4152,
+            "ticket_hit_rate": 0.4317803660565724
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2267,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 780,
+            "race_hit_rate": 0.34406704896338774,
+            "winning_tickets": 780,
+            "ticket_hit_rate": 0.11468901632112924
+          },
+          "counter": {
+            "races": 2267,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 533,
+            "race_hit_rate": 0.23511248345831495,
+            "winning_tickets": 533,
+            "ticket_hit_rate": 0.05877812086457874
+          },
+          "longshot": {
+            "races": 2267,
+            "average_tickets_per_race": 4.996029995588884,
+            "race_hits": 406,
+            "race_hit_rate": 0.17909131010145568,
+            "winning_tickets": 407,
+            "ticket_hit_rate": 0.03593501677556066
+          },
+          "combined": {
+            "races": 2267,
+            "average_tickets_per_race": 11.996029995588884,
+            "race_hits": 1719,
+            "race_hit_rate": 0.7582708425231584,
+            "winning_tickets": 1720,
+            "ticket_hit_rate": 0.06324692038977753
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 826,
+            "race_hit_rate": 0.34359400998336104,
+            "winning_tickets": 826,
+            "ticket_hit_rate": 0.06871880199667221
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.997920133111481,
+            "race_hits": 472,
+            "race_hit_rate": 0.19633943427620631,
+            "winning_tickets": 473,
+            "ticket_hit_rate": 0.032803939246827105
+          },
+          "longshot": {
+            "races": 2399,
+            "average_tickets_per_race": 7.9799916631929975,
+            "race_hits": 391,
+            "race_hit_rate": 0.1629845769070446,
+            "winning_tickets": 391,
+            "ticket_hit_rate": 0.02042415378186377
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 18.961314475873543,
+            "race_hits": 1688,
+            "race_hit_rate": 0.7021630615640599,
+            "winning_tickets": 1690,
+            "ticket_hit_rate": 0.03707522541298291
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1269,
+            "race_hit_rate": 0.5278702163061564,
+            "winning_tickets": 1789,
+            "ticket_hit_rate": 0.1860440931780366
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1111,
+            "race_hit_rate": 0.4621464226289517,
+            "winning_tickets": 1317,
+            "ticket_hit_rate": 0.10956738768718802
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 6.982529118136439,
+            "race_hits": 1038,
+            "race_hit_rate": 0.4317803660565724,
+            "winning_tickets": 1229,
+            "ticket_hit_rate": 0.07321577505063744
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 15.982529118136439,
+            "race_hits": 2071,
+            "race_hit_rate": 0.8614808652246256,
+            "winning_tickets": 4335,
+            "ticket_hit_rate": 0.11282598511269586
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 741,
+            "race_hit_rate": 0.3082362728785358,
+            "winning_tickets": 741,
+            "ticket_hit_rate": 0.03852953410981697
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 424,
+            "race_hit_rate": 0.17637271214642264,
+            "winning_tickets": 424,
+            "ticket_hit_rate": 0.017637271214642262
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 11.979201331114808,
+            "race_hits": 358,
+            "race_hit_rate": 0.14891846921797006,
+            "winning_tickets": 358,
+            "ticket_hit_rate": 0.012431418848531148
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 29.97920133111481,
+            "race_hits": 1521,
+            "race_hit_rate": 0.6326955074875208,
+            "winning_tickets": 1523,
+            "ticket_hit_rate": 0.02113223255168586
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 775,
+            "race_hit_rate": 0.3223793677204659,
+            "winning_tickets": 777,
+            "ticket_hit_rate": 0.03232113144758735
+          },
+          "counter": {
+            "races": 2399,
+            "average_tickets_per_race": 11.989995831596499,
+            "race_hits": 384,
+            "race_hit_rate": 0.16006669445602334,
+            "winning_tickets": 384,
+            "ticket_hit_rate": 0.013350020859407593
+          },
+          "longshot": {
+            "races": 2387,
+            "average_tickets_per_race": 14.969836614997906,
+            "race_hits": 252,
+            "race_hit_rate": 0.10557184750733138,
+            "winning_tickets": 252,
+            "ticket_hit_rate": 0.007052304592393586
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 36.82903494176373,
+            "race_hits": 1410,
+            "race_hit_rate": 0.586522462562396,
+            "winning_tickets": 1413,
+            "ticket_hit_rate": 0.015959429391102026
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 328,
+            "race_hit_rate": 0.13643926788685523,
+            "winning_tickets": 328,
+            "ticket_hit_rate": 0.009095951192457015
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 253,
+            "race_hit_rate": 0.10524126455906822,
+            "winning_tickets": 254,
+            "ticket_hit_rate": 0.0048026017243987295
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 29.985440931780367,
+            "race_hits": 247,
+            "race_hit_rate": 0.10274542429284526,
+            "winning_tickets": 247,
+            "ticket_hit_rate": 0.0034265103697024347
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 66.98544093178036,
+            "race_hits": 826,
+            "race_hit_rate": 0.34359400998336104,
+            "winning_tickets": 829,
+            "ticket_hit_rate": 0.005148013140163817
+          }
+        }
+      },
+      "current50_role50": {
+        "win": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 597,
+            "race_hit_rate": 0.2483361064891847,
+            "winning_tickets": 597,
+            "ticket_hit_rate": 0.2483361064891847
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 463,
+            "race_hit_rate": 0.19259567387687188,
+            "winning_tickets": 463,
+            "ticket_hit_rate": 0.19259567387687188
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 322,
+            "race_hit_rate": 0.13394342762063227,
+            "winning_tickets": 322,
+            "ticket_hit_rate": 0.13394342762063227
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1382,
+            "race_hit_rate": 0.5748752079866889,
+            "winning_tickets": 1382,
+            "ticket_hit_rate": 0.19162506932889628
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1352,
+            "race_hit_rate": 0.562396006655574,
+            "winning_tickets": 1352,
+            "ticket_hit_rate": 0.562396006655574
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1167,
+            "race_hit_rate": 0.48544093178036607,
+            "winning_tickets": 1167,
+            "ticket_hit_rate": 0.48544093178036607
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1493,
+            "race_hit_rate": 0.6210482529118136,
+            "winning_tickets": 1727,
+            "ticket_hit_rate": 0.3591930116472546
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2304,
+            "race_hit_rate": 0.9584026622296173,
+            "winning_tickets": 4246,
+            "ticket_hit_rate": 0.4415557404326123
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2267,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 819,
+            "race_hit_rate": 0.36127040141155714,
+            "winning_tickets": 819,
+            "ticket_hit_rate": 0.12042346713718571
+          },
+          "counter": {
+            "races": 2267,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 550,
+            "race_hit_rate": 0.24261138067931187,
+            "winning_tickets": 550,
+            "ticket_hit_rate": 0.06065284516982797
+          },
+          "longshot": {
+            "races": 2267,
+            "average_tickets_per_race": 4.995147772386414,
+            "race_hits": 374,
+            "race_hit_rate": 0.16497573886193206,
+            "winning_tickets": 376,
+            "ticket_hit_rate": 0.0332038149063935
+          },
+          "combined": {
+            "races": 2267,
+            "average_tickets_per_race": 11.995147772386414,
+            "race_hits": 1743,
+            "race_hit_rate": 0.768857520952801,
+            "winning_tickets": 1745,
+            "ticket_hit_rate": 0.06417092634133785
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 865,
+            "race_hit_rate": 0.35981697171381033,
+            "winning_tickets": 865,
+            "ticket_hit_rate": 0.07196339434276207
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.997920133111481,
+            "race_hits": 479,
+            "race_hit_rate": 0.1992512479201331,
+            "winning_tickets": 480,
+            "ticket_hit_rate": 0.033289409806505306
+          },
+          "longshot": {
+            "races": 2399,
+            "average_tickets_per_race": 7.9799916631929975,
+            "race_hits": 377,
+            "race_hit_rate": 0.15714881200500208,
+            "winning_tickets": 377,
+            "ticket_hit_rate": 0.01969285415796072
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 18.961314475873543,
+            "race_hits": 1720,
+            "race_hit_rate": 0.7154742096505824,
+            "winning_tickets": 1722,
+            "ticket_hit_rate": 0.03777724151547726
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1317,
+            "race_hit_rate": 0.5478369384359401,
+            "winning_tickets": 1859,
+            "ticket_hit_rate": 0.19332362728785357
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1141,
+            "race_hit_rate": 0.4746256239600666,
+            "winning_tickets": 1351,
+            "ticket_hit_rate": 0.11239600665557405
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 6.982529118136439,
+            "race_hits": 1026,
+            "race_hit_rate": 0.42678868552412647,
+            "winning_tickets": 1222,
+            "ticket_hit_rate": 0.07279876087215537
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 15.982529118136439,
+            "race_hits": 2088,
+            "race_hit_rate": 0.8685524126455907,
+            "winning_tickets": 4432,
+            "ticket_hit_rate": 0.11535058039664775
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 754,
+            "race_hit_rate": 0.3136439267886855,
+            "winning_tickets": 754,
+            "ticket_hit_rate": 0.03920549084858569
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 465,
+            "race_hit_rate": 0.19342762063227953,
+            "winning_tickets": 466,
+            "ticket_hit_rate": 0.019384359400998336
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 11.979201331114808,
+            "race_hits": 336,
+            "race_hit_rate": 0.13976705490848584,
+            "winning_tickets": 336,
+            "ticket_hit_rate": 0.01166747690811862
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 29.97920133111481,
+            "race_hits": 1554,
+            "race_hit_rate": 0.6464226289517471,
+            "winning_tickets": 1556,
+            "ticket_hit_rate": 0.021590120715970586
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 806,
+            "race_hit_rate": 0.3352745424292845,
+            "winning_tickets": 808,
+            "ticket_hit_rate": 0.03361064891846922
+          },
+          "counter": {
+            "races": 2399,
+            "average_tickets_per_race": 11.989995831596499,
+            "race_hits": 384,
+            "race_hit_rate": 0.16006669445602334,
+            "winning_tickets": 384,
+            "ticket_hit_rate": 0.013350020859407593
+          },
+          "longshot": {
+            "races": 2387,
+            "average_tickets_per_race": 14.969836614997906,
+            "race_hits": 252,
+            "race_hit_rate": 0.10557184750733138,
+            "winning_tickets": 252,
+            "ticket_hit_rate": 0.007052304592393586
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 36.82903494176373,
+            "race_hits": 1441,
+            "race_hit_rate": 0.5994176372712147,
+            "winning_tickets": 1444,
+            "ticket_hit_rate": 0.01630956549239301
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 344,
+            "race_hit_rate": 0.14309484193011648,
+            "winning_tickets": 344,
+            "ticket_hit_rate": 0.009539656128674431
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 295,
+            "race_hit_rate": 0.12271214642262895,
+            "winning_tickets": 296,
+            "ticket_hit_rate": 0.005596732718196945
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 29.985440931780367,
+            "race_hits": 234,
+            "race_hit_rate": 0.0973377703826955,
+            "winning_tickets": 234,
+            "ticket_hit_rate": 0.0032461677186654643
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 66.98544093178036,
+            "race_hits": 870,
+            "race_hit_rate": 0.36189683860232946,
+            "winning_tickets": 874,
+            "ticket_hit_rate": 0.005427458968037607
+          }
+        }
+      },
+      "market70_role30": {
+        "win": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 816,
+            "race_hit_rate": 0.33943427620632277,
+            "winning_tickets": 816,
+            "ticket_hit_rate": 0.33943427620632277
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 435,
+            "race_hit_rate": 0.18094841930116473,
+            "winning_tickets": 435,
+            "ticket_hit_rate": 0.18094841930116473
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 328,
+            "race_hit_rate": 0.13643926788685523,
+            "winning_tickets": 328,
+            "ticket_hit_rate": 0.13643926788685523
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1579,
+            "race_hit_rate": 0.6568219633943427,
+            "winning_tickets": 1579,
+            "ticket_hit_rate": 0.21894065446478092
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1584,
+            "race_hit_rate": 0.6589018302828619,
+            "winning_tickets": 1584,
+            "ticket_hit_rate": 0.6589018302828619
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1261,
+            "race_hit_rate": 0.5245424292845258,
+            "winning_tickets": 1261,
+            "ticket_hit_rate": 0.5245424292845258
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1530,
+            "race_hit_rate": 0.6364392678868552,
+            "winning_tickets": 1763,
+            "ticket_hit_rate": 0.36668053244592347
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2339,
+            "race_hit_rate": 0.9729617304492513,
+            "winning_tickets": 4608,
+            "ticket_hit_rate": 0.47920133111480867
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2267,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 967,
+            "race_hit_rate": 0.4265549183943538,
+            "winning_tickets": 967,
+            "ticket_hit_rate": 0.14218497279811793
+          },
+          "counter": {
+            "races": 2267,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 541,
+            "race_hit_rate": 0.23864137626819584,
+            "winning_tickets": 541,
+            "ticket_hit_rate": 0.05966034406704896
+          },
+          "longshot": {
+            "races": 2267,
+            "average_tickets_per_race": 4.9977944419938245,
+            "race_hits": 348,
+            "race_hit_rate": 0.15350683722981914,
+            "winning_tickets": 348,
+            "ticket_hit_rate": 0.030714916151809355
+          },
+          "combined": {
+            "races": 2267,
+            "average_tickets_per_race": 11.997794441993824,
+            "race_hits": 1856,
+            "race_hit_rate": 0.8187031318923688,
+            "winning_tickets": 1856,
+            "ticket_hit_rate": 0.06823780286039928
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1048,
+            "race_hit_rate": 0.43594009983361065,
+            "winning_tickets": 1048,
+            "ticket_hit_rate": 0.08718801996672212
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.997920133111481,
+            "race_hits": 470,
+            "race_hit_rate": 0.19550748752079866,
+            "winning_tickets": 470,
+            "ticket_hit_rate": 0.03259588043553645
+          },
+          "longshot": {
+            "races": 2399,
+            "average_tickets_per_race": 7.9799916631929975,
+            "race_hits": 359,
+            "race_hit_rate": 0.149645685702376,
+            "winning_tickets": 359,
+            "ticket_hit_rate": 0.01875261178437108
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 18.961314475873543,
+            "race_hits": 1875,
+            "race_hit_rate": 0.7799500831946755,
+            "winning_tickets": 1877,
+            "ticket_hit_rate": 0.04117763201193427
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1482,
+            "race_hit_rate": 0.6164725457570716,
+            "winning_tickets": 2238,
+            "ticket_hit_rate": 0.23273710482529117
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1295,
+            "race_hit_rate": 0.5386855241264559,
+            "winning_tickets": 1459,
+            "ticket_hit_rate": 0.1213810316139767
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 6.982529118136439,
+            "race_hits": 1030,
+            "race_hit_rate": 0.42845257903494177,
+            "winning_tickets": 1166,
+            "ticket_hit_rate": 0.06946264744429882
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 15.982529118136439,
+            "race_hits": 2188,
+            "race_hit_rate": 0.9101497504159733,
+            "winning_tickets": 4863,
+            "ticket_hit_rate": 0.1265681120191557
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 963,
+            "race_hit_rate": 0.40058236272878534,
+            "winning_tickets": 963,
+            "ticket_hit_rate": 0.05007279534109817
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 442,
+            "race_hit_rate": 0.18386023294509152,
+            "winning_tickets": 442,
+            "ticket_hit_rate": 0.01838602329450915
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 11.979201331114808,
+            "race_hits": 311,
+            "race_hit_rate": 0.12936772046589018,
+            "winning_tickets": 311,
+            "ticket_hit_rate": 0.010799361066740745
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 29.97920133111481,
+            "race_hits": 1714,
+            "race_hit_rate": 0.7129783693843594,
+            "winning_tickets": 1716,
+            "ticket_hit_rate": 0.023810184542805604
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 951,
+            "race_hit_rate": 0.3955906821963394,
+            "winning_tickets": 953,
+            "ticket_hit_rate": 0.03964226289517471
+          },
+          "counter": {
+            "races": 2399,
+            "average_tickets_per_race": 11.989995831596499,
+            "race_hits": 428,
+            "race_hit_rate": 0.1784076698624427,
+            "winning_tickets": 428,
+            "ticket_hit_rate": 0.014879710749548046
+          },
+          "longshot": {
+            "races": 2387,
+            "average_tickets_per_race": 14.969836614997906,
+            "race_hits": 242,
+            "race_hit_rate": 0.10138248847926268,
+            "winning_tickets": 242,
+            "ticket_hit_rate": 0.00677245123555257
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 36.82903494176373,
+            "race_hits": 1620,
+            "race_hit_rate": 0.6738768718801996,
+            "winning_tickets": 1623,
+            "ticket_hit_rate": 0.018331319109524832
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 521,
+            "race_hit_rate": 0.21672212978369385,
+            "winning_tickets": 522,
+            "ticket_hit_rate": 0.014475873544093179
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 266,
+            "race_hit_rate": 0.11064891846921797,
+            "winning_tickets": 266,
+            "ticket_hit_rate": 0.005029496294055362
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 29.985440931780367,
+            "race_hits": 268,
+            "race_hit_rate": 0.11148086522462562,
+            "winning_tickets": 268,
+            "ticket_hit_rate": 0.003717833113685233
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 66.98544093178036,
+            "race_hits": 1054,
+            "race_hit_rate": 0.4384359400998336,
+            "winning_tickets": 1056,
+            "ticket_hit_rate": 0.006557662094104935
+          }
+        }
+      },
+      "market50_current25_role25": {
+        "win": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 787,
+            "race_hit_rate": 0.3273710482529118,
+            "winning_tickets": 787,
+            "ticket_hit_rate": 0.3273710482529118
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 449,
+            "race_hit_rate": 0.1867720465890183,
+            "winning_tickets": 449,
+            "ticket_hit_rate": 0.1867720465890183
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 327,
+            "race_hit_rate": 0.1360232945091514,
+            "winning_tickets": 327,
+            "ticket_hit_rate": 0.1360232945091514
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1563,
+            "race_hit_rate": 0.6501663893510815,
+            "winning_tickets": 1563,
+            "ticket_hit_rate": 0.21672212978369385
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1581,
+            "race_hit_rate": 0.6576539101497504,
+            "winning_tickets": 1581,
+            "ticket_hit_rate": 0.6576539101497504
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1224,
+            "race_hit_rate": 0.5091514143094842,
+            "winning_tickets": 1224,
+            "ticket_hit_rate": 0.5091514143094842
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1515,
+            "race_hit_rate": 0.6301996672212978,
+            "winning_tickets": 1730,
+            "ticket_hit_rate": 0.35981697171381033
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2333,
+            "race_hit_rate": 0.9704658901830283,
+            "winning_tickets": 4535,
+            "ticket_hit_rate": 0.47160981697171384
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2267,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 945,
+            "race_hit_rate": 0.4168504631671813,
+            "winning_tickets": 945,
+            "ticket_hit_rate": 0.13895015438906044
+          },
+          "counter": {
+            "races": 2267,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 547,
+            "race_hit_rate": 0.24128804587560654,
+            "winning_tickets": 547,
+            "ticket_hit_rate": 0.060322011468901635
+          },
+          "longshot": {
+            "races": 2267,
+            "average_tickets_per_race": 4.99823555359506,
+            "race_hits": 354,
+            "race_hit_rate": 0.1561535068372298,
+            "winning_tickets": 355,
+            "ticket_hit_rate": 0.031329979701703294
+          },
+          "combined": {
+            "races": 2267,
+            "average_tickets_per_race": 11.998235553595059,
+            "race_hits": 1846,
+            "race_hit_rate": 0.8142920158800176,
+            "winning_tickets": 1847,
+            "ticket_hit_rate": 0.06790441176470588
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1031,
+            "race_hit_rate": 0.4288685524126456,
+            "winning_tickets": 1031,
+            "ticket_hit_rate": 0.08577371048252912
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.997920133111481,
+            "race_hits": 470,
+            "race_hit_rate": 0.19550748752079866,
+            "winning_tickets": 470,
+            "ticket_hit_rate": 0.03259588043553645
+          },
+          "longshot": {
+            "races": 2399,
+            "average_tickets_per_race": 7.9799916631929975,
+            "race_hits": 363,
+            "race_hit_rate": 0.15131304710295956,
+            "winning_tickets": 363,
+            "ticket_hit_rate": 0.018961554534057668
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 18.961314475873543,
+            "race_hits": 1862,
+            "race_hit_rate": 0.7745424292845258,
+            "winning_tickets": 1864,
+            "ticket_hit_rate": 0.040892437970295945
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1504,
+            "race_hit_rate": 0.6256239600665557,
+            "winning_tickets": 2209,
+            "ticket_hit_rate": 0.22972129783693843
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1264,
+            "race_hit_rate": 0.5257903494176372,
+            "winning_tickets": 1440,
+            "ticket_hit_rate": 0.11980033277870217
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 6.982529118136439,
+            "race_hits": 1000,
+            "race_hit_rate": 0.415973377703827,
+            "winning_tickets": 1131,
+            "ticket_hit_rate": 0.06737757655188847
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 15.982529118136439,
+            "race_hits": 2179,
+            "race_hit_rate": 0.9064059900166389,
+            "winning_tickets": 4780,
+            "ticket_hit_rate": 0.12440789131226901
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 938,
+            "race_hit_rate": 0.39018302828618967,
+            "winning_tickets": 939,
+            "ticket_hit_rate": 0.04882487520798669
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 455,
+            "race_hit_rate": 0.18926788685524126,
+            "winning_tickets": 455,
+            "ticket_hit_rate": 0.018926788685524127
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 11.979201331114808,
+            "race_hits": 304,
+            "race_hit_rate": 0.1264559068219634,
+            "winning_tickets": 304,
+            "ticket_hit_rate": 0.010556288631154941
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 29.97920133111481,
+            "race_hits": 1696,
+            "race_hit_rate": 0.7054908485856906,
+            "winning_tickets": 1698,
+            "ticket_hit_rate": 0.023560427362286664
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 943,
+            "race_hit_rate": 0.3922628951747088,
+            "winning_tickets": 945,
+            "ticket_hit_rate": 0.03930948419301165
+          },
+          "counter": {
+            "races": 2399,
+            "average_tickets_per_race": 11.989995831596499,
+            "race_hits": 399,
+            "race_hit_rate": 0.16631929970821174,
+            "winning_tickets": 399,
+            "ticket_hit_rate": 0.013871506049228202
+          },
+          "longshot": {
+            "races": 2387,
+            "average_tickets_per_race": 14.969836614997906,
+            "race_hits": 255,
+            "race_hit_rate": 0.106828655215752,
+            "winning_tickets": 255,
+            "ticket_hit_rate": 0.007136260599445891
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 36.82903494176373,
+            "race_hits": 1596,
+            "race_hit_rate": 0.6638935108153078,
+            "winning_tickets": 1599,
+            "ticket_hit_rate": 0.01806024599884794
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 484,
+            "race_hit_rate": 0.20133111480865223,
+            "winning_tickets": 485,
+            "ticket_hit_rate": 0.013449805879090405
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 294,
+            "race_hit_rate": 0.12229617304492513,
+            "winning_tickets": 294,
+            "ticket_hit_rate": 0.005558916956587506
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 29.985440931780367,
+            "race_hits": 251,
+            "race_hit_rate": 0.10440931780366057,
+            "winning_tickets": 252,
+            "ticket_hit_rate": 0.003495872927793577
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 66.98544093178036,
+            "race_hits": 1028,
+            "race_hit_rate": 0.4276206322795341,
+            "winning_tickets": 1031,
+            "ticket_hit_rate": 0.00640241441195283
+          }
+        }
+      },
+      "market50_role50": {
+        "win": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 794,
+            "race_hit_rate": 0.3302828618968386,
+            "winning_tickets": 794,
+            "ticket_hit_rate": 0.3302828618968386
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 446,
+            "race_hit_rate": 0.18552412645590682,
+            "winning_tickets": 446,
+            "ticket_hit_rate": 0.18552412645590682
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 324,
+            "race_hit_rate": 0.13477537437603992,
+            "winning_tickets": 324,
+            "ticket_hit_rate": 0.13477537437603992
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1564,
+            "race_hit_rate": 0.6505823627287853,
+            "winning_tickets": 1564,
+            "ticket_hit_rate": 0.2168607875762618
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1583,
+            "race_hit_rate": 0.658485856905158,
+            "winning_tickets": 1583,
+            "ticket_hit_rate": 0.658485856905158
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1250,
+            "race_hit_rate": 0.5199667221297837,
+            "winning_tickets": 1250,
+            "ticket_hit_rate": 0.5199667221297837
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1514,
+            "race_hit_rate": 0.629783693843594,
+            "winning_tickets": 1729,
+            "ticket_hit_rate": 0.3596089850249584
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2336,
+            "race_hit_rate": 0.9717138103161398,
+            "winning_tickets": 4562,
+            "ticket_hit_rate": 0.47441763727121466
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2267,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 950,
+            "race_hit_rate": 0.4190560211733569,
+            "winning_tickets": 950,
+            "ticket_hit_rate": 0.13968534039111896
+          },
+          "counter": {
+            "races": 2267,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 545,
+            "race_hit_rate": 0.24040582267313632,
+            "winning_tickets": 545,
+            "ticket_hit_rate": 0.06010145566828408
+          },
+          "longshot": {
+            "races": 2267,
+            "average_tickets_per_race": 4.9991177767975294,
+            "race_hits": 359,
+            "race_hit_rate": 0.1583590648434054,
+            "winning_tickets": 360,
+            "ticket_hit_rate": 0.03176564016588723
+          },
+          "combined": {
+            "races": 2267,
+            "average_tickets_per_race": 11.99911777679753,
+            "race_hits": 1854,
+            "race_hit_rate": 0.8178209086898985,
+            "winning_tickets": 1855,
+            "ticket_hit_rate": 0.06819351518270715
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1038,
+            "race_hit_rate": 0.4317803660565724,
+            "winning_tickets": 1038,
+            "ticket_hit_rate": 0.08635607321131447
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.997920133111481,
+            "race_hits": 454,
+            "race_hit_rate": 0.18885191347753744,
+            "winning_tickets": 454,
+            "ticket_hit_rate": 0.03148623344198627
+          },
+          "longshot": {
+            "races": 2399,
+            "average_tickets_per_race": 7.9799916631929975,
+            "race_hits": 358,
+            "race_hit_rate": 0.1492288453522301,
+            "winning_tickets": 358,
+            "ticket_hit_rate": 0.018700376096949436
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 18.961314475873543,
+            "race_hits": 1848,
+            "race_hit_rate": 0.7687188019966722,
+            "winning_tickets": 1850,
+            "ticket_hit_rate": 0.040585305925454666
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1495,
+            "race_hit_rate": 0.6218801996672213,
+            "winning_tickets": 2232,
+            "ticket_hit_rate": 0.23211314475873543
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1260,
+            "race_hit_rate": 0.5241264559068219,
+            "winning_tickets": 1442,
+            "ticket_hit_rate": 0.1199667221297837
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 6.982529118136439,
+            "race_hits": 995,
+            "race_hit_rate": 0.41389351081530784,
+            "winning_tickets": 1144,
+            "ticket_hit_rate": 0.06815203145478375
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 15.982529118136439,
+            "race_hits": 2184,
+            "race_hit_rate": 0.908485856905158,
+            "winning_tickets": 4818,
+            "ticket_hit_rate": 0.12539690802144604
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 934,
+            "race_hit_rate": 0.38851913477537436,
+            "winning_tickets": 934,
+            "ticket_hit_rate": 0.048564891846921796
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 449,
+            "race_hit_rate": 0.1867720465890183,
+            "winning_tickets": 449,
+            "ticket_hit_rate": 0.018677204658901832
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 11.979201331114808,
+            "race_hits": 316,
+            "race_hit_rate": 0.1314475873544093,
+            "winning_tickets": 316,
+            "ticket_hit_rate": 0.01097298423501632
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 29.97920133111481,
+            "race_hits": 1697,
+            "race_hit_rate": 0.7059068219633944,
+            "winning_tickets": 1699,
+            "ticket_hit_rate": 0.023574302761204386
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 943,
+            "race_hit_rate": 0.3922628951747088,
+            "winning_tickets": 945,
+            "ticket_hit_rate": 0.03930948419301165
+          },
+          "counter": {
+            "races": 2399,
+            "average_tickets_per_race": 11.989995831596499,
+            "race_hits": 416,
+            "race_hit_rate": 0.17340558566069195,
+            "winning_tickets": 416,
+            "ticket_hit_rate": 0.01446252259769156
+          },
+          "longshot": {
+            "races": 2387,
+            "average_tickets_per_race": 14.969836614997906,
+            "race_hits": 232,
+            "race_hit_rate": 0.09719312945119397,
+            "winning_tickets": 232,
+            "ticket_hit_rate": 0.006492597878711555
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 36.82903494176373,
+            "race_hits": 1590,
+            "race_hit_rate": 0.6613976705490848,
+            "winning_tickets": 1593,
+            "ticket_hit_rate": 0.017992477721178717
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 489,
+            "race_hit_rate": 0.2034109816971714,
+            "winning_tickets": 490,
+            "ticket_hit_rate": 0.013588463671658347
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 280,
+            "race_hit_rate": 0.11647254575707154,
+            "winning_tickets": 280,
+            "ticket_hit_rate": 0.005294206625321434
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 29.985440931780367,
+            "race_hits": 246,
+            "race_hit_rate": 0.10232945091514144,
+            "winning_tickets": 246,
+            "ticket_hit_rate": 0.003412637858084206
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 66.98544093178036,
+            "race_hits": 1014,
+            "race_hit_rate": 0.42179700499168055,
+            "winning_tickets": 1016,
+            "ticket_hit_rate": 0.006309265802661566
+          }
+        }
+      },
+      "popularity": {
+        "win": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 816,
+            "race_hit_rate": 0.33943427620632277,
+            "winning_tickets": 816,
+            "ticket_hit_rate": 0.33943427620632277
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 458,
+            "race_hit_rate": 0.19051580698835274,
+            "winning_tickets": 458,
+            "ticket_hit_rate": 0.19051580698835274
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 306,
+            "race_hit_rate": 0.12728785357737105,
+            "winning_tickets": 306,
+            "ticket_hit_rate": 0.12728785357737105
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 1580,
+            "race_hit_rate": 0.6572379367720466,
+            "winning_tickets": 1580,
+            "ticket_hit_rate": 0.21907931225734886
+          }
+        },
+        "place": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1584,
+            "race_hit_rate": 0.6589018302828619,
+            "winning_tickets": 1584,
+            "ticket_hit_rate": 0.6589018302828619
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 1.0,
+            "race_hits": 1261,
+            "race_hit_rate": 0.5245424292845258,
+            "winning_tickets": 1261,
+            "ticket_hit_rate": 0.5245424292845258
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 2.0,
+            "race_hits": 1543,
+            "race_hit_rate": 0.641846921797005,
+            "winning_tickets": 1779,
+            "ticket_hit_rate": 0.3700083194675541
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 2340,
+            "race_hit_rate": 0.9733777038269551,
+            "winning_tickets": 4624,
+            "ticket_hit_rate": 0.480865224625624
+          }
+        },
+        "bracket_quinella": {
+          "main": {
+            "races": 2267,
+            "average_tickets_per_race": 3.0,
+            "race_hits": 960,
+            "race_hit_rate": 0.423467137185708,
+            "winning_tickets": 960,
+            "ticket_hit_rate": 0.141155712395236
+          },
+          "counter": {
+            "races": 2267,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 532,
+            "race_hit_rate": 0.23467137185707984,
+            "winning_tickets": 532,
+            "ticket_hit_rate": 0.05866784296426996
+          },
+          "longshot": {
+            "races": 2267,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 292,
+            "race_hit_rate": 0.12880458756065286,
+            "winning_tickets": 292,
+            "ticket_hit_rate": 0.02576091751213057
+          },
+          "combined": {
+            "races": 2267,
+            "average_tickets_per_race": 12.0,
+            "race_hits": 1784,
+            "race_hit_rate": 0.7869430966034406,
+            "winning_tickets": 1784,
+            "ticket_hit_rate": 0.06557859138362006
+          }
+        },
+        "quinella": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1030,
+            "race_hit_rate": 0.42845257903494177,
+            "winning_tickets": 1030,
+            "ticket_hit_rate": 0.08569051580698835
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.998336106489185,
+            "race_hits": 445,
+            "race_hit_rate": 0.185108153078203,
+            "winning_tickets": 445,
+            "ticket_hit_rate": 0.03085991678224688
+          },
+          "longshot": {
+            "races": 2400,
+            "average_tickets_per_race": 7.9783333333333335,
+            "race_hits": 247,
+            "race_hit_rate": 0.10291666666666667,
+            "winning_tickets": 247,
+            "ticket_hit_rate": 0.012899519532066013
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 18.96339434276206,
+            "race_hits": 1721,
+            "race_hit_rate": 0.7158901830282862,
+            "winning_tickets": 1722,
+            "ticket_hit_rate": 0.03777309818373256
+          }
+        },
+        "wide": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 4.0,
+            "race_hits": 1448,
+            "race_hit_rate": 0.6023294509151415,
+            "winning_tickets": 2191,
+            "ticket_hit_rate": 0.2278494176372712
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 5.0,
+            "race_hits": 1326,
+            "race_hit_rate": 0.5515806988352745,
+            "winning_tickets": 1458,
+            "ticket_hit_rate": 0.12129783693843595
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 6.984608985024958,
+            "race_hits": 603,
+            "race_hit_rate": 0.25083194675540765,
+            "winning_tickets": 663,
+            "ticket_hit_rate": 0.03948543862783634
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 15.984608985024959,
+            "race_hits": 1967,
+            "race_hit_rate": 0.8182196339434277,
+            "winning_tickets": 4312,
+            "ticket_hit_rate": 0.1122127670648242
+          }
+        },
+        "exacta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 8.0,
+            "race_hits": 965,
+            "race_hit_rate": 0.401414309484193,
+            "winning_tickets": 965,
+            "ticket_hit_rate": 0.050176788685524124
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 430,
+            "race_hit_rate": 0.1788685524126456,
+            "winning_tickets": 430,
+            "ticket_hit_rate": 0.01788685524126456
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 11.983361064891847,
+            "race_hits": 156,
+            "race_hit_rate": 0.064891846921797,
+            "winning_tickets": 156,
+            "ticket_hit_rate": 0.005415162454873646
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 29.983361064891845,
+            "race_hits": 1550,
+            "race_hit_rate": 0.6447587354409318,
+            "winning_tickets": 1551,
+            "ticket_hit_rate": 0.021517758046614873
+          }
+        },
+        "trio": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 10.0,
+            "race_hits": 938,
+            "race_hit_rate": 0.39018302828618967,
+            "winning_tickets": 940,
+            "ticket_hit_rate": 0.039101497504159734
+          },
+          "counter": {
+            "races": 2400,
+            "average_tickets_per_race": 11.989166666666666,
+            "race_hits": 358,
+            "race_hit_rate": 0.14916666666666667,
+            "winning_tickets": 358,
+            "ticket_hit_rate": 0.012441787725029541
+          },
+          "longshot": {
+            "races": 2387,
+            "average_tickets_per_race": 14.969836614997906,
+            "race_hits": 187,
+            "race_hit_rate": 0.07834101382488479,
+            "winning_tickets": 187,
+            "ticket_hit_rate": 0.005233257772926986
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 36.83319467554077,
+            "race_hits": 1482,
+            "race_hit_rate": 0.6164725457570716,
+            "winning_tickets": 1485,
+            "ticket_hit_rate": 0.016770754514551595
+          }
+        },
+        "trifecta": {
+          "main": {
+            "races": 2404,
+            "average_tickets_per_race": 15.0,
+            "race_hits": 508,
+            "race_hit_rate": 0.2113144758735441,
+            "winning_tickets": 509,
+            "ticket_hit_rate": 0.014115363283416529
+          },
+          "counter": {
+            "races": 2404,
+            "average_tickets_per_race": 22.0,
+            "race_hits": 296,
+            "race_hit_rate": 0.12312811980033278,
+            "winning_tickets": 296,
+            "ticket_hit_rate": 0.005596732718196945
+          },
+          "longshot": {
+            "races": 2404,
+            "average_tickets_per_race": 29.988352745424294,
+            "race_hits": 149,
+            "race_hit_rate": 0.06198003327787022,
+            "winning_tickets": 149,
+            "ticket_hit_rate": 0.0020668035288242802
+          },
+          "combined": {
+            "races": 2404,
+            "average_tickets_per_race": 66.9883527454243,
+            "race_hits": 952,
+            "race_hit_rate": 0.39600665557404324,
+            "winning_tickets": 954,
+            "ticket_hit_rate": 0.005923994038748137
+          }
+        }
+      }
+    }
+  },
+  "comparison": {
+    "win": {
+      "main": {
+        "current_hit_rate": 0.23419301164725456,
+        "candidate_hit_rate": 0.33943427620632277,
+        "change_pp": 10.52412645590682,
+        "points": 1.0
+      },
+      "counter": {
+        "current_hit_rate": 0.17470881863560733,
+        "candidate_hit_rate": 0.18094841930116473,
+        "change_pp": 0.6239600665557399,
+        "points": 1.0
+      },
+      "longshot": {
+        "current_hit_rate": 0.12728785357737105,
+        "candidate_hit_rate": 0.13643926788685523,
+        "change_pp": 0.9151414309484185,
+        "points": 1.0
+      },
+      "combined": {
+        "current_hit_rate": 0.5361896838602329,
+        "candidate_hit_rate": 0.6568219633943427,
+        "change_pp": 12.063227953410982,
+        "points": 3.0
+      },
+      "selected": "market70_role30",
+      "vs_popularity": {
+        "main": {
+          "popularity_hit_rate": 0.33943427620632277,
+          "candidate_hit_rate": 0.33943427620632277,
+          "change_pp": 0.0
+        },
+        "counter": {
+          "popularity_hit_rate": 0.19051580698835274,
+          "candidate_hit_rate": 0.18094841930116473,
+          "change_pp": -0.9567387687188011
+        },
+        "longshot": {
+          "popularity_hit_rate": 0.12728785357737105,
+          "candidate_hit_rate": 0.13643926788685523,
+          "change_pp": 0.9151414309484185
+        },
+        "combined": {
+          "popularity_hit_rate": 0.6572379367720466,
+          "candidate_hit_rate": 0.6568219633943427,
+          "change_pp": -0.04159733777038266
+        }
+      }
+    },
+    "place": {
+      "main": {
+        "current_hit_rate": 0.5366056572379367,
+        "candidate_hit_rate": 0.6589018302828619,
+        "change_pp": 12.229617304492512,
+        "points": 1.0
+      },
+      "counter": {
+        "current_hit_rate": 0.4650582362728785,
+        "candidate_hit_rate": 0.5245424292845258,
+        "change_pp": 5.9484193011647255,
+        "points": 1.0
+      },
+      "longshot": {
+        "current_hit_rate": 0.5944259567387687,
+        "candidate_hit_rate": 0.6364392678868552,
+        "change_pp": 4.2013311148086485,
+        "points": 2.0
+      },
+      "combined": {
+        "current_hit_rate": 0.9417637271214643,
+        "candidate_hit_rate": 0.9729617304492513,
+        "change_pp": 3.1198003327786994,
+        "points": 4.0
+      },
+      "selected": "market70_role30",
+      "vs_popularity": {
+        "main": {
+          "popularity_hit_rate": 0.6589018302828619,
+          "candidate_hit_rate": 0.6589018302828619,
+          "change_pp": 0.0
+        },
+        "counter": {
+          "popularity_hit_rate": 0.5245424292845258,
+          "candidate_hit_rate": 0.5245424292845258,
+          "change_pp": 0.0
+        },
+        "longshot": {
+          "popularity_hit_rate": 0.641846921797005,
+          "candidate_hit_rate": 0.6364392678868552,
+          "change_pp": -0.5407653910149746
+        },
+        "combined": {
+          "popularity_hit_rate": 0.9733777038269551,
+          "candidate_hit_rate": 0.9729617304492513,
+          "change_pp": -0.04159733777038266
+        }
+      }
+    },
+    "bracket_quinella": {
+      "main": {
+        "current_hit_rate": 0.33480370533745035,
+        "candidate_hit_rate": 0.4265549183943538,
+        "change_pp": 9.175121305690343,
+        "points": 3.0
+      },
+      "counter": {
+        "current_hit_rate": 0.2329069254521394,
+        "candidate_hit_rate": 0.23864137626819584,
+        "change_pp": 0.5734450816056447,
+        "points": 4.0
+      },
+      "longshot": {
+        "current_hit_rate": 0.17247463608292898,
+        "candidate_hit_rate": 0.15350683722981914,
+        "change_pp": -1.896779885310984,
+        "points": 4.9977944419938245
+      },
+      "combined": {
+        "current_hit_rate": 0.7401852668725187,
+        "candidate_hit_rate": 0.8187031318923688,
+        "change_pp": 7.8517865019850035,
+        "points": 11.997794441993824
+      },
+      "selected": "market70_role30",
+      "vs_popularity": {
+        "main": {
+          "popularity_hit_rate": 0.423467137185708,
+          "candidate_hit_rate": 0.4265549183943538,
+          "change_pp": 0.3087781208645779
+        },
+        "counter": {
+          "popularity_hit_rate": 0.23467137185707984,
+          "candidate_hit_rate": 0.23864137626819584,
+          "change_pp": 0.39700044111160016
+        },
+        "longshot": {
+          "popularity_hit_rate": 0.12880458756065286,
+          "candidate_hit_rate": 0.15350683722981914,
+          "change_pp": 2.4702249669166285
+        },
+        "combined": {
+          "popularity_hit_rate": 0.7869430966034406,
+          "candidate_hit_rate": 0.8187031318923688,
+          "change_pp": 3.1760035288928123
+        }
+      }
+    },
+    "quinella": {
+      "main": {
+        "current_hit_rate": 0.32529118136439267,
+        "candidate_hit_rate": 0.43594009983361065,
+        "change_pp": 11.064891846921798,
+        "points": 5.0
+      },
+      "counter": {
+        "current_hit_rate": 0.1975873544093178,
+        "candidate_hit_rate": 0.19550748752079866,
+        "change_pp": -0.2079866888519133,
+        "points": 5.997920133111481
+      },
+      "longshot": {
+        "current_hit_rate": 0.15923301375573157,
+        "candidate_hit_rate": 0.149645685702376,
+        "change_pp": -0.9587328053355576,
+        "points": 7.9799916631929975
+      },
+      "combined": {
+        "current_hit_rate": 0.6813643926788685,
+        "candidate_hit_rate": 0.7799500831946755,
+        "change_pp": 9.858569051580702,
+        "points": 18.961314475873543
+      },
+      "selected": "market70_role30",
+      "vs_popularity": {
+        "main": {
+          "popularity_hit_rate": 0.42845257903494177,
+          "candidate_hit_rate": 0.43594009983361065,
+          "change_pp": 0.7487520798668879
+        },
+        "counter": {
+          "popularity_hit_rate": 0.185108153078203,
+          "candidate_hit_rate": 0.19550748752079866,
+          "change_pp": 1.0399334442595665
+        },
+        "longshot": {
+          "popularity_hit_rate": 0.10291666666666667,
+          "candidate_hit_rate": 0.149645685702376,
+          "change_pp": 4.672901903570932
+        },
+        "combined": {
+          "popularity_hit_rate": 0.7158901830282862,
+          "candidate_hit_rate": 0.7799500831946755,
+          "change_pp": 6.405990016638929
+        }
+      }
+    },
+    "wide": {
+      "main": {
+        "current_hit_rate": 0.512063227953411,
+        "candidate_hit_rate": 0.6164725457570716,
+        "change_pp": 10.440931780366059,
+        "points": 4.0
+      },
+      "counter": {
+        "current_hit_rate": 0.4488352745424293,
+        "candidate_hit_rate": 0.5386855241264559,
+        "change_pp": 8.98502495840266,
+        "points": 5.0
+      },
+      "longshot": {
+        "current_hit_rate": 0.423044925124792,
+        "candidate_hit_rate": 0.42845257903494177,
+        "change_pp": 0.5407653910149746,
+        "points": 6.982529118136439
+      },
+      "combined": {
+        "current_hit_rate": 0.8494176372712147,
+        "candidate_hit_rate": 0.9101497504159733,
+        "change_pp": 6.073211314475868,
+        "points": 15.982529118136439
+      },
+      "selected": "market70_role30",
+      "vs_popularity": {
+        "main": {
+          "popularity_hit_rate": 0.6023294509151415,
+          "candidate_hit_rate": 0.6164725457570716,
+          "change_pp": 1.4143094841930104
+        },
+        "counter": {
+          "popularity_hit_rate": 0.5515806988352745,
+          "candidate_hit_rate": 0.5386855241264559,
+          "change_pp": -1.2895174708818624
+        },
+        "longshot": {
+          "popularity_hit_rate": 0.25083194675540765,
+          "candidate_hit_rate": 0.42845257903494177,
+          "change_pp": 17.762063227953412
+        },
+        "combined": {
+          "popularity_hit_rate": 0.8182196339434277,
+          "candidate_hit_rate": 0.9101497504159733,
+          "change_pp": 9.193011647254568
+        }
+      }
+    },
+    "exacta": {
+      "main": {
+        "current_hit_rate": 0.28369384359401,
+        "candidate_hit_rate": 0.40058236272878534,
+        "change_pp": 11.688851913477533,
+        "points": 8.0
+      },
+      "counter": {
+        "current_hit_rate": 0.18926788685524126,
+        "candidate_hit_rate": 0.18386023294509152,
+        "change_pp": -0.5407653910149746,
+        "points": 10.0
+      },
+      "longshot": {
+        "current_hit_rate": 0.1314475873544093,
+        "candidate_hit_rate": 0.12936772046589018,
+        "change_pp": -0.2079866888519133,
+        "points": 11.979201331114808
+      },
+      "combined": {
+        "current_hit_rate": 0.6044093178036606,
+        "candidate_hit_rate": 0.7129783693843594,
+        "change_pp": 10.856905158069885,
+        "points": 29.97920133111481
+      },
+      "selected": "market70_role30",
+      "vs_popularity": {
+        "main": {
+          "popularity_hit_rate": 0.401414309484193,
+          "candidate_hit_rate": 0.40058236272878534,
+          "change_pp": -0.08319467554076532
+        },
+        "counter": {
+          "popularity_hit_rate": 0.1788685524126456,
+          "candidate_hit_rate": 0.18386023294509152,
+          "change_pp": 0.4991680532445919
+        },
+        "longshot": {
+          "popularity_hit_rate": 0.064891846921797,
+          "candidate_hit_rate": 0.12936772046589018,
+          "change_pp": 6.447587354409317
+        },
+        "combined": {
+          "popularity_hit_rate": 0.6447587354409318,
+          "candidate_hit_rate": 0.7129783693843594,
+          "change_pp": 6.821963394342767
+        }
+      }
+    },
+    "trio": {
+      "main": {
+        "current_hit_rate": 0.2974209650582363,
+        "candidate_hit_rate": 0.3955906821963394,
+        "change_pp": 9.816971713810313,
+        "points": 10.0
+      },
+      "counter": {
+        "current_hit_rate": 0.15131304710295956,
+        "candidate_hit_rate": 0.1784076698624427,
+        "change_pp": 2.709462275948313,
+        "points": 11.989995831596499
+      },
+      "longshot": {
+        "current_hit_rate": 0.11813992459153749,
+        "candidate_hit_rate": 0.10138248847926268,
+        "change_pp": -1.6757436112274815,
+        "points": 14.969836614997906
+      },
+      "combined": {
+        "current_hit_rate": 0.5657237936772047,
+        "candidate_hit_rate": 0.6738768718801996,
+        "change_pp": 10.815307820299491,
+        "points": 36.82903494176373
+      },
+      "selected": "market70_role30",
+      "vs_popularity": {
+        "main": {
+          "popularity_hit_rate": 0.39018302828618967,
+          "candidate_hit_rate": 0.3955906821963394,
+          "change_pp": 0.5407653910149746
+        },
+        "counter": {
+          "popularity_hit_rate": 0.14916666666666667,
+          "candidate_hit_rate": 0.1784076698624427,
+          "change_pp": 2.9241003195776023
+        },
+        "longshot": {
+          "popularity_hit_rate": 0.07834101382488479,
+          "candidate_hit_rate": 0.10138248847926268,
+          "change_pp": 2.304147465437789
+        },
+        "combined": {
+          "popularity_hit_rate": 0.6164725457570716,
+          "candidate_hit_rate": 0.6738768718801996,
+          "change_pp": 5.740432612312807
+        }
+      }
+    },
+    "trifecta": {
+      "main": {
+        "current_hit_rate": 0.12437603993344426,
+        "candidate_hit_rate": 0.21672212978369385,
+        "change_pp": 9.234608985024959,
+        "points": 15.0
+      },
+      "counter": {
+        "current_hit_rate": 0.10440931780366057,
+        "candidate_hit_rate": 0.11064891846921797,
+        "change_pp": 0.6239600665557399,
+        "points": 22.0
+      },
+      "longshot": {
+        "current_hit_rate": 0.09276206322795341,
+        "candidate_hit_rate": 0.11148086522462562,
+        "change_pp": 1.871880199667221,
+        "points": 29.985440931780367
+      },
+      "combined": {
+        "current_hit_rate": 0.3207154742096506,
+        "candidate_hit_rate": 0.4384359400998336,
+        "change_pp": 11.772046589018304,
+        "points": 66.98544093178036
+      },
+      "selected": "market70_role30",
+      "vs_popularity": {
+        "main": {
+          "popularity_hit_rate": 0.2113144758735441,
+          "candidate_hit_rate": 0.21672212978369385,
+          "change_pp": 0.5407653910149746
+        },
+        "counter": {
+          "popularity_hit_rate": 0.12312811980033278,
+          "candidate_hit_rate": 0.11064891846921797,
+          "change_pp": -1.247920133111481
+        },
+        "longshot": {
+          "popularity_hit_rate": 0.06198003327787022,
+          "candidate_hit_rate": 0.11148086522462562,
+          "change_pp": 4.950083194675541
+        },
+        "combined": {
+          "popularity_hit_rate": 0.39600665557404324,
+          "candidate_hit_rate": 0.4384359400998336,
+          "change_pp": 4.2429284525790365
+        }
+      }
+    }
+  },
+  "baselines": {
+    "popularity": {
+      "source": "existing jra-bet-strategy-comparison-v1 artifact; restricted to the same flat-race IDs",
+      "artifact_run_id": 35476550918
+    }
+  },
+  "selection_including_popularity_2025": {
+    "win": "popularity",
+    "place": "market70_role30",
+    "bracket_quinella": "market70_role30",
+    "quinella": "market70_role30",
+    "wide": "market70_role30",
+    "exacta": "market70_role30",
+    "trio": "market70_role30",
+    "trifecta": "market70_role30"
+  },
+  "recommended_after_2026_audit": {
+    "win": "popularity",
+    "place": "popularity",
+    "bracket_quinella": "market70_role30",
+    "quinella": "market70_role30",
+    "wide": "market70_role30",
+    "exacta": "market70_role30",
+    "trio": "market70_role30",
+    "trifecta": "market70_role30"
+  },
+  "audit_status": "2026 has now been inspected and cannot be reused as an untouched holdout for later tuning."
+}
