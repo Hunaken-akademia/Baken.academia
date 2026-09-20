@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getVercelOidcToken } from "@vercel/oidc";
 import { loadHistory, scoreHistory } from "@/lib/history";
 import { buildTickets } from "@/lib/tickets";
 
@@ -167,8 +168,13 @@ export async function GET(request: NextRequest) {
     });
     let roleModel = { version: "履歴補正フォールバック", feature_count: 0 };
     try {
+      const oidcToken = await getVercelOidcToken();
+      if (!oidcToken) throw new Error("Vercel OIDC token is unavailable");
       const modelResponse = await fetch(`${request.nextUrl.origin}/api/rein_score`, {
-        method: "POST", cache: "no-store", headers: { "content-type": "application/json" },
+        method: "POST", cache: "no-store", headers: {
+          "content-type": "application/json",
+          "x-rein-oidc-token": oidcToken,
+        },
         body: JSON.stringify({
           race: {
             race_date: `${raceId.slice(0, 4)}-${raceId.slice(4, 6)}-${raceId.slice(6, 8)}`,
