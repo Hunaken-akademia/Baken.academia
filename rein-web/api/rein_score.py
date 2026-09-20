@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import shutil
+import sys
 import tarfile
 import tempfile
 import threading
@@ -11,6 +12,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rein_core import ReinRuntime
 
 
