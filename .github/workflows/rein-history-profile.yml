@@ -1,0 +1,49 @@
+name: Build REIN history profile
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: JRA result backfill run ID
+        required: true
+        default: "35414533165"
+  push:
+    branches: [main]
+    paths:
+      - .github/rein-history-request.json
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_RUN_ID: ${{ inputs.source_run_id || '35414533165' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+      - name: Download licensed JRA history
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+      - name: Build leakage-safe REIN profile
+        run: |
+          tar --no-same-owner -xzf .dataset/jra-backfill-result.tar.gz
+          python -m baken_academia.rein_history             --input data/raw/jra/races-2019-2026.parquet             --output artifacts/rein/history-profile.json.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rein-history-profile-v2
+          path: artifacts/rein/history-profile.json.gz
+          if-no-files-found: error
+          retention-days: 90
