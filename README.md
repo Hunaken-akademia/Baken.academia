@@ -154,3 +154,16 @@ python -m baken_academia.nar_backfill --year 2019 --month 1 \
 過去分は月間日程から開催日とレース結果をたどり、レース単位のチェックポイントと監査JSONを残します。並列取得は行いません。
 
 利用条件を確認できる過去レースCSVです。列名が異なる場合は、元データを変更せず変換アダプターを追加します。
+
+
+### REIN Web向け履歴プロファイル
+
+Vercel上のREINは、368,068走の原本をリクエストごとに読む代わりに、GitHub Actionsで生成した圧縮プロファイルを利用します。通算、近5走、芝・ダート、距離、競馬場、騎手、厩舎、枠傾向を収録し、各指標は少数サンプルを平滑化しています。
+
+```bash
+python -m baken_academia.rein_history \
+  --input data/raw/jra/races-2019-2026.parquet \
+  --output artifacts/rein/history-profile.json.gz
+```
+
+Web側では人気を履歴特徴へ混入させず、買い目生成時にのみ組み合わせます。本線は人気順、対抗は人気75%＋REIN25%、穴は人気50%＋REIN50%です。
