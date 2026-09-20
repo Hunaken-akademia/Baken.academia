@@ -17,10 +17,33 @@ const tableRows = (html: string) => [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>
 })).filter((row) => row.cells.length >= 7);
 
 function runningStyle(detail: string) {
-  const positions = detail.match(/\b(\d{1,2})-(\d{1,2})-(\d{1,2})-(\d{1,2})\b/);
-  if (!positions) return "自在";
-  const early = (+positions[1] + +positions[2]) / 2;
-  return early <= 2 ? "逃げ" : early <= 4 ? "先行" : early <= 8 ? "好位" : early <= 12 ? "差し" : "追込";
+  const recentPositions = [...detail.matchAll(/\b\d{1,2}(?:-\d{1,2}){1,3}\b/g)]
+    .map((match) => match[0])
+    .slice(0, 5);
+  const earlyPositions = recentPositions.map((value) => {
+    const positions = value.split("-").map(Number);
+    return positions.length >= 2 ? (positions[0] + positions[1]) / 2 : positions[0];
+  });
+  if (!earlyPositions.length) return { style: "自在", earlyPosition: null, recentPositions };
+  const weighted = earlyPositions.reduce((sum, value, index) => sum + value * (earlyPositions.length - index), 0);
+  const weights = earlyPositions.reduce((sum, _value, index) => sum + earlyPositions.length - index, 0);
+  const earlyPosition = Math.round((weighted / weights) * 10) / 10;
+  const style = earlyPosition <= 2.4 ? "逃げ" : earlyPosition <= 4.5 ? "先行" : earlyPosition <= 7.5 ? "好位" : earlyPosition <= 10.5 ? "差し" : "追込";
+  return { style, earlyPosition, recentPositions };
+}
+
+function pastPerformanceRows(html: string) {
+  const table = html.match(/<table[^>]*id=["']denma_past["'][^>]*>([\s\S]*?)<\/table>/i)?.[1] || "";
+  return [...table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)]
+    .map((match) => match[1])
+    .filter((row) => /hr-denma__passing/.test(row));
+}
+
+function paceAdjustment(style: string, pace: string) {
+  if (pace === "ハイペース寄り") return ({ 逃げ: -3, 先行: -1, 好位: 1, 差し: 3, 追込: 2, 自在: 0 } as Record<string, number>)[style] || 0;
+  if (pace === "平均〜やや速い") return ({ 逃げ: -2, 先行: 0, 好位: 1, 差し: 2, 追込: 1, 自在: 0 } as Record<string, number>)[style] || 0;
+  if (pace === "スロー") return ({ 逃げ: 4, 先行: 3, 好位: 1, 差し: -1, 追込: -2, 自在: 0 } as Record<string, number>)[style] || 0;
+  return ({ 逃げ: 2, 先行: 2, 好位: 1, 差し: 0, 追込: -1, 自在: 0 } as Record<string, number>)[style] || 0;
 }
 
 function mark(index: number) { return ["◎", "○", "▲", "☆", "△", "注"][index] || (index < 8 ? "・" : "消"); }
@@ -45,6 +68,7 @@ export async function GET(request: NextRequest) {
     const oddsMap = new Map(oddsRows.map((row) => [+row.cells[1], +row.cells[3]]));
     const full = decode(card);
     const detailText = decode(detail);
+    const pastRows = pastPerformanceRows(detail);
     const racecourse = full.match(/\d+回(札幌|函館|福島|新潟|東京|中山|中京|京都|阪神|小倉)\d+日/)?.[1] || "";
     const course = full.match(/(芝|ダート|障害)[・ ]*(?:右|左|直線)?[・ ]*\d{3,4}m/)?.[0] || "コース取得中";
     const surface = course.match(/^(芝|ダート|障害)/)?.[1] || "芝";
@@ -66,8 +90,9 @@ export async function GET(request: NextRequest) {
       const jockeyId = cleanId(row.html.match(/directory\/jockey\/(\d+)/)?.[1]);
       const trainerId = cleanId(row.html.match(/directory\/trainer\/(\d+)/)?.[1]);
       const pedigree = cells[5];
-      const detailSlice = detailText.slice(Math.max(0, detailText.indexOf(name)), detailText.indexOf(name) + 900);
-      const style = runningStyle(detailSlice);
+      const detailSlice = detailText.slice(Math.max(0, detailText.lastIndexOf(name)), detailText.lastIndexOf(name) + 900);
+      const styleProfile = runningStyle(pastRows[number - 1] || detailSlice);
+      const style = styleProfile.style;
       const historical = scoreHistory(history, { horseId, jockeyId, trainerId, racecourse, surface, distanceM, going, gate });
       const positives = [...historical.reasons];
       const cautions = [...historical.risks];
@@ -80,13 +105,33 @@ export async function GET(request: NextRequest) {
       if (style === "逃げ" || style === "先行") { liveAdjustment += 1; positives.push("位置取り"); }
       const marketScore = Math.round(clamp(96 - (popularity - 1) * (50 / Math.max(cardRows.length - 1, 1)), 42, 96));
       const reinScore = Math.round(clamp(72 + historical.adjustment + liveAdjustment, 45, 95));
+      const jockey = decode(row.html.match(/directory\/jockey\/\d+\/[^>]*>([^<]+)/i)?.[1] || "");
+      const trainer = decode(row.html.match(/directory\/trainer\/\d+\/[^>]*>([^<]+)/i)?.[1] || "");
       return {
         number, gate, name, score: reinScore, reinScore, marketScore, odds: odd, popularity,
         mark: "", style, verdict: "", historyAdjustment: historical.adjustment,
         historySamples: historical.samples, positives: [...new Set(positives)].slice(0, 4),
-        cautions: [...new Set(cautions)].slice(0, 4),
+        cautions: [...new Set(cautions)].slice(0, 4), weight, weightChange: change, pedigree,
+        jockey, trainer, earlyPosition: styleProfile.earlyPosition,
+        recentPositions: styleProfile.recentPositions,
+        paceAdjustment: 0,
+        historyFactors: [...historical.components]
+          .sort((a, b) => Math.abs(b.signal) - Math.abs(a.signal))
+          .slice(0, 5)
+          .map((component) => ({ label: component.label, samples: component.samples, impact: Math.round(component.signal * 1000) / 10 })),
       };
-    }).sort((a, b) => b.reinScore - a.reinScore || a.popularity - b.popularity);
+    });
+    const frontRunners = raw.filter((horse) => horse.style === "逃げ" || horse.style === "先行");
+    const escapeCount = raw.filter((horse) => horse.style === "逃げ").length;
+    const pace = escapeCount >= 2 ? "ハイペース寄り" : frontRunners.length >= 4 ? "平均〜やや速い" : frontRunners.length <= 1 ? "スロー" : "スロー〜平均";
+    raw.forEach((horse) => {
+      horse.paceAdjustment = paceAdjustment(horse.style, pace);
+      horse.reinScore = Math.round(clamp(horse.reinScore + horse.paceAdjustment, 45, 95));
+      horse.score = horse.reinScore;
+      if (horse.paceAdjustment > 0) horse.positives = [...new Set([...horse.positives, `展開利 +${horse.paceAdjustment}`])].slice(0, 5);
+      if (horse.paceAdjustment < 0) horse.cautions = [...new Set([...horse.cautions, `展開不利 ${horse.paceAdjustment}`])].slice(0, 5);
+    });
+    raw.sort((a, b) => b.reinScore - a.reinScore || a.popularity - b.popularity);
     raw.forEach((horse, index) => {
       horse.mark = mark(index);
       horse.verdict = index === 0 ? "軸" : index < 3 ? "相手" : index === 3 ? "穴" : index < 7 ? "連下" : "見送り";
@@ -95,12 +140,17 @@ export async function GET(request: NextRequest) {
     const raceNumber = decode(card.match(/<div[^>]*class="[^"]*hr-predictRaceInfo__raceNumber[^"]*"[^>]*>([\s\S]*?)<\/div>/i)?.[1] || "");
     const title = `${racecourse}${raceNumber} ${raceName}`.trim() || `${raceId.slice(-2).replace(/^0/, "")}R`;
     const start = full.match(/(\d{1,2}:\d{2})発走/)?.[1] || "--:--";
-    const leaders = raw.filter((horse) => horse.style === "逃げ" || horse.style === "先行").slice(0, 3).map((horse) => horse.number);
-    const pace = leaders.length >= 3 ? "平均〜やや速い" : leaders.length <= 1 ? "スロー" : "スロー〜平均";
+    const leaderHorses = [...frontRunners]
+      .sort((a, b) => (a.earlyPosition ?? 99) - (b.earlyPosition ?? 99))
+      .slice(0, 4);
+    const leaders = leaderHorses.map((horse) => horse.number);
+    const paceDetail = leaderHorses.length
+      ? `${leaderHorses.map((horse) => `${horse.number} ${horse.name}（${horse.style}）`).join("・")}が前方候補。逃げ${escapeCount}頭、先行${frontRunners.length - escapeCount}頭から判定。`
+      : "明確な逃げ・先行馬が不在。好位勢の出方次第で落ち着く展開を想定。";
     return NextResponse.json({
       race: { title, course, condition: going, start, updated: `${new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}更新`, raceId },
       model: { ...history.meta, strategy: "本線=人気順 / 対抗=人気75%+REIN25% / 穴=人気50%+REIN50%" },
-      pace: { label: pace, detail: `${leaders.join("・") || "先行候補不明"}が前。脚質構成と枠を反映して補正。`, leaders },
+      pace: { label: pace, detail: paceDetail, leaders, escapeCount, frontCount: frontRunners.length },
       horses: raw,
       tickets: buildTickets(raw),
     });
