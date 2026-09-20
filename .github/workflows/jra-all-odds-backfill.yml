@@ -2,6 +2,10 @@ name: JRA all bet types odds and payouts backfill
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/jra-all-odds-backfill.yml"
   workflow_run:
     workflows: ["JRA licensed final odds remaining eight years"]
     types: [completed]
@@ -12,7 +16,7 @@ permissions:
 
 concurrency:
   group: jra-all-bet-types-backfill
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   plan:
@@ -23,20 +27,16 @@ jobs:
       - id: periods
         shell: python
         run: |
-          import calendar, json, os
-          from datetime import date
+          import json, os
+          from datetime import date, timedelta
           periods = []
-          year, month = 2019, 1
-          while (year, month) <= (2026, 9):
-              start = date(year, month, 1)
-              end = date(year, month, calendar.monthrange(year, month)[1])
-              if end > date(2026, 9, 18):
-                  end = date(2026, 9, 18)
-              periods.append({"name": f"{year}-{month:02d}",
+          start = date(2019, 1, 1)
+          last = date(2026, 9, 18)
+          while start <= last:
+              end = min(start + timedelta(days=13), last)
+              periods.append({"name": f"{start:%Y%m%d}-{end:%Y%m%d}",
                               "start": start.isoformat(), "end": end.isoformat()})
-              month += 1
-              if month == 13:
-                  year, month = year + 1, 1
+              start = end + timedelta(days=1)
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
               out.write("periods=" + json.dumps(periods, separators=(",", ":")) + "\n")
 
@@ -44,6 +44,7 @@ jobs:
     needs: plan
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
       github.event.workflow_run.conclusion == 'success'
     strategy:
       fail-fast: false
@@ -51,7 +52,7 @@ jobs:
       matrix:
         period: ${{ fromJSON(needs.plan.outputs.periods) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 355
+    timeout-minutes: 210
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
