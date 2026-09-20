@@ -40,6 +40,16 @@ jobs:
         working-directory: rein-web
         run: npm run build
 
+      - name: Enable Vercel project OIDC tokens
+        if: env.VERCEL_TOKEN != ''
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            --url "https://api.vercel.com/v9/projects/prj_8X6LIxRxvKKNyVQWxFKF6AQJ6wrm?teamId=team_JoV13Y5pkEXrjvf8JCKP6tNY" \
+            --header "Authorization: Bearer $VERCEL_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{"oidcTokenConfig":{"enabled":true,"issuerMode":"team"}}'
+
       - name: Deploy to Vercel
         if: env.VERCEL_TOKEN != ''
         working-directory: rein-web
