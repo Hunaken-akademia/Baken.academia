@@ -11,13 +11,13 @@ import threading
 import urllib.request
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from rein_core import ReinRuntime
 
 
 BROKER_URL = "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/vercel-rein-model"
-_runtime: ReinRuntime | None = None
+_runtime: Any = None
 _runtime_lock = threading.Lock()
 
 
@@ -48,13 +48,15 @@ def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
     archive.extractall(destination, filter="data")
 
 
-def get_runtime() -> ReinRuntime:
+def get_runtime() -> Any:
     global _runtime
     if _runtime is not None:
         return _runtime
     with _runtime_lock:
         if _runtime is not None:
             return _runtime
+        from rein_core import ReinRuntime
+
         registry, bundle = _request_bundle()
         version = registry["model"]["version"]
         destination = Path(tempfile.gettempdir()) / "rein-runtime" / version
