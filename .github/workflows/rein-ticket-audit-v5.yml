@@ -1,0 +1,51 @@
+name: REIN ticket and role Top-K audit v5
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/rein_ticket_research_v4.py"
+      - ".github/workflows/rein-ticket-audit-v5.yml"
+      - ".github/rein-ticket-audit-v5-request.json"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+      - name: Download licensed JRA history
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: "35414533165"
+      - run: tar --no-same-owner -xzf .dataset/jra-backfill-result.tar.gz
+      - name: Download held-out REIN predictions
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-history-v2-model
+          path: .model
+          github-token: ${{ github.token }}
+          run-id: "35417574150"
+      - name: Audit balanced longshot caps and role Top-K
+        env:
+          REIN_HISTORY_PATH: data/raw/jra/races-2019-2026.parquet
+          REIN_AUDIT_V5_ONLY: "1"
+        run: python scripts/rein_ticket_research_v4.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rein-ticket-audit-v5
+          path: reports/rein-ticket-audit-v5
+          retention-days: 90
