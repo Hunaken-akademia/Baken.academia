@@ -6,8 +6,8 @@ export type TicketTier = { group: "本線" | "対抗" | "穴"; points: number; s
 export type Ticket = { type: string; tiers: TicketTier[] };
 
 const caps: Record<string, [number, number, number]> = {
-  単勝: [1, 1, 1], 複勝: [1, 1, 2], 枠連: [3, 4, 5], 馬連: [5, 6, 8],
-  ワイド: [4, 5, 7], 馬単: [8, 10, 12], 三連複: [10, 12, 15], 三連単: [15, 22, 30],
+  単勝: [1, 1, 1], 複勝: [1, 1, 1], 枠連: [3, 4, 4], 馬連: [5, 6, 6],
+  ワイド: [4, 5, 5], 馬単: [8, 10, 10], 三連複: [10, 12, 12], 三連単: [15, 22, 22],
 };
 type RoleHorse = TicketHorse & { first: number; second: number; third: number };
 type Candidate = { selection: number[]; probability: number };
