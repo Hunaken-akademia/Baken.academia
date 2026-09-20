@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import json
 import math
+import ctypes
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+_libgomp = Path(__file__).resolve().parent / "lib" / "libgomp.so.1"
+if _libgomp.is_file():
+    ctypes.CDLL(str(_libgomp), mode=ctypes.RTLD_GLOBAL)
 
 import lightgbm as lgb
 import numpy as np
