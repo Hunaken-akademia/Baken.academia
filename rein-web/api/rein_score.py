@@ -21,8 +21,7 @@ _runtime: Any = None
 _runtime_lock = threading.Lock()
 
 
-def _request_bundle() -> tuple[dict, bytes]:
-    token = os.environ.get("VERCEL_OIDC_TOKEN", "")
+def _request_bundle(token: str) -> tuple[dict, bytes]:
     if not token:
         raise RuntimeError("VERCEL_OIDC_TOKEN is unavailable")
     request = urllib.request.Request(
@@ -48,7 +47,7 @@ def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
     archive.extractall(destination, filter="data")
 
 
-def get_runtime() -> Any:
+def get_runtime(token: str) -> Any:
     global _runtime
     if _runtime is not None:
         return _runtime
@@ -57,7 +56,7 @@ def get_runtime() -> Any:
             return _runtime
         from rein_core import ReinRuntime
 
-        registry, bundle = _request_bundle()
+        registry, bundle = _request_bundle(token)
         version = registry["model"]["version"]
         destination = Path(tempfile.gettempdir()) / "rein-runtime" / version
         if not (destination / "schema.json").is_file():
@@ -81,7 +80,8 @@ class handler(BaseHTTPRequestHandler):
             runners = payload.get("runners", [])
             if not 4 <= len(runners) <= 18:
                 raise ValueError("Runner count must be between 4 and 18")
-            result = get_runtime().score(payload["race"], runners)
+            token = self.headers.get("x-rein-oidc-token", "") or os.environ.get("VERCEL_OIDC_TOKEN", "")
+            result = get_runtime(token).score(payload["race"], runners)
             body = json.dumps(result, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
         except Exception as error:
