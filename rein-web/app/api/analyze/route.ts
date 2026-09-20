@@ -102,6 +102,10 @@ export async function GET(request: NextRequest) {
     const distanceM = +(course.match(/(\d{3,4})m/)?.[1] || 0);
     const going = full.match(/馬場[：: ]*(良|稍重|重|不良)/)?.[1] || "未発表";
     const className = raceClass(full);
+    const dateMatch = full.match(/(20\d{2})年(\d{1,2})月(\d{1,2})日/);
+    const raceDate = dateMatch
+      ? `${dateMatch[1]}-${dateMatch[2].padStart(2, "0")}-${dateMatch[3].padStart(2, "0")}`
+      : new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
     const raw = cardRows.map((row) => {
       const cells = row.cells;
@@ -177,7 +181,7 @@ export async function GET(request: NextRequest) {
         },
         body: JSON.stringify({
           race: {
-            race_date: `${raceId.slice(0, 4)}-${raceId.slice(4, 6)}-${raceId.slice(6, 8)}`,
+            race_date: raceDate,
             racecourse, surface, distance_m: distanceM, going, race_class: className,
           },
           runners: raw.map((horse) => ({
