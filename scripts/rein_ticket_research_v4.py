@@ -174,7 +174,6 @@ def main() -> None:
     history_path = Path(os.environ.get("REIN_HISTORY_PATH", "data/raw/history.parquet"))
     raw = pd.read_parquet(history_path)
     raw["race_id"] = raw["race_id"].astype(str)
-    predictions["race_id"] = predictions["race_id"].astype(str)
     print("[features] point-in-time history", flush=True)
     x, added = add_v3_features(prepare(raw))
     base, _, _ = build_feature_frame(x)
