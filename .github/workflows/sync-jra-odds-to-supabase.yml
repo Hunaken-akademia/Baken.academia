@@ -17,10 +17,12 @@ on:
     paths:
       - ".github/workflows/sync-jra-odds-to-supabase.yml"
       - "scripts/sync_jra_artifacts_to_supabase.sh"
+      - "supabase/functions/github-jra-archive/**"
 
 permissions:
   actions: read
   contents: read
+  id-token: write
 
 concurrency:
   group: sync-jra-odds-to-supabase
@@ -32,21 +34,12 @@ jobs:
     timeout-minutes: 55
     env:
       GH_TOKEN: ${{ github.token }}
-      SUPABASE_URL: "https://dcewdzagnomcnvteokwj.supabase.co"
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
       SUPABASE_BUCKET: "baken-archive"
       SOURCE_WORKFLOW_FILE: "jra-all-odds-backfill.yml"
       SOURCE_RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id || '' }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Validate archive credentials
-        shell: bash
-        run: |
-          if [[ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]]; then
-            echo "::error::Repository secret SUPABASE_SERVICE_ROLE_KEY is not configured."
-            exit 1
-          fi
 
       - name: Upload completed chunks and verify checksums
         shell: bash

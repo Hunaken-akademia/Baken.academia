@@ -3,17 +3,55 @@ set -Eeuo pipefail
 
 : "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 : "${GH_TOKEN:?GH_TOKEN is required}"
-: "${SUPABASE_URL:?SUPABASE_URL is required}"
-: "${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY is required}"
+: "${SUPABASE_BROKER_URL:?SUPABASE_BROKER_URL is required}"
+: "${ACTIONS_ID_TOKEN_REQUEST_URL:?GitHub OIDC request URL is required}"
+: "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?GitHub OIDC request token is required}"
 
 BUCKET="${SUPABASE_BUCKET:-baken-archive}"
 WORKFLOW_FILE="${SOURCE_WORKFLOW_FILE:-jra-all-odds-backfill.yml}"
 RUN_ID="${SOURCE_RUN_ID:-}"
+OIDC_AUDIENCE="rein-supabase-archive-v1"
+OIDC_TOKEN=""
+OIDC_REFRESHED_AT=0
+BROKER_RESPONSE=""
 
-SUPABASE_HEADERS=(-H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}")
-if [[ "${SUPABASE_SERVICE_ROLE_KEY}" != sb_secret_* ]]; then
-  SUPABASE_HEADERS+=(-H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}")
-fi
+refresh_oidc_token() {
+  local now token_response
+  now="$(date +%s)"
+  if [[ -n "${OIDC_TOKEN}" ]] && (( now - OIDC_REFRESHED_AT < 240 )); then
+    return
+  fi
+
+  token_response="$(curl --fail-with-body --silent --show-error --retry 3 \
+    -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+    "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${OIDC_AUDIENCE}")"
+  OIDC_TOKEN="$(jq -er '.value' <<<"${token_response}")"
+  OIDC_REFRESHED_AT="${now}"
+}
+
+broker_call() {
+  local action="$1"
+  local path="${2:-}"
+  local payload
+
+  refresh_oidc_token
+  if [[ -n "${path}" ]]; then
+    payload="$(jq -nc --arg action "${action}" --arg path "${path}" \
+      '{action: $action, path: $path}')"
+  else
+    payload="$(jq -nc --arg action "${action}" '{action: $action}')"
+  fi
+
+  BROKER_RESPONSE="$(curl --fail-with-body --silent --show-error --retry 3 \
+    -X POST "${SUPABASE_BROKER_URL}" \
+    -H "Authorization: Bearer ${OIDC_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data "${payload}")"
+}
+
+broker_call "health"
+jq -e '.ok == true' <<<"${BROKER_RESPONSE}" >/dev/null
+echo "Supabase archive broker authentication succeeded."
 
 if [[ -z "${RUN_ID}" ]]; then
   RUN_ID="$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow "${WORKFLOW_FILE}" --limit 1 --json databaseId --jq '.[0].databaseId')"
@@ -28,7 +66,10 @@ tmp_root="$(mktemp -d)"
 trap 'rm -rf "${tmp_root}"' EXIT
 
 artifacts_tsv="${tmp_root}/artifacts.tsv"
-gh api --paginate   "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100"   --jq '.artifacts[] | select(.expired == false and (.name | startswith("jra-all-odds-"))) | [.id, .name] | @tsv'   > "${artifacts_tsv}"
+gh api --paginate \
+  "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
+  --jq '.artifacts[] | select(.expired == false and (.name | startswith("jra-all-odds-"))) | [.id, .name] | @tsv' \
+  > "${artifacts_tsv}"
 
 if [[ ! -s "${artifacts_tsv}" ]]; then
   echo "No completed JRA odds artifacts are available yet."
@@ -39,15 +80,41 @@ synced=0
 skipped=0
 failed=0
 
+upload_signed() {
+  local path="$1"
+  local file="$2"
+  local content_type="$3"
+  local signed_url
+
+  broker_call "sign-upload" "${path}"
+  signed_url="$(jq -er '.signed_url' <<<"${BROKER_RESPONSE}")"
+  curl --fail-with-body --silent --show-error --retry 3 \
+    -X PUT "${signed_url}" \
+    -H "Content-Type: ${content_type}" \
+    -H "Cache-Control: max-age=31536000" \
+    -H "x-upsert: false" \
+    --data-binary "@${file}" >/dev/null
+}
+
+download_signed() {
+  local path="$1"
+  local output="$2"
+  local signed_url
+
+  broker_call "sign-download" "${path}"
+  signed_url="$(jq -er '.signed_url' <<<"${BROKER_RESPONSE}")"
+  curl --fail-with-body --silent --show-error --retry 3 \
+    "${signed_url}" --output "${output}"
+}
+
 while IFS=$'\t' read -r artifact_id artifact_name; do
   period="${artifact_name#jra-all-odds-}"
   year="${period:0:4}"
   object_path="jra/odds/all-bets/v1/${year}/${period}.tar.gz"
   manifest_path="jra/odds/all-bets/v1/${year}/${period}.manifest.json"
-  authenticated_url="${SUPABASE_URL}/storage/v1/object/authenticated/${BUCKET}/${object_path}"
 
-  status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}'     "${SUPABASE_HEADERS[@]}"     "${authenticated_url}")"
-  if [[ "${status}" == "200" ]]; then
+  broker_call "exists" "${object_path}"
+  if [[ "$(jq -r '.exists' <<<"${BROKER_RESPONSE}")" == "true" ]]; then
     echo "Already archived: ${object_path}"
     skipped=$((skipped + 1))
     continue
@@ -71,10 +138,18 @@ while IFS=$'\t' read -r artifact_id artifact_name; do
   sha256="$(sha256sum "${archive_file}" | cut -d' ' -f1)"
   size_bytes="$(stat -c '%s' "${archive_file}")"
 
-  curl --fail-with-body --silent --show-error     -X POST "${SUPABASE_URL}/storage/v1/object/${BUCKET}/${object_path}"     "${SUPABASE_HEADERS[@]}"     -H "Content-Type: application/gzip"     -H "x-upsert: true"     --data-binary "@${archive_file}" > /dev/null
+  if ! upload_signed "${object_path}" "${archive_file}" "application/gzip"; then
+    echo "::error::Failed to upload ${object_path}"
+    failed=$((failed + 1))
+    continue
+  fi
 
   verify_file="${artifact_dir}/verified.tar.gz"
-  curl --fail-with-body --silent --show-error     "${authenticated_url}"     "${SUPABASE_HEADERS[@]}"     --output "${verify_file}"
+  if ! download_signed "${object_path}" "${verify_file}"; then
+    echo "::error::Failed to download uploaded object ${object_path}"
+    failed=$((failed + 1))
+    continue
+  fi
   verified_sha256="$(sha256sum "${verify_file}" | cut -d' ' -f1)"
   if [[ "${verified_sha256}" != "${sha256}" ]]; then
     echo "::error::Checksum mismatch after upload: ${object_path}"
@@ -106,7 +181,11 @@ with open(path, "w", encoding="utf-8") as f:
     f.write("\n")
 PY
 
-  curl --fail-with-body --silent --show-error     -X POST "${SUPABASE_URL}/storage/v1/object/${BUCKET}/${manifest_path}"     "${SUPABASE_HEADERS[@]}"     -H "Content-Type: application/json"     -H "x-upsert: true"     --data-binary "@${manifest_file}" > /dev/null
+  if ! upload_signed "${manifest_path}" "${manifest_file}" "application/json"; then
+    echo "::error::Archive uploaded but manifest failed: ${manifest_path}"
+    failed=$((failed + 1))
+    continue
+  fi
 
   echo "Archived and verified: ${object_path} (${size_bytes} bytes, sha256=${sha256})"
   synced=$((synced + 1))
