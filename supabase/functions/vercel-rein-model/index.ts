@@ -32,10 +32,9 @@ async function authorize(req: Request) {
   return payload
 }
 
-const secretKeys = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}")
-const adminKey = secretKeys.default ?? Object.values(secretKeys).find((value) => typeof value === "string")
-if (!adminKey) throw new Error("No Supabase secret key is available to this function")
-const supabase = createClient(Deno.env.get("SUPABASE_URL")!, adminKey as string, {
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+if (!serviceRoleKey) throw new Error("SUPABASE_SERVICE_ROLE_KEY is unavailable")
+const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
@@ -48,7 +47,10 @@ Deno.serve(async (req: Request) => {
       .select("version,manifest_path,trained_through,history_through,feature_count,artifact_sha256,artifact_size_bytes,metrics,activated_at")
       .eq("status", "ready")
       .single()
-    if (registryError || !model) return json({ error: "No active REIN model" }, 404)
+    if (registryError || !model) {
+      console.error("REIN registry lookup failed", registryError?.message ?? "model not found")
+      return json({ error: "No active REIN model", detail: registryError?.message ?? "model not found" }, 404)
+    }
     const bundlePath = model.manifest_path.replace(/manifest\.json$/, "bundle.tar.gz")
     const [{ data: bundle, error: bundleError }, { data: manifest, error: manifestError }] = await Promise.all([
       supabase.storage.from(BUCKET).createSignedUrl(bundlePath, 300),
