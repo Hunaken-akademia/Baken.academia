@@ -54,23 +54,40 @@ export async function GET(request: NextRequest) {
   const base = "https://sports.yahoo.co.jp/keiba/race";
   try {
     const headers = { "user-agent": "Mozilla/5.0 (compatible; REIN/0.2; personal analysis)" };
-    const [cardRes, detailRes, oddsRes, history] = await Promise.all([
+    const [cardRes, detailRes, oddsRes, resultRes, history] = await Promise.all([
       fetch(`${base}/denma/${raceId}`, { headers, cache: "no-store" }),
       fetch(`${base}/denma/${raceId}?detail=1`, { headers, cache: "no-store" }),
       fetch(`${base}/odds/tfw/${raceId}`, { headers, cache: "no-store" }),
+      fetch(`${base}/result/${raceId}`, { headers, cache: "no-store" }),
       loadHistory(),
     ]);
-    if (!cardRes.ok || !oddsRes.ok) throw new Error("出馬表またはオッズを取得できませんでした");
-    const [card, detail, odds] = await Promise.all([cardRes.text(), detailRes.text(), oddsRes.text()]);
+    if (!cardRes.ok) throw new Error("出馬表を取得できませんでした");
+    const [card, detail, odds, result] = await Promise.all([
+      cardRes.text(),
+      detailRes.ok ? detailRes.text() : Promise.resolve(""),
+      oddsRes.ok ? oddsRes.text() : Promise.resolve(""),
+      resultRes.ok ? resultRes.text() : Promise.resolve(""),
+    ]);
     const cardRows = tableRows(card).filter((row) => /^\d+$/.test(row.cells[1] || "") && /\d+\([+-]?\d+\)/.test(row.cells[6] || ""));
     const oddsRows = tableRows(odds).filter((row) => /^\d+$/.test(row.cells[1] || "") && /^\d+(\.\d+)?$/.test(row.cells[3] || ""));
+    const resultRows = tableRows(result).filter((row) =>
+      /^\d+$/.test(row.cells[0] || "") && /^\d+$/.test(row.cells[2] || "") && /\(\d+(?:\.\d+)?\)/.test(row.cells[7] || "")
+    );
     if (!cardRows.length) throw new Error("出馬表の形式を読み取れませんでした。発走前の中央競馬レースを指定してください");
-    const oddsMap = new Map(oddsRows.map((row) => [+row.cells[1], +row.cells[3]]));
+    const liveOddsMap = new Map(oddsRows.map((row) => [+row.cells[1], +row.cells[3]]));
+    const finalOddsMap = new Map(resultRows.map((row) => [
+      +row.cells[2],
+      +(row.cells[7].match(/\((\d+(?:\.\d+)?)\)/)?.[1] || 999),
+    ]));
+    const oddsMap = liveOddsMap.size ? liveOddsMap : finalOddsMap;
+    const finalPopularity = new Map(
+      [...finalOddsMap.entries()].sort((a, b) => a[1] - b[1]).map(([number], index) => [number, index + 1])
+    );
     const full = decode(card);
     const detailText = decode(detail);
     const pastRows = pastPerformanceRows(detail);
     const racecourse = full.match(/\d+回(札幌|函館|福島|新潟|東京|中山|中京|京都|阪神|小倉)\d+日/)?.[1] || "";
-    const course = full.match(/(芝|ダート|障害)[・ ]*(?:右|左|直線)?[・ ]*\d{3,4}m/)?.[0] || "コース取得中";
+    const course = full.match(/(芝|ダート|障害)[・ ]*(?:(?:右|左|直線)(?:[・ ]*(?:内|外))?)?[・ ]*\d{3,4}m/)?.[0] || "コース取得中";
     const surface = course.match(/^(芝|ダート|障害)/)?.[1] || "芝";
     const distanceM = +(course.match(/(\d{3,4})m/)?.[1] || 0);
     const going = full.match(/馬場[：: ]*(良|稍重|重|不良)/)?.[1] || "未発表";
@@ -84,7 +101,7 @@ export async function GET(request: NextRequest) {
       const weight = +(cells[6].match(/\d+/)?.[0] || 0);
       const change = +(cells[6].match(/\(([+-]?\d+)\)/)?.[1] || 0);
       const popOdds = cells[7].match(/(\d+)\((\d+(?:\.\d+)?)\)/);
-      const popularity = popOdds ? +popOdds[1] : 99;
+      const popularity = popOdds && +popOdds[1] > 0 ? +popOdds[1] : (finalPopularity.get(number) ?? 99);
       const odd = oddsMap.get(number) ?? (popOdds ? +popOdds[2] : 999);
       const horseId = cleanId(row.html.match(/directory\/horse\/(\d+)/)?.[1]);
       const jockeyId = cleanId(row.html.match(/directory\/jockey\/(\d+)/)?.[1]);
@@ -147,12 +164,19 @@ export async function GET(request: NextRequest) {
     const paceDetail = leaderHorses.length
       ? `${leaderHorses.map((horse) => `${horse.number} ${horse.name}（${horse.style}）`).join("・")}が前方候補。逃げ${escapeCount}頭、先行${frontRunners.length - escapeCount}頭から判定。`
       : "明確な逃げ・先行馬が不在。好位勢の出方次第で落ち着く展開を想定。";
+    const finishers = resultRows.map((row) => ({
+      finish: +row.cells[0],
+      number: +row.cells[2],
+      name: decode(row.html.match(/directory\/horse\/\d+\/[^>]*>([^<]+)/i)?.[1] || row.cells[3].split(" ")[0]),
+      odds: +(row.cells[7].match(/\((\d+(?:\.\d+)?)\)/)?.[1] || 0),
+    }));
     return NextResponse.json({
       race: { title, course, condition: going, start, updated: `${new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}更新`, raceId },
-      model: { ...history.meta, strategy: "本線=人気順 / 対抗=人気75%+REIN25% / 穴=人気50%+REIN50%" },
+      model: { ...history.meta, strategy: "本線=人気順 / 対抗=人気75%+REIN25% / 穴=人気50%+REIN50%", snapshotPolicy: resultRows.length ? "最終オッズから復習用予想を再構成" : "発走前の最新情報で分析" },
       pace: { label: pace, detail: paceDetail, leaders, escapeCount, frontCount: frontRunners.length },
       horses: raw,
       tickets: buildTickets(raw),
+      review: { isFinished: resultRows.length > 0, finishers },
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "分析データを取得できませんでした" }, { status: 502 });
