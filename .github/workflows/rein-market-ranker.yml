@@ -1,0 +1,67 @@
+name: Train REIN market-aware ranker
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/rein-market-ranker-request.json]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest tests.test_market_ranker tests.test_ranking_quality -v
+      - name: Download licensed JRA dataset
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: "35414533165"
+      - run: tar --no-same-owner -xzf .dataset/jra-backfill-result.tar.gz
+      - name: Train market-aware race ranker
+        run: >-
+          python -m baken_academia.market_ranker
+          --input data/raw/jra/races-2019-2026.parquet
+          --output artifacts/rein-market-ranker-v1
+      - name: Publish summary
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+          report = json.loads(Path("artifacts/rein-market-ranker-v1/report.json").read_text())
+          data = report["periods"]["test_2026"]
+          labels = {"market_ranker": "新REIN順位モデル", "popularity": "人気順"}
+          lines = [
+              "## REIN レース内ランキングモデル 2026未使用テスト",
+              "",
+              f"- Best iteration: {report['best_iteration']}",
+              f"- Test: {report['date_ranges']['test'][0]}〜{report['date_ranges']['test'][1]}",
+              "",
+              "|方式|評価1位1着率|評価1位3着内率|トップ3内に勝ち馬|トップ3から2頭以上3着内|トップ3全頭3着内|",
+              "|---|---:|---:|---:|---:|---:|",
+          ]
+          for method, label in labels.items():
+              row = data[method]["race_level"]
+              lines.append(
+                  f"|{label}|{row['top1_win_rate']:.2%}|{row['top1_top3_rate']:.2%}|"
+                  f"{row['top3_contains_winner_rate']:.2%}|"
+                  f"{row['top3_two_or_more_placed_rate']:.2%}|{row['top3_all_placed_rate']:.2%}|"
+              )
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write("\n".join(lines) + "\n")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rein-market-ranker-v1
+          path: artifacts/rein-market-ranker-v1
+          retention-days: 90
