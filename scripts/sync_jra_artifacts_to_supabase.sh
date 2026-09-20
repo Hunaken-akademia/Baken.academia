@@ -10,6 +10,11 @@ BUCKET="${SUPABASE_BUCKET:-baken-archive}"
 WORKFLOW_FILE="${SOURCE_WORKFLOW_FILE:-jra-all-odds-backfill.yml}"
 RUN_ID="${SOURCE_RUN_ID:-}"
 
+SUPABASE_HEADERS=(-H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}")
+if [[ "${SUPABASE_SERVICE_ROLE_KEY}" != sb_secret_* ]]; then
+  SUPABASE_HEADERS+=(-H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}")
+fi
+
 if [[ -z "${RUN_ID}" ]]; then
   RUN_ID="$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow "${WORKFLOW_FILE}" --limit 1 --json databaseId --jq '.[0].databaseId')"
 fi
@@ -41,7 +46,7 @@ while IFS=$'\t' read -r artifact_id artifact_name; do
   manifest_path="jra/odds/all-bets/v1/${year}/${period}.manifest.json"
   authenticated_url="${SUPABASE_URL}/storage/v1/object/authenticated/${BUCKET}/${object_path}"
 
-  status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}'     -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}"     -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"     "${authenticated_url}")"
+  status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}'     "${SUPABASE_HEADERS[@]}"     "${authenticated_url}")"
   if [[ "${status}" == "200" ]]; then
     echo "Already archived: ${object_path}"
     skipped=$((skipped + 1))
@@ -66,10 +71,10 @@ while IFS=$'\t' read -r artifact_id artifact_name; do
   sha256="$(sha256sum "${archive_file}" | cut -d' ' -f1)"
   size_bytes="$(stat -c '%s' "${archive_file}")"
 
-  curl --fail-with-body --silent --show-error     -X POST "${SUPABASE_URL}/storage/v1/object/${BUCKET}/${object_path}"     -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}"     -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"     -H "Content-Type: application/gzip"     -H "x-upsert: true"     --data-binary "@${archive_file}" > /dev/null
+  curl --fail-with-body --silent --show-error     -X POST "${SUPABASE_URL}/storage/v1/object/${BUCKET}/${object_path}"     "${SUPABASE_HEADERS[@]}"     -H "Content-Type: application/gzip"     -H "x-upsert: true"     --data-binary "@${archive_file}" > /dev/null
 
   verify_file="${artifact_dir}/verified.tar.gz"
-  curl --fail-with-body --silent --show-error     "${authenticated_url}"     -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}"     -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"     --output "${verify_file}"
+  curl --fail-with-body --silent --show-error     "${authenticated_url}"     "${SUPABASE_HEADERS[@]}"     --output "${verify_file}"
   verified_sha256="$(sha256sum "${verify_file}" | cut -d' ' -f1)"
   if [[ "${verified_sha256}" != "${sha256}" ]]; then
     echo "::error::Checksum mismatch after upload: ${object_path}"
@@ -101,7 +106,7 @@ with open(path, "w", encoding="utf-8") as f:
     f.write("\n")
 PY
 
-  curl --fail-with-body --silent --show-error     -X POST "${SUPABASE_URL}/storage/v1/object/${BUCKET}/${manifest_path}"     -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}"     -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}"     -H "Content-Type: application/json"     -H "x-upsert: true"     --data-binary "@${manifest_file}" > /dev/null
+  curl --fail-with-body --silent --show-error     -X POST "${SUPABASE_URL}/storage/v1/object/${BUCKET}/${manifest_path}"     "${SUPABASE_HEADERS[@]}"     -H "Content-Type: application/json"     -H "x-upsert: true"     --data-binary "@${manifest_file}" > /dev/null
 
   echo "Archived and verified: ${object_path} (${size_bytes} bytes, sha256=${sha256})"
   synced=$((synced + 1))
