@@ -13,7 +13,7 @@ jobs:
   cancel:
     runs-on: ubuntu-latest
     steps:
-      - name: Cancel the superseded monthly run
+      - name: Force-cancel the superseded monthly run
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api --method POST repos/${{ github.repository }}/actions/runs/35490438174/cancel
+        run: gh api --method POST repos/${{ github.repository }}/actions/runs/35490438174/force-cancel
