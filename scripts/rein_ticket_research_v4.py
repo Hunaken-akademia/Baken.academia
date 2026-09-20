@@ -9,6 +9,7 @@ from __future__ import annotations
 import itertools
 import json
 import multiprocessing as mp
+import os
 import sys
 from pathlib import Path
 
@@ -170,8 +171,8 @@ def evaluate_mix(item: tuple[str, tuple[float, float, float]]) -> tuple[str, dic
 
 
 def main() -> None:
-    raw = pd.read_parquet("data/raw/history.parquet")
-    predictions = pd.read_parquet(".model/test_predictions.parquet")
+    history_path = Path(os.environ.get("REIN_HISTORY_PATH", "data/raw/history.parquet"))
+    raw = pd.read_parquet(history_path)
     raw["race_id"] = raw["race_id"].astype(str)
     predictions["race_id"] = predictions["race_id"].astype(str)
     print("[features] point-in-time history", flush=True)
@@ -184,6 +185,8 @@ def main() -> None:
     flat = x["surface"].isin(["芝", "ダート"])
     train = x["race_date"].lt("2025-01-01") & flat
     model_info = {}
+    model_dir = Path(os.environ.get("REIN_MODEL_DIR", "artifacts/rein-role-model-v4"))
+    model_dir.mkdir(parents=True, exist_ok=True)
     for role, position in (("first", 1), ("second", 2), ("third", 3)):
         y = pd.to_numeric(x["finish_position"], errors="coerce").eq(position)
         print(f"[model] {role}", flush=True)
@@ -196,7 +199,21 @@ def main() -> None:
         model.fit(frame.loc[train], y.loc[train])
         x[f"v4_{role}_probability"] = model.predict_proba(frame)[:, 1]
         model_info[role] = {"iterations": 650}
+        model.booster_.save_model(str(model_dir / f"{role}.txt"))
 
+    (model_dir / "schema.json").write_text(json.dumps({
+        "version": "rein-role-v4",
+        "base_features": list(base.columns),
+        "advanced_features": feature_names,
+        "feature_order": list(frame.columns),
+        "trained_through": "2024-12-31",
+    }, ensure_ascii=False, indent=2))
+    if os.environ.get("REIN_TRAIN_ONLY") == "1":
+        print(f"[model] exported to {model_dir}", flush=True)
+        return
+
+    predictions = pd.read_parquet(".model/test_predictions.parquet")
+    predictions["race_id"] = predictions["race_id"].astype(str)
     columns = ["race_id", "horse_id", "horse_number", "gate", "popularity",
                "v4_first_probability", "v4_second_probability", "v4_third_probability"]
     runners = predictions.merge(x[columns], on=["race_id", "horse_id"], how="left", validate="one_to_one")

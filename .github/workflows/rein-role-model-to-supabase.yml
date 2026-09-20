@@ -1,0 +1,84 @@
+name: Build and publish REIN role model
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "JRA result backfill workflow run ID"
+        required: true
+        default: "35414533165"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/rein_ticket_research_v4.py"
+      - "scripts/rein_research.py"
+      - "scripts/rein_research_v3.py"
+      - "scripts/build_rein_role_bundle.py"
+      - "scripts/upload_rein_model_to_supabase.sh"
+      - "src/baken_academia/features.py"
+      - "src/baken_academia/history_features.py"
+      - ".github/workflows/rein-role-model-to-supabase.yml"
+      - "supabase/functions/github-rein-model/**"
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+concurrency:
+  group: rein-role-model-to-supabase
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      SOURCE_RUN_ID: ${{ inputs.source_run_id || '35414533165' }}
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-rein-model"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+      - name: Download licensed JRA history
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+      - name: Train exact role models
+        shell: bash
+        run: |
+          tar --no-same-owner -xzf .dataset/jra-backfill-result.tar.gz
+          history="data/raw/jra/races-2019-2026.parquet"
+          export REIN_HISTORY_PATH="${history}"
+          export REIN_MODEL_DIR="artifacts/rein-role-model-v4"
+          export REIN_TRAIN_ONLY=1
+          python scripts/rein_ticket_research_v4.py
+          version="rein-role-v4-${GITHUB_SHA}"
+          bundle="artifacts/rein-role-model-v4/${version}.bundle.tar.gz"
+          python scripts/build_rein_role_bundle.py \
+            --history "${history}" --model-dir "${REIN_MODEL_DIR}" \
+            --output "${bundle}" --version "${version}" \
+            --source-commit "${GITHUB_SHA}" \
+            --metrics reports/rein-ticket-research-v4/report.json \
+            > artifacts/rein-role-model-v4/build-result.json
+          echo "MODEL_VERSION=${version}" >> "${GITHUB_ENV}"
+          echo "MODEL_BUNDLE=${bundle}" >> "${GITHUB_ENV}"
+          echo "MODEL_MANIFEST=${bundle%.bundle.tar.gz}.bundle.manifest.json" >> "${GITHUB_ENV}"
+          echo "MODEL_METRICS=reports/rein-ticket-research-v4/report.json" >> "${GITHUB_ENV}"
+      - name: Upload and atomically activate in Supabase
+        run: bash scripts/upload_rein_model_to_supabase.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.MODEL_VERSION }}
+          path: |
+            ${{ env.MODEL_BUNDLE }}
+            ${{ env.MODEL_MANIFEST }}
+            artifacts/rein-role-model-v4/build-result.json
+          retention-days: 30
