@@ -1,0 +1,50 @@
+name: REIN wheel and formation search v6
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/rein_ticket_structure_search_v6.py"
+      - ".github/workflows/rein-ticket-structure-v6.yml"
+      - ".github/rein-ticket-structure-v6-request.json"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+      - name: Download licensed JRA history
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: "35414533165"
+      - run: tar --no-same-owner -xzf .dataset/jra-backfill-result.tar.gz
+      - name: Download held-out REIN predictions
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-history-v2-model
+          path: .model
+          github-token: ${{ github.token }}
+          run-id: "35417574150"
+      - name: Search wheel and formation plans
+        env:
+          REIN_HISTORY_PATH: data/raw/jra/races-2019-2026.parquet
+        run: python scripts/rein_ticket_structure_search_v6.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rein-ticket-structure-v6
+          path: reports/rein-ticket-structure-v6
+          retention-days: 90
