@@ -8,7 +8,9 @@ on:
         required: false
         type: string
   workflow_run:
-    workflows: ["JRA all bet types odds and payouts backfill"]
+    workflows:
+      - "JRA all bet types odds and payouts backfill"
+      - "JRA eight-year payouts backfill"
     types: [completed]
   schedule:
     - cron: "17 * * * *"

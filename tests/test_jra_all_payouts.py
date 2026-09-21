@@ -26,6 +26,34 @@ class JraAllPayoutsTest(unittest.TestCase):
                          (7, 3, 11))
         self.assertEqual(trifecta["payout_yen_per_100"], 125430)
 
+    def test_parses_current_jra_refund_cards(self) -> None:
+        refunds = """<div class="refund_area"><div class="refund_unit"><ul>
+        <li class="win"><dl><dt>単勝</dt><dd><div class="line">
+          <div class="num">4</div><div class="yen">280<span>円</span></div>
+        </div></dd></dl></li>
+        <li class="place"><dl><dt>複勝</dt><dd>
+          <div class="line"><div class="num">4</div><div class="yen">110<span>円</span></div></div>
+          <div class="line"><div class="num">11</div><div class="yen">150<span>円</span></div></div>
+          <div class="line"><div class="num">1</div><div class="yen">280<span>円</span></div></div>
+        </dd></dl></li>
+        <li class="umatan"><dl><dt>馬単</dt><dd><div class="line">
+          <div class="num">4-11</div><div class="yen">1,200<span>円</span></div>
+        </div></dd></dl></li>
+        <li class="tierce"><dl><dt>3連単</dt><dd><div class="line">
+          <div class="num">4-11-1</div><div class="yen">6,880<span>円</span></div>
+        </div></dd></dl></li>
+        </ul></div></div>"""
+        page = f'''<div id="race_result_1R"><div class="date_line"><div class="date">
+        2026年9月13日 4回阪神4日</div></div>{refunds}</div>'''.encode("cp932")
+        payouts = parse_all_payouts(page, "sample")
+        self.assertEqual(len(payouts), 6)
+        self.assertEqual([row["payout_yen_per_100"] for row in payouts if row["bet_type"] == "place"],
+                         [110, 150, 280])
+        trifecta = next(row for row in payouts if row["bet_type"] == "trifecta")
+        self.assertEqual((trifecta["selection_1"], trifecta["selection_2"], trifecta["selection_3"]),
+                         (4, 11, 1))
+        self.assertEqual(trifecta["payout_yen_per_100"], 6880)
+
 
 if __name__ == "__main__":
     unittest.main()

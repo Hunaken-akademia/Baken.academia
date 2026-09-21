@@ -12,7 +12,7 @@ const WORKFLOW_REF =
   REF
 const BUCKET = "baken-archive"
 const PATH_PATTERN =
-  /^jra\/odds\/all-bets\/v1\/\d{4}\/\d{8}-\d{8}\.(?:tar\.gz|manifest\.json)$/
+  /^jra\/(?:odds\/all-bets|payouts)\/v1\/\d{4}\/(?:\d{8}-\d{8}|\d{4}-q[1-4])\.(?:tar\.gz|manifest\.json)$/
 const JWKS = createRemoteJWKSet(
   new URL(GITHUB_ISSUER + "/.well-known/jwks"),
 )

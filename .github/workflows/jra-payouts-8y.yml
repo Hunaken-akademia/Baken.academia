@@ -1,0 +1,105 @@
+name: JRA eight-year payouts backfill
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["JRA all bet types odds and payouts backfill"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: jra-eight-year-payouts-backfill
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      periods: ${{ steps.periods.outputs.periods }}
+    steps:
+      - id: periods
+        shell: python
+        run: |
+          import calendar, json, os
+          from datetime import date
+          periods = []
+          last = date(2026, 9, 18)
+          for year in range(2019, last.year + 1):
+              for quarter in range(1, 5):
+                  first_month = (quarter - 1) * 3 + 1
+                  start = date(year, first_month, 1)
+                  if start > last:
+                      break
+                  last_month = first_month + 2
+                  end = min(date(year, last_month, calendar.monthrange(year, last_month)[1]), last)
+                  periods.append({
+                      "name": f"{year}-q{quarter}",
+                      "start": start.isoformat(),
+                      "end": end.isoformat(),
+                  })
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write("periods=" + json.dumps(periods, separators=(",", ":")) + "\n")
+          print(f"planned chunks: {len(periods)}")
+
+  collect:
+    needs: plan
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        period: ${{ fromJSON(needs.plan.outputs.periods) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest tests.test_jra_all_payouts -v
+      - name: Download JRA race history
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-backfill-2019-2026
+          path: .dataset
+          github-token: ${{ github.token }}
+          run-id: "35414533165"
+      - run: tar -xzf .dataset/jra-backfill-result.tar.gz
+      - name: Collect every standard payout type
+        run: >-
+          python -m baken_academia.jra_payouts_backfill
+          --input data/raw/jra/races-2019-2026.parquet
+          --start-date ${{ matrix.period.start }} --end-date ${{ matrix.period.end }}
+          --output-dir data/raw/jra-payouts/normalized
+          --work-dir data/raw/jra-payouts
+          --min-delay 3 --max-delay 4
+          --permission-confirmed --continue-on-error
+      - name: Validate payout coverage
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          audit = json.loads(Path("data/raw/jra-payouts/normalized/audit.json").read_text())
+          if audit["errors"]:
+              raise SystemExit(f"payout source errors: {len(audit['errors'])}")
+          if audit["payout_races"] < audit["expected_races"] * 0.99:
+              raise SystemExit(
+                  f"payout coverage too low: {audit['payout_races']}/{audit['expected_races']}"
+              )
+          print(json.dumps(audit, ensure_ascii=False, indent=2))
+          PY
+      - name: Package payouts and audit
+        if: always()
+        run: tar -czf jra-payouts-${{ matrix.period.name }}.tar.gz data/raw/jra-payouts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jra-payouts-${{ matrix.period.name }}
+          path: jra-payouts-${{ matrix.period.name }}.tar.gz
+          if-no-files-found: error
+          retention-days: 90

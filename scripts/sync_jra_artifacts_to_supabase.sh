@@ -10,6 +10,9 @@ set -Eeuo pipefail
 BUCKET="${SUPABASE_BUCKET:-baken-archive}"
 WORKFLOW_FILE="${SOURCE_WORKFLOW_FILE:-jra-all-odds-backfill.yml}"
 RUN_ID="${SOURCE_RUN_ID:-}"
+ARTIFACT_PREFIX="${SOURCE_ARTIFACT_PREFIX:-}"
+OBJECT_ROOT="${SUPABASE_OBJECT_ROOT:-}"
+DATASET="${ARCHIVE_DATASET:-}"
 OIDC_AUDIENCE="rein-supabase-archive-v1"
 OIDC_TOKEN=""
 OIDC_REFRESHED_AT=0
@@ -61,6 +64,19 @@ if [[ -z "${RUN_ID}" || "${RUN_ID}" == "null" ]]; then
   exit 1
 fi
 
+workflow_name="$(gh run view "${RUN_ID}" --repo "${GITHUB_REPOSITORY}" --json name --jq '.name')"
+if [[ -z "${ARTIFACT_PREFIX}" ]]; then
+  if [[ "${workflow_name}" == "JRA eight-year payouts backfill" ]]; then
+    ARTIFACT_PREFIX="jra-payouts-"
+    OBJECT_ROOT="${OBJECT_ROOT:-jra/payouts/v1}"
+    DATASET="${DATASET:-jra-all-bet-types-payouts}"
+  else
+    ARTIFACT_PREFIX="jra-all-odds-"
+    OBJECT_ROOT="${OBJECT_ROOT:-jra/odds/all-bets/v1}"
+    DATASET="${DATASET:-jra-all-bet-types-odds}"
+  fi
+fi
+
 echo "Syncing completed artifacts from workflow run ${RUN_ID}"
 tmp_root="$(mktemp -d)"
 trap 'rm -rf "${tmp_root}"' EXIT
@@ -68,11 +84,11 @@ trap 'rm -rf "${tmp_root}"' EXIT
 artifacts_tsv="${tmp_root}/artifacts.tsv"
 gh api --paginate \
   "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
-  --jq '.artifacts[] | select(.expired == false and (.name | startswith("jra-all-odds-"))) | [.id, .name] | @tsv' \
+  --jq ".artifacts[] | select(.expired == false and (.name | startswith(\"${ARTIFACT_PREFIX}\"))) | [.id, .name] | @tsv" \
   > "${artifacts_tsv}"
 
 if [[ ! -s "${artifacts_tsv}" ]]; then
-  echo "No completed JRA odds artifacts are available yet."
+  echo "No completed JRA artifacts with prefix ${ARTIFACT_PREFIX} are available yet."
   exit 0
 fi
 
@@ -108,10 +124,10 @@ download_signed() {
 }
 
 while IFS=$'\t' read -r artifact_id artifact_name; do
-  period="${artifact_name#jra-all-odds-}"
+  period="${artifact_name#"${ARTIFACT_PREFIX}"}"
   year="${period:0:4}"
-  object_path="jra/odds/all-bets/v1/${year}/${period}.tar.gz"
-  manifest_path="jra/odds/all-bets/v1/${year}/${period}.manifest.json"
+  object_path="${OBJECT_ROOT}/${year}/${period}.tar.gz"
+  manifest_path="${OBJECT_ROOT}/${year}/${period}.manifest.json"
 
   broker_call "exists" "${object_path}"
   if [[ "$(jq -r '.exists' <<<"${BROKER_RESPONSE}")" == "true" ]]; then
@@ -158,15 +174,15 @@ while IFS=$'\t' read -r artifact_id artifact_name; do
   fi
 
   manifest_file="${artifact_dir}/manifest.json"
-  python - "${manifest_file}" "${RUN_ID}" "${artifact_id}" "${artifact_name}" "${object_path}" "${sha256}" "${size_bytes}" <<'PY'
+  python - "${manifest_file}" "${RUN_ID}" "${artifact_id}" "${artifact_name}" "${object_path}" "${sha256}" "${size_bytes}" "${DATASET}" <<'PY'
 import json
 import sys
 from datetime import datetime, timezone
 
-path, run_id, artifact_id, artifact_name, object_path, sha256, size_bytes = sys.argv[1:]
+path, run_id, artifact_id, artifact_name, object_path, sha256, size_bytes, dataset = sys.argv[1:]
 payload = {
     "schema_version": 1,
-    "dataset": "jra-all-bet-types-odds",
+    "dataset": dataset,
     "source_workflow_run_id": int(run_id),
     "source_artifact_id": int(artifact_id),
     "source_artifact_name": artifact_name,

@@ -6,6 +6,7 @@ import { loadHistory, scoreHistory } from "@/lib/history";
 import { buildTickets } from "@/lib/tickets";
 import { responseCache } from "@/lib/response-cache";
 import { parseMarket, parsePopularity } from "@/lib/market-data";
+import { parsePayouts } from "@/lib/payouts";
 import { fetchSource } from "@/lib/source-fetch";
 
 const cachedAnalysis = responseCache(15_000);
@@ -343,14 +344,15 @@ async function analyze(request: NextRequest) {
       name: decode(row.html.match(/directory\/horse\/\d+\/[^>]*>([^<]+)/i)?.[1] || row.cells[3].split(" ")[0]),
       odds: parseMarket(row.cells[7])!.odds,
     }));
+    const payouts = parsePayouts(result);
     return NextResponse.json({
-      warnings: [!odds ? "単勝オッズ表を取得できず、出馬表の掲載値を使用しています" : "", !result ? "確定結果を取得できていません" : ""].filter(Boolean),
+      warnings: [!odds ? "単勝オッズ表を取得できず、出馬表の掲載値を使用しています" : "", !result ? "確定結果を取得できていません" : "", resultRows.length && !payouts.length ? "払戻情報を取得できていません" : ""].filter(Boolean),
       race: { title, course, condition: going, start, updated: `${new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}更新`, raceId },
       model: { ...history.meta, version: roleModel.version, featureCount: roleModel.feature_count, strategy: "全券種=人気70%+着順別REIN 30%", snapshotPolicy: resultRows.length ? "最終オッズから復習用予想を再構成" : "発走前の最新情報で分析" },
       pace: { label: pace, detail: paceDetail, leaders, escapeCount, frontCount: frontRunners.length },
       horses: raw,
       tickets: buildTickets(raw),
-      review: { isFinished: resultRows.length > 0, finishers },
+      review: { isFinished: resultRows.length > 0, finishers, payouts },
     }, { headers: {
       ...publicCacheHeaders,
       "x-rein-fallback": roleModel.feature_count ? "0" : "1",

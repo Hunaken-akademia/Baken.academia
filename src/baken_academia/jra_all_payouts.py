@@ -52,8 +52,30 @@ def parse_all_payouts(payload: bytes, source_cname: str) -> list[dict[str, objec
         race_no = int(race_match.group())
         race_date = date(*(int(value) for value in date_match.groups()))
         race_id = f"{race_date:%Y%m%d}-{course_match.group(1)}-{race_no:02d}"
+        # Current JRA result pages render refunds as li > dl > dd > div.line.
+        # Keep the table fallback because older archived pages used table rows.
+        groups: list[tuple[str, list[tuple[str, str]]]] = []
+        for item in unit.xpath(
+            ".//div[contains(concat(' ',normalize-space(@class),' '),' refund_area ')]"
+            "//li[.//dt]"
+        ):
+            label_text = _text(_first(item, ".//dt"))
+            label = next((candidate for candidate in LABELS if candidate in label_text), None)
+            if not label:
+                continue
+            lines = [
+                (
+                    _text(_first(line, ".//*[contains(concat(' ',normalize-space(@class),' '),' num ')]")),
+                    _text(_first(line, ".//*[contains(concat(' ',normalize-space(@class),' '),' yen ')]")),
+                )
+                for line in item.xpath(
+                    ".//*[contains(concat(' ',normalize-space(@class),' '),' line ')]"
+                )
+            ]
+            groups.append((label, lines))
+
         active_label: str | None = None
-        for tr in unit.xpath(".//tr"):
+        for tr in unit.xpath(".//tr") if not groups else []:
             cells = tr.xpath("./th|./td")
             if not cells:
                 continue
@@ -66,36 +88,35 @@ def parse_all_payouts(payload: bytes, source_cname: str) -> list[dict[str, objec
                 value_cells = cell_texts
             else:
                 continue
-            bet_type, arity = LABELS[active_label]
-            payout_cells = [value for value in value_cells if "円" in value]
             selection_cells = [value for value in value_cells if "円" not in value]
-            payouts = [
-                int(value.replace(",", ""))
-                for cell in payout_cells
-                for value in re.findall(r"([\d,]+)\s*円", cell)
-            ]
-            selections = [
-                selection
-                for cell in selection_cells
-                for selection in _extract_selections(cell, arity)
-                if all(1 <= value <= 18 for value in selection)
-            ]
-            if not selections or not payouts:
-                continue
-            for selection, payout in zip(selections, payouts, strict=False):
-                records.append(
-                    {
-                        "race_id": race_id,
-                        "race_date": race_date.isoformat(),
-                        "race_no": race_no,
-                        "bet_type": bet_type,
-                        "bet_type_label": active_label,
-                        "selection_1": selection[0],
-                        "selection_2": selection[1] if arity >= 2 else None,
-                        "selection_3": selection[2] if arity >= 3 else None,
-                        "payout_yen_per_100": payout,
-                        "source": "JRA公式・払戻",
-                        "source_cname": source_cname,
-                    }
-                )
+            payout_cells = [value for value in value_cells if "円" in value]
+            groups.append((active_label, list(zip(selection_cells, payout_cells, strict=False))))
+
+        for label, lines in groups:
+            bet_type, arity = LABELS[label]
+            for selection_text, payout_text in lines:
+                selections = [
+                    selection for selection in _extract_selections(selection_text, arity)
+                    if all(1 <= value <= 18 for value in selection)
+                ]
+                payout_match = re.search(r"([\d,]+)\s*円", payout_text)
+                if not selections or not payout_match:
+                    continue
+                payout = int(payout_match.group(1).replace(",", ""))
+                for selection in selections:
+                    records.append(
+                        {
+                            "race_id": race_id,
+                            "race_date": race_date.isoformat(),
+                            "race_no": race_no,
+                            "bet_type": bet_type,
+                            "bet_type_label": label,
+                            "selection_1": selection[0],
+                            "selection_2": selection[1] if arity >= 2 else None,
+                            "selection_3": selection[2] if arity >= 3 else None,
+                            "payout_yen_per_100": payout,
+                            "source": "JRA公式・払戻",
+                            "source_cname": source_cname,
+                        }
+                    )
     return records
