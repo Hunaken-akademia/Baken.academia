@@ -7,7 +7,7 @@
     "prebuild": "node scripts/prepare-history-profile.mjs",
     "build": "npm test && next build",
     "start": "next start",
-    "test": "node --test tests/*.test.mjs"
+    "test": "NODE_ENV=development node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
