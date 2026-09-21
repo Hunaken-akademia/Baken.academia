@@ -4,7 +4,12 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 const source = readFileSync(new URL('../lib/market-data.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText;
-const { parseMarket, parsePopularity } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const { parseMarket, parsePopularity, parseResultOdds } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+test('reads final odds even when Yahoo temporarily omits popularity', () => {
+  assert.equal(parseResultOdds('- (3.8)'), 3.8);
+  assert.equal(parseResultOdds('2 (3.8)'), 3.8);
+  assert.equal(parseResultOdds('-'), null);
+});
 test('preserves published popularity without fabricating hidden odds', () => {
   assert.equal(parsePopularity('15( **** )'), 15);
   assert.equal(parseMarket('15( **** )'), null);

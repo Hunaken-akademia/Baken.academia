@@ -37,3 +37,22 @@ test('ignores result-table rows and incomplete payout rows', () => {
     <tr><th>単勝</th><td>発売なし</td><td>---</td></tr></table>`;
   assert.deepEqual(parsePayouts(html), []);
 });
+
+test('keeps rowspan continuation rows and numeric popularity from live Yahoo tables', () => {
+  const html = `<table><tbody>
+    <tr><th rowspan="3">複勝</th><td>15</td><td>170円</td><td>1</td></tr>
+    <tr><td>9</td><td>710円</td><td>9</td></tr>
+    <tr><td>12</td><td>300円</td><td>5</td></tr>
+    <tr><th rowspan="3">ワイド</th><td>12-15</td><td>680円</td><td>7</td></tr>
+    <tr><td>9-15</td><td>1,660円</td><td>13</td></tr>
+    <tr><td>9-12</td><td>2,580円</td><td>30</td></tr>
+  </tbody></table>`;
+  assert.deepEqual(parsePayouts(html), [
+    { type: '複勝', selection: '15', payout: 170, popularity: 1 },
+    { type: '複勝', selection: '9', payout: 710, popularity: 9 },
+    { type: '複勝', selection: '12', payout: 300, popularity: 5 },
+    { type: 'ワイド', selection: '12-15', payout: 680, popularity: 7 },
+    { type: 'ワイド', selection: '9-15', payout: 1660, popularity: 13 },
+    { type: 'ワイド', selection: '9-12', payout: 2580, popularity: 30 },
+  ]);
+});

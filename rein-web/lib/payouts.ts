@@ -44,37 +44,41 @@ function selections(value: string, arity: number): number[][] {
 export function parsePayouts(html: string): RacePayout[] {
   const payouts: RacePayout[] = [];
   const seen = new Set<string>();
-  for (const row of html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
-    const cells = [...row[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)]
-      .map((cell) => text(cell[1]));
-    if (cells.length < 2) continue;
-    const labelIndex = cells.findIndex((cell) => LABELS.some(([label]) => cell === label));
-    if (labelIndex < 0) continue;
-    const definition = LABELS.find(([label]) => label === cells[labelIndex]);
-    if (!definition) continue;
-    const [label, arity, ordered] = definition;
-    const values = cells.slice(labelIndex + 1);
-    const selectionValues = values
-      .filter((value) => !/円|人気/.test(value))
-      .flatMap((value) => selections(value, arity))
-      .filter((items) => items.every((item) => item >= 1 && item <= 18));
-    const payoutValues = values.flatMap((value) =>
-      [...value.matchAll(/([\d,]+)\s*円/g)].map((match) => +match[1].replace(/,/g, ""))
-    );
-    const popularityValues = values.flatMap((value) =>
-      [...value.matchAll(/(\d+)\s*番?人気/g)].map((match) => +match[1])
-    );
-    for (let index = 0; index < Math.min(selectionValues.length, payoutValues.length); index++) {
-      const selection = selectionValues[index].join(ordered ? "→" : "-");
-      const key = `${label}:${selection}:${payoutValues[index]}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      payouts.push({
-        type: label.replace("三連", "3連"),
-        selection,
-        payout: payoutValues[index],
-        popularity: popularityValues[index] ?? null,
-      });
+  for (const table of html.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)) {
+    let active: (typeof LABELS)[number] | undefined;
+    for (const row of table[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+      const cells = [...row[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+        .map((cell) => text(cell[1]));
+      if (cells.length < 2) continue;
+      const labelIndex = cells.findIndex((cell) => LABELS.some(([label]) => cell === label));
+      if (labelIndex >= 0) active = LABELS.find(([label]) => label === cells[labelIndex]);
+      else if (!active || cells.length !== 3) continue;
+      if (!active) continue;
+      const [label, arity, ordered] = active;
+      const values = labelIndex >= 0 ? cells.slice(labelIndex + 1) : cells;
+      if (values.length < 2) continue;
+      const selectionValues = selections(values[0], arity)
+        .filter((items) => items.every((item) => item >= 1 && item <= 18));
+      const payoutValues = [...values[1].matchAll(/([\d,]+)\s*円/g)]
+        .map((match) => +match[1].replace(/,/g, ""));
+      const popularityText = values[2] || "";
+      const popularityValues = [...popularityText.matchAll(/(\d+)\s*(?:番)?人気/g)]
+        .map((match) => +match[1]);
+      if (!popularityValues.length && /^\d+(?:\s+\d+)*$/.test(popularityText)) {
+        popularityValues.push(...popularityText.split(/\s+/).map(Number));
+      }
+      for (let index = 0; index < Math.min(selectionValues.length, payoutValues.length); index++) {
+        const selection = selectionValues[index].join(ordered ? "→" : "-");
+        const key = `${label}:${selection}:${payoutValues[index]}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        payouts.push({
+          type: label.replace("三連", "3連"),
+          selection,
+          payout: payoutValues[index],
+          popularity: popularityValues[index] ?? null,
+        });
+      }
     }
   }
   return payouts;

@@ -5,7 +5,7 @@ import { timingSafeEqual } from "node:crypto";
 import { loadHistory, scoreHistory } from "@/lib/history";
 import { buildTickets } from "@/lib/tickets";
 import { responseCache } from "@/lib/response-cache";
-import { parseMarket, parsePopularity } from "@/lib/market-data";
+import { parseMarket, parsePopularity, parseResultOdds } from "@/lib/market-data";
 import { parsePayouts } from "@/lib/payouts";
 import { fetchSource } from "@/lib/source-fetch";
 
@@ -142,13 +142,13 @@ async function analyze(request: NextRequest) {
     const cardRows = tableRows(card).filter((row) => /^\d+$/.test(row.cells[1] || "") && /\d+\([+-]?\d+\)/.test(row.cells[6] || ""));
     const oddsRows = tableRows(odds, 5).filter((row) => /^\d+$/.test(row.cells[1] || "") && /^\d+(\.\d+)?$/.test(row.cells[3] || ""));
     const resultRows = tableRows(result).filter((row) =>
-      /^\d+$/.test(row.cells[0] || "") && /^\d+$/.test(row.cells[2] || "") && parseMarket(row.cells[7] || "") !== null
+      /^\d+$/.test(row.cells[0] || "") && /^\d+$/.test(row.cells[2] || "") && parseResultOdds(row.cells[7] || "") !== null
     );
     if (!cardRows.length) throw new Error("出馬表の形式を読み取れませんでした。発走前の中央競馬レースを指定してください");
     const liveOddsMap = new Map(oddsRows.map((row) => [+row.cells[1], +row.cells[3]]));
     const finalOddsMap = new Map(resultRows.map((row) => [
       +row.cells[2],
-      parseMarket(row.cells[7])!.odds,
+      parseResultOdds(row.cells[7])!,
     ]));
     const oddsMap = liveOddsMap.size ? liveOddsMap : finalOddsMap;
     const finalPopularity = new Map(
@@ -342,7 +342,7 @@ async function analyze(request: NextRequest) {
       finish: +row.cells[0],
       number: +row.cells[2],
       name: decode(row.html.match(/directory\/horse\/\d+\/[^>]*>([^<]+)/i)?.[1] || row.cells[3].split(" ")[0]),
-      odds: parseMarket(row.cells[7])!.odds,
+      odds: parseResultOdds(row.cells[7])!,
     }));
     const payouts = parsePayouts(result);
     return NextResponse.json({

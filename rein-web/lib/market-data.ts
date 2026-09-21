@@ -12,3 +12,9 @@ export function parsePopularity(value: string) {
   const rank = match ? Number(match[1]) : 0;
   return rank >= 1 && rank <= 18 ? rank : null;
 }
+
+export function parseResultOdds(value: string) {
+  const match = value.match(/\(\s*(\d+(?:\.\d+)?)\s*\)\s*$/);
+  const odds = match ? Number(match[1]) : 0;
+  return Number.isFinite(odds) && odds >= 1 ? odds : null;
+}
