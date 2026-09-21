@@ -27,3 +27,13 @@ Prediction models, scoring and ticket selection logic are unchanged. Cache fresh
 9. Confirm model fallback is visible to users, freshness timestamps are clear, and predictions are not presented as guaranteed outcomes.
 
 No paid plan upgrade or new paid resource is part of this change. Cost reduction is not quantified until production measurements exist.
+
+## Agreed operating envelope
+
+- Expected audience: 100–1,000 users.
+- Total monthly infrastructure target: JPY 30,000–50,000.
+- Keep the normal operating target below JPY 20,000 so traffic spikes, tax and exchange-rate changes have headroom.
+- Use shared CDN caching for public race analysis and schedules before adding paid infrastructure.
+- Current list-price baseline is Vercel Pro USD 20/month plus Supabase Pro USD 25/month, before tax and usage overages. Supabase Pro includes 100,000 MAU, one Micro compute instance through its compute credit, 8 GB disk and 250 GB egress; 100–1,000 users do not justify a larger database tier by user count alone.
+- Before launch, configure firewall rate limits for `/api/analyze` (initial target: 10 requests/minute/IP) and `/api/races` (60 requests/minute/IP), then adjust from measured false positives and cache-hit data.
+- Set team-level billing notifications only after accounting for the other projects on the same Vercel team. Vercel's spend budget covers metered usage across every project on the team, and pausing at the limit pauses every production project; it must not be configured as if it applied only to REIN.

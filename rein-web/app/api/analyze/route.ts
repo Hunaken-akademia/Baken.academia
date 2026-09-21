@@ -272,7 +272,7 @@ async function analyze(request: NextRequest) {
       tickets: buildTickets(raw),
       review: { isFinished: resultRows.length > 0, finishers },
     }, { headers: {
-      "Cache-Control": "no-store",
+      "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=15",
       "x-rein-fallback": roleModel.feature_count ? "0" : "1",
     } });
   } catch (error) {

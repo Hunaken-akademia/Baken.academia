@@ -6,6 +6,10 @@ import { Tabs as TabsPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+type TabsProps = React.ComponentProps<typeof TabsPrimitive.Root> & {
+  onSwipeBack?: () => void
+}
+
 function Tabs({
   className,
   style,
@@ -13,8 +17,9 @@ function Tabs({
   defaultValue,
   value,
   onValueChange,
+  onSwipeBack,
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.Root>) {
+}: TabsProps) {
   const [internalValue, setInternalValue] = React.useState(defaultValue)
   const root = React.useRef<HTMLDivElement>(null)
   const start = React.useRef<{ x: number; y: number; time: number } | null>(null)
@@ -53,9 +58,18 @@ function Tabs({
         if (Date.now() - origin.time > 800 || Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2) return
         const tabs = Array.from(root.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)') ?? [])
         const index = tabs.findIndex((tab) => tab.getAttribute("aria-selected") === "true")
+        if (index === 0 && dx > 0 && onSwipeBack) {
+          event.preventDefault()
+          event.stopPropagation()
+          suppressClickUntil.current = Date.now() + 400
+          onSwipeBack()
+          return
+        }
         const target = tabs[index + (dx < 0 ? 1 : -1)]
         const next = target?.getAttribute("data-tab-value")
         if (index >= 0 && next) {
+          event.preventDefault()
+          event.stopPropagation()
           change(next)
           suppressClickUntil.current = Date.now() + 400
         }

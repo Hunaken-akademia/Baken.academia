@@ -24,7 +24,8 @@ test('touch navigation: left/right, boundaries, vertical, edge, and normal tab c
   const { Tabs, TabsList, TabsTrigger, TabsContent } = module.exports;
   const h = React.createElement;
   const root = createRoot(document.getElementById('app'));
-  await React.act(async () => root.render(h(Tabs, { defaultValue: 'a' },
+  let backCount = 0;
+  await React.act(async () => root.render(h(Tabs, { defaultValue: 'a', onSwipeBack: () => backCount++ },
     h(TabsList, null, ...['a', 'b', 'c'].map(value => h(TabsTrigger, { key: value, value }, value))),
     ...['a', 'b', 'c'].map(value => h(TabsContent, { key: value, value }, value)))));
   const selected = () => document.querySelector('[role="tab"][aria-selected="true"]').textContent;
@@ -48,6 +49,7 @@ test('touch navigation: left/right, boundaries, vertical, edge, and normal tab c
   await swipe(250, 100, 220, 100); assert.equal(selected(), 'b');
   await React.act(async () => document.querySelector('[data-tab-value="a"]').dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true, button: 0 })));
   assert.equal(selected(), 'a');
+  await swipe(100, 100, 250, 100); assert.equal(backCount, 1); assert.equal(selected(), 'a');
   await React.act(async () => root.unmount());
   dom.window.close();
 });
