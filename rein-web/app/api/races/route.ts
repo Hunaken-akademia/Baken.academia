@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { responseCache } from "@/lib/response-cache";
+
+const cachedSchedule = responseCache(30_000, 1);
 
 export const runtime = "nodejs";
+export const maxDuration = 40;
 export const dynamic = "force-dynamic";
 
 const BASE = "https://sports.yahoo.co.jp/keiba";
@@ -42,14 +46,18 @@ function races(html: string, nextRace: number) {
 }
 
 export async function GET() {
+  return cachedSchedule("schedule", loadSchedule);
+}
+
+async function loadSchedule() {
   try {
-    const homeResponse = await fetch(`${BASE}/`, { headers, cache: "no-store" });
+    const homeResponse = await fetch(`${BASE}/`, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) });
     if (!homeResponse.ok) throw new Error("本日の開催情報を取得できませんでした");
     const home = await homeResponse.text();
     const seeds = venueSeeds(home);
     if (!seeds.length) return NextResponse.json({ dateLabel: "本日の開催", venues: [] });
     const venues = await Promise.all(seeds.map(async (seed) => {
-      const response = await fetch(`${BASE}/race/list/${seed.eventId}`, { headers, cache: "no-store" });
+      const response = await fetch(`${BASE}/race/list/${seed.eventId}`, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) });
       if (!response.ok) return { ...seed, races: [] };
       return { ...seed, races: races(await response.text(), seed.nextRace) };
     }));

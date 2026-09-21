@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import shutil
 import sys
 import tarfile
@@ -13,6 +12,7 @@ import urllib.error
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any
+import jwt
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -20,6 +20,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 BROKER_URL = "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/vercel-rein-model"
 _runtime: Any = None
 _runtime_lock = threading.Lock()
+ISSUER = "https://oidc.vercel.com/hunaken-akademia"
+AUDIENCE = "https://vercel.com/hunaken-akademia"
+_jwks = jwt.PyJWKClient(f"{ISSUER}/.well-known/jwks", lifespan=300, timeout=5)
+
+
+def authorize(token: str) -> None:
+    if not token or len(token) > 16384:
+        raise jwt.InvalidTokenError("Missing token")
+    key = _jwks.get_signing_key_from_jwt(token)
+    claims = jwt.decode(token, key.key, algorithms=["RS256"], issuer=ISSUER,
+                        audience=AUDIENCE, options={"require": ["exp", "iat", "iss", "aud"]})
+    if (claims.get("owner_id") != "team_JoV13Y5pkEXrjvf8JCKP6tNY"
+            or claims.get("project_id") != "prj_8X6LIxRxvKKNyVQWxFKF6AQJ6wrm"
+            or claims.get("environment") not in ("production", "preview")):
+        raise jwt.InvalidTokenError("Unauthorized project")
 
 
 def _request_bundle(token: str) -> tuple[dict, bytes]:
@@ -78,6 +93,8 @@ def get_runtime(token: str) -> Any:
 class handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
+            token = self.headers.get("x-rein-oidc-token", "")
+            authorize(token)
             size = int(self.headers.get("content-length", "0"))
             if size <= 0 or size > 131072:
                 raise ValueError("Invalid request size")
@@ -85,12 +102,17 @@ class handler(BaseHTTPRequestHandler):
             runners = payload.get("runners", [])
             if not 4 <= len(runners) <= 18:
                 raise ValueError("Runner count must be between 4 and 18")
-            token = self.headers.get("x-rein-oidc-token", "") or os.environ.get("VERCEL_OIDC_TOKEN", "")
             result = get_runtime(token).score(payload["race"], runners)
             body = json.dumps(result, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
-        except Exception as error:
-            body = json.dumps({"error": str(error)}, ensure_ascii=False).encode("utf-8")
+        except (jwt.InvalidTokenError, jwt.PyJWKClientError):
+            body = b'{"error":"Unauthorized"}'
+            self.send_response(401)
+        except (ValueError, KeyError, TypeError):
+            body = b'{"error":"Invalid request"}'
+            self.send_response(400)
+        except Exception:
+            body = b'{"error":"Inference temporarily unavailable"}'
             self.send_response(500)
         self.send_header("content-type", "application/json; charset=utf-8")
         self.send_header("cache-control", "no-store")

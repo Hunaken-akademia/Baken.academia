@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getVercelOidcToken } from "@vercel/oidc";
 import { loadHistory, scoreHistory } from "@/lib/history";
 import { buildTickets } from "@/lib/tickets";
+import { responseCache } from "@/lib/response-cache";
+
+const cachedAnalysis = responseCache(15_000);
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 const decode = (value: string) => value.replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -61,14 +65,20 @@ function raceClass(text: string) {
 export async function GET(request: NextRequest) {
   const raceId = request.nextUrl.searchParams.get("raceId") || "";
   if (!/^\d{10,12}$/.test(raceId)) return NextResponse.json({ error: "レースIDは10〜12桁で入力してください" }, { status: 400 });
+  return cachedAnalysis(raceId, () => analyze(request));
+}
+
+async function analyze(request: NextRequest) {
+  const raceId = request.nextUrl.searchParams.get("raceId") || "";
+  if (!/^\d{10,12}$/.test(raceId)) return NextResponse.json({ error: "レースIDは10〜12桁で入力してください" }, { status: 400 });
   const base = "https://sports.yahoo.co.jp/keiba/race";
   try {
     const headers = { "user-agent": "Mozilla/5.0 (compatible; REIN/0.2; personal analysis)" };
     const [cardRes, detailRes, oddsRes, resultRes, history] = await Promise.all([
-      fetch(`${base}/denma/${raceId}`, { headers, cache: "no-store" }),
-      fetch(`${base}/denma/${raceId}?detail=1`, { headers, cache: "no-store" }),
-      fetch(`${base}/odds/tfw/${raceId}`, { headers, cache: "no-store" }),
-      fetch(`${base}/result/${raceId}`, { headers, cache: "no-store" }),
+      fetch(`${base}/denma/${raceId}`, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) }),
+      fetch(`${base}/denma/${raceId}?detail=1`, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) }),
+      fetch(`${base}/odds/tfw/${raceId}`, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) }),
+      fetch(`${base}/result/${raceId}`, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) }),
       loadHistory(),
     ]);
     if (!cardRes.ok) throw new Error("出馬表を取得できませんでした");
@@ -174,7 +184,11 @@ export async function GET(request: NextRequest) {
     try {
       const oidcToken = await getVercelOidcToken();
       if (!oidcToken) throw new Error("Vercel OIDC token is unavailable");
-      const modelResponse = await fetch(`${request.nextUrl.origin}/api/rein_score`, {
+      // Never forward the service identity to a request-controlled Host header.
+      const deploymentHost = process.env.VERCEL_ENV === "production" ? "rein-web.vercel.app" : process.env.VERCEL_URL;
+      if (!deploymentHost || !/^[a-zA-Z0-9.-]+\.vercel\.app$/.test(deploymentHost)) throw new Error("Trusted inference host unavailable");
+      const modelResponse = await fetch(`https://${deploymentHost}/api/rein_score`, {
+        signal: AbortSignal.timeout(90_000),
         method: "POST", cache: "no-store", headers: {
           "content-type": "application/json",
           "x-rein-oidc-token": oidcToken,
@@ -257,7 +271,10 @@ export async function GET(request: NextRequest) {
       horses: raw,
       tickets: buildTickets(raw),
       review: { isFinished: resultRows.length > 0, finishers },
-    });
+    }, { headers: {
+      "Cache-Control": "no-store",
+      "x-rein-fallback": roleModel.feature_count ? "0" : "1",
+    } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "分析データを取得できませんでした" }, { status: 502 });
   }
