@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "prebuild": "node scripts/prepare-history-profile.mjs",
+    "build": "npm test && next build",
     "start": "next start",
     "test": "node --test tests/*.test.mjs"
   },

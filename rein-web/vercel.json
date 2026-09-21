@@ -1,10 +1,21 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "fluid": true,
+  "regions": ["hnd1"],
+  "git": {
+    "deploymentEnabled": {
+      "*": false,
+      "main": true
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/rein-live",
-      "schedule": "*/10 * * * *"
+      "schedule": "40,50 23 * * *"
+    },
+    {
+      "path": "/api/cron/rein-live",
+      "schedule": "*/10 0-8 * * *"
     }
   ],
   "functions": {

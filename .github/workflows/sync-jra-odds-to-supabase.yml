@@ -12,14 +12,6 @@ on:
       - "JRA all bet types odds and payouts backfill"
       - "JRA eight-year payouts backfill"
     types: [completed]
-  schedule:
-    - cron: "17 * * * *"
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/sync-jra-odds-to-supabase.yml"
-      - "scripts/sync_jra_artifacts_to_supabase.sh"
-      - "supabase/functions/github-jra-archive/**"
 
 permissions:
   actions: read

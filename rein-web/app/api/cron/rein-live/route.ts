@@ -1,5 +1,5 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { hasBearerSecret } from "@/lib/internal-auth";
 import { liveRefreshTargets, mapWithConcurrency, type RaceVenue } from "@/lib/rein-live";
 
 export const runtime = "nodejs";
@@ -8,17 +8,9 @@ export const dynamic = "force-dynamic";
 
 const PRODUCTION_ORIGIN = "https://rein-web.vercel.app";
 
-function authorized(request: NextRequest, secret: string) {
-  const supplied = request.headers.get("authorization") || "";
-  const expected = `Bearer ${secret}`;
-  const left = Buffer.from(supplied);
-  const right = Buffer.from(expected);
-  return left.length === right.length && timingSafeEqual(left, right);
-}
-
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET || "";
-  if (!secret || !authorized(request, secret)) {
+  if (!hasBearerSecret(request.headers.get("authorization"), secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

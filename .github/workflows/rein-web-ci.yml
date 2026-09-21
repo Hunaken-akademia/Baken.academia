@@ -1,12 +1,7 @@
-name: REIN web build and deploy
+name: REIN web emergency deploy
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "rein-web/**"
-      - ".github/workflows/rein-web-ci.yml"
 
 permissions:
   contents: read
@@ -50,31 +45,13 @@ jobs:
           python -m pip install 'PyJWT[crypto]==2.14.0'
           python -m unittest discover -s tests -p 'test_*.py' -v
 
-      - name: Enable Vercel project OIDC tokens
-        if: env.VERCEL_TOKEN != ''
-        run: |
-          curl --fail-with-body --silent --show-error \
-            --request PATCH \
-            --url "https://api.vercel.com/v9/projects/prj_8X6LIxRxvKKNyVQWxFKF6AQJ6wrm?teamId=team_JoV13Y5pkEXrjvf8JCKP6tNY" \
-            --header "Authorization: Bearer $VERCEL_TOKEN" \
-            --header "Content-Type: application/json" \
-            --data '{"oidcTokenConfig":{"enabled":true,"issuerMode":"team"}}'
-
-      - name: Configure protected cron authentication
+      - name: Deploy to Vercel
         if: env.VERCEL_TOKEN != ''
         working-directory: rein-web
         run: |
           npx vercel link --yes --project rein-web --scope hunaken-akademia --token "$VERCEL_TOKEN"
-          cron_secret="$(openssl rand -hex 32)"
-          echo "::add-mask::$cron_secret"
-          printf '%s' "$cron_secret" | npx vercel env add CRON_SECRET production \
-            --force --sensitive --yes --scope hunaken-akademia --token "$VERCEL_TOKEN"
-
-      - name: Deploy to Vercel
-        if: env.VERCEL_TOKEN != ''
-        working-directory: rein-web
-        run: npx vercel deploy --prod --yes --scope hunaken-akademia --token "$VERCEL_TOKEN"
+          npx vercel deploy --prod --yes --scope hunaken-akademia --token "$VERCEL_TOKEN"
 
       - name: Explain skipped deployment
         if: env.VERCEL_TOKEN == ''
-        run: echo "Build succeeded. Add the VERCEL_TOKEN repository secret to enable production deployment."
+        run: echo "Build succeeded. Emergency deployment requires the existing VERCEL_TOKEN repository secret."
