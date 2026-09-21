@@ -58,14 +58,14 @@ function Tabs({
         if (Date.now() - origin.time > 800 || Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 2) return
         const tabs = Array.from(root.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)') ?? [])
         const index = tabs.findIndex((tab) => tab.getAttribute("aria-selected") === "true")
-        if (index === 0 && dx > 0 && onSwipeBack) {
+        if (index === 0 && dx < 0 && onSwipeBack) {
           event.preventDefault()
           event.stopPropagation()
           suppressClickUntil.current = Date.now() + 400
           onSwipeBack()
           return
         }
-        const target = tabs[index + (dx < 0 ? 1 : -1)]
+        const target = tabs[index + (dx > 0 ? 1 : -1)]
         const next = target?.getAttribute("data-tab-value")
         if (index >= 0 && next) {
           event.preventDefault()
