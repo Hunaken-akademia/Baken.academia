@@ -5,6 +5,7 @@ import { timingSafeEqual } from "node:crypto";
 import { loadHistory, scoreHistory } from "@/lib/history";
 import { buildTickets } from "@/lib/tickets";
 import { responseCache } from "@/lib/response-cache";
+import { parseMarket } from "@/lib/market-data";
 
 const cachedAnalysis = responseCache(15_000);
 const sharedCache = getCache({ namespace: "rein-analysis-v1" });
@@ -25,10 +26,10 @@ const decode = (value: string) => value.replace(/<script[\s\S]*?<\/script>/gi, "
   .replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const cleanId = (value = "") => value.replace(/^0+/, "") || "0";
-const tableRows = (html: string) => [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)].map((match) => ({
+const tableRows = (html: string, minimumCells = 7) => [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)].map((match) => ({
   html: match[1],
   cells: [...match[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((cell) => decode(cell[1])),
-})).filter((row) => row.cells.length >= 7);
+})).filter((row) => row.cells.length >= minimumCells);
 
 function runningStyle(detail: string) {
   const recentPositions = [...detail.matchAll(/\b\d{1,2}(?:-\d{1,2}){1,3}\b/g)]
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
 
   if (!forceRefresh) {
     try {
-      const snapshot = await sharedCache.get(`snapshot:${raceId}`);
+      const snapshot = await sharedCache.get(`snapshot-market-v2:${raceId}`);
       if (typeof snapshot === "string") {
         return new NextResponse(snapshot, {
           status: 200,
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
     : await cachedAnalysis(raceId, () => analyze(request));
   if (response.ok && response.headers.get("x-rein-fallback") === "0") {
     try {
-      await sharedCache.set(`snapshot:${raceId}`, await response.clone().text(), {
+      await sharedCache.set(`snapshot-market-v2:${raceId}`, await response.clone().text(), {
         ttl: 15 * 60,
         tags: [`rein-race-${raceId}`, "rein-live"],
         name: "REIN race analysis",
@@ -145,15 +146,15 @@ async function analyze(request: NextRequest) {
       resultRes.ok ? resultRes.text() : Promise.resolve(""),
     ]);
     const cardRows = tableRows(card).filter((row) => /^\d+$/.test(row.cells[1] || "") && /\d+\([+-]?\d+\)/.test(row.cells[6] || ""));
-    const oddsRows = tableRows(odds).filter((row) => /^\d+$/.test(row.cells[1] || "") && /^\d+(\.\d+)?$/.test(row.cells[3] || ""));
+    const oddsRows = tableRows(odds, 5).filter((row) => /^\d+$/.test(row.cells[1] || "") && /^\d+(\.\d+)?$/.test(row.cells[3] || ""));
     const resultRows = tableRows(result).filter((row) =>
-      /^\d+$/.test(row.cells[0] || "") && /^\d+$/.test(row.cells[2] || "") && /\(\d+(?:\.\d+)?\)/.test(row.cells[7] || "")
+      /^\d+$/.test(row.cells[0] || "") && /^\d+$/.test(row.cells[2] || "") && parseMarket(row.cells[7] || "") !== null
     );
     if (!cardRows.length) throw new Error("出馬表の形式を読み取れませんでした。発走前の中央競馬レースを指定してください");
     const liveOddsMap = new Map(oddsRows.map((row) => [+row.cells[1], +row.cells[3]]));
     const finalOddsMap = new Map(resultRows.map((row) => [
       +row.cells[2],
-      +(row.cells[7].match(/\((\d+(?:\.\d+)?)\)/)?.[1] || 999),
+      parseMarket(row.cells[7])!.odds,
     ]));
     const oddsMap = liveOddsMap.size ? liveOddsMap : finalOddsMap;
     const finalPopularity = new Map(
@@ -195,9 +196,12 @@ async function analyze(request: NextRequest) {
       const fixedWeight = fixedWeights?.[String(number)];
       const weight = fixedWeight?.weight || publishedWeight;
       const change = fixedWeight ? fixedWeight.change : publishedChange;
-      const popOdds = cells[7].match(/(\d+)\((\d+(?:\.\d+)?)\)/);
-      const popularity = popOdds && +popOdds[1] > 0 ? +popOdds[1] : (finalPopularity.get(number) ?? 99);
-      const odd = oddsMap.get(number) ?? (popOdds ? +popOdds[2] : 999);
+      const popOdds = parseMarket(cells[7] || "");
+      const popularity = popOdds?.popularity ?? finalPopularity.get(number);
+      const odd = oddsMap.get(number) ?? popOdds?.odds;
+      if (!popularity || popularity > cardRows.length || odd === undefined || !Number.isFinite(odd) || odd < 1) {
+        throw new Error("人気・オッズを正常に取得できないため、評価と買い目の生成を保留しています。時間をおいて更新してください");
+      }
       const horseId = cleanId(row.html.match(/directory\/horse\/(\d+)/)?.[1]);
       const jockeyId = cleanId(row.html.match(/directory\/jockey\/(\d+)/)?.[1]);
       const trainerId = cleanId(row.html.match(/directory\/trainer\/(\d+)/)?.[1]);
@@ -344,7 +348,7 @@ async function analyze(request: NextRequest) {
       finish: +row.cells[0],
       number: +row.cells[2],
       name: decode(row.html.match(/directory\/horse\/\d+\/[^>]*>([^<]+)/i)?.[1] || row.cells[3].split(" ")[0]),
-      odds: +(row.cells[7].match(/\((\d+(?:\.\d+)?)\)/)?.[1] || 0),
+      odds: parseMarket(row.cells[7])!.odds,
     }));
     return NextResponse.json({
       race: { title, course, condition: going, start, updated: `${new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}更新`, raceId },
