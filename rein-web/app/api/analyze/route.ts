@@ -5,7 +5,7 @@ import { timingSafeEqual } from "node:crypto";
 import { loadHistory, scoreHistory } from "@/lib/history";
 import { buildTickets } from "@/lib/tickets";
 import { responseCache } from "@/lib/response-cache";
-import { parseMarket } from "@/lib/market-data";
+import { parseMarket, parsePopularity } from "@/lib/market-data";
 
 const cachedAnalysis = responseCache(15_000);
 const sharedCache = getCache({ namespace: "rein-analysis-v1" });
@@ -197,9 +197,9 @@ async function analyze(request: NextRequest) {
       const weight = fixedWeight?.weight || publishedWeight;
       const change = fixedWeight ? fixedWeight.change : publishedChange;
       const popOdds = parseMarket(cells[7] || "");
-      const popularity = popOdds?.popularity ?? finalPopularity.get(number);
-      const odd = oddsMap.get(number) ?? popOdds?.odds;
-      if (!popularity || popularity > cardRows.length || odd === undefined || !Number.isFinite(odd) || odd < 1) {
+      const popularity = parsePopularity(cells[7] || "") ?? finalPopularity.get(number);
+      const odd = oddsMap.get(number) ?? popOdds?.odds ?? null;
+      if (!popularity || popularity > cardRows.length || (odd !== null && (!Number.isFinite(odd) || odd < 1))) {
         throw new Error("人気・オッズを正常に取得できないため、評価と買い目の生成を保留しています。時間をおいて更新してください");
       }
       const horseId = cleanId(row.html.match(/directory\/horse\/(\d+)/)?.[1]);

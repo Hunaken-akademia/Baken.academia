@@ -6,3 +6,9 @@ export function parseMarket(value: string) {
   return popularity >= 1 && popularity <= 18 && Number.isFinite(odds) && odds >= 1
     ? { popularity, odds } : null;
 }
+
+export function parsePopularity(value: string) {
+  const match = value.match(/^\s*(\d+)\s*\(/);
+  const rank = match ? Number(match[1]) : 0;
+  return rank >= 1 && rank <= 18 ? rank : null;
+}

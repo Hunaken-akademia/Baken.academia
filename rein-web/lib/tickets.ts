@@ -1,5 +1,5 @@
 export type TicketHorse = {
-  number: number; gate: number; popularity: number; odds: number; reinScore: number; marketScore: number;
+  number: number; gate: number; popularity: number; odds: number | null; reinScore: number; marketScore: number;
   firstProbability?: number; secondProbability?: number; thirdProbability?: number;
 };
 export type TicketTier = { group: "本線" | "対抗" | "穴"; points: number; selections: string[] };
