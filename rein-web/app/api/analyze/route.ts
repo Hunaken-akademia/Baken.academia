@@ -6,6 +6,7 @@ import { loadHistory, scoreHistory } from "@/lib/history";
 import { buildTickets } from "@/lib/tickets";
 import { responseCache } from "@/lib/response-cache";
 import { parseMarket, parsePopularity } from "@/lib/market-data";
+import { fetchSource } from "@/lib/source-fetch";
 
 const cachedAnalysis = responseCache(15_000);
 const sharedCache = getCache({ namespace: "rein-analysis-v1" });
@@ -17,7 +18,7 @@ type FixedWeight = { weight: number; change: number };
 type FixedWeights = Record<string, FixedWeight>;
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 180;
 export const dynamic = "force-dynamic";
 
 const decode = (value: string) => value.replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -130,20 +131,12 @@ async function analyze(request: NextRequest) {
   if (!/^\d{10,12}$/.test(raceId)) return NextResponse.json({ error: "レースIDは10〜12桁で入力してください" }, { status: 400 });
   const base = "https://sports.yahoo.co.jp/keiba/race";
   try {
-    const headers = { "user-agent": "Mozilla/5.0 (compatible; REIN/0.2; personal analysis)" };
-    const [cardRes, detailRes, oddsRes, resultRes, history] = await Promise.all([
-      fetch(`${base}/denma/${raceId}`, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) }),
-      fetch(`${base}/denma/${raceId}?detail=1`, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) }),
-      fetch(`${base}/odds/tfw/${raceId}`, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) }),
-      fetch(`${base}/result/${raceId}`, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) }),
+    const [card, detail, odds, result, history] = await Promise.all([
+      fetchSource(`${base}/denma/${raceId}`, "出馬表"),
+      fetchSource(`${base}/denma/${raceId}?detail=1`, "出走履歴"),
+      fetchSource(`${base}/odds/tfw/${raceId}`, "単勝オッズ", true),
+      fetchSource(`${base}/result/${raceId}`, "確定結果", true),
       loadHistory(),
-    ]);
-    if (!cardRes.ok) throw new Error("出馬表を取得できませんでした");
-    const [card, detail, odds, result] = await Promise.all([
-      cardRes.text(),
-      detailRes.ok ? detailRes.text() : Promise.resolve(""),
-      oddsRes.ok ? oddsRes.text() : Promise.resolve(""),
-      resultRes.ok ? resultRes.text() : Promise.resolve(""),
     ]);
     const cardRows = tableRows(card).filter((row) => /^\d+$/.test(row.cells[1] || "") && /\d+\([+-]?\d+\)/.test(row.cells[6] || ""));
     const oddsRows = tableRows(odds, 5).filter((row) => /^\d+$/.test(row.cells[1] || "") && /^\d+(\.\d+)?$/.test(row.cells[3] || ""));
@@ -351,6 +344,7 @@ async function analyze(request: NextRequest) {
       odds: parseMarket(row.cells[7])!.odds,
     }));
     return NextResponse.json({
+      warnings: [!odds ? "単勝オッズ表を取得できず、出馬表の掲載値を使用しています" : "", !result ? "確定結果を取得できていません" : ""].filter(Boolean),
       race: { title, course, condition: going, start, updated: `${new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}更新`, raceId },
       model: { ...history.meta, version: roleModel.version, featureCount: roleModel.feature_count, strategy: "全券種=人気70%+着順別REIN 30%", snapshotPolicy: resultRows.length ? "最終オッズから復習用予想を再構成" : "発走前の最新情報で分析" },
       pace: { label: pace, detail: paceDetail, leaders, escapeCount, frontCount: frontRunners.length },

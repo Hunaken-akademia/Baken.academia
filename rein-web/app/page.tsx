@@ -7,18 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { compactSelections } from "@/lib/tickets";
+import { raceProgress } from "@/lib/race-progress";
 
 type HistoryFactor = { label:string; samples:number; impact:number };
 type Horse = { number:number; gate?:number; name:string; score:number; odds:number|null; popularity:number; mark:string; style:string; verdict:string; historyAdjustment?:number; historySamples?:number; positives:string[]; cautions:string[]; weight?:number; weightChange?:number; pedigree?:string; jockey?:string; trainer?:string; earlyPosition?:number|null; recentPositions?:string[]; paceAdjustment?:number; marketScore?:number; reinScore?:number; firstProbability?:number; secondProbability?:number; thirdProbability?:number; firstSuitability?:number; secondSuitability?:number; thirdSuitability?:number; historyFactors?:HistoryFactor[] };
 type TicketTier = { group:"本線"|"対抗"|"穴"; points:number; selections:string[] };
 type Ticket = { type:string; tiers:TicketTier[] };
 type Analysis = {
+  warnings?:string[];
   race:{title:string;course:string;condition:string;start:string;updated:string;raceId:string};
   model?:{version:string;dateFrom:string;dateTo:string;races:number;runners:number;horses:number;strategy:string;snapshotPolicy?:string;featureCount?:number};
   pace:{label:string;detail:string;leaders:number[]}; horses:Horse[]; tickets:Ticket[];
   review?:{isFinished:boolean;finishers:Array<{finish:number;number:number;name:string;odds:number}>};
 };
-type Race = { number:number; start:string; raceId:string; title:string; course:string; status:"確定"|"次レース"|"発売前" };
+type Race = { number:number; start:string; raceId:string; title:string; course:string; status:"確定"|"次レース"|"発売前"|"発走時刻経過" };
 type Venue = { name:string; eventId:string; nextRace:number; nextStart:string; races:Race[] };
 type Schedule = { dateLabel:string; updatedAt:string; venues:Venue[] };
 
@@ -33,16 +35,16 @@ export default function Home(){
   const [error,setError]=useState("");
   const danger=useMemo(()=>data?.horses.find(h=>h.popularity<=3&&h.score<78),[data]);
 
-  async function loadSchedule(){
-    setLoading(true); setError("");
+  async function loadSchedule(background=false){
+    if(!background){setLoading(true); setError("");}
     try{
       const response=await fetch("/api/races");
       const result=await response.json() as Schedule&{error?:string};
       if(!response.ok)throw new Error(result.error||"開催情報を取得できませんでした");
       setSchedule(result);
-      if(venue){setVenue(result.venues.find(item=>item.eventId===venue.eventId)||null);}
+      setVenue(current=>current ? result.venues.find(item=>item.eventId===current.eventId)||null : null);
     }catch(value){setError(value instanceof Error?value.message:"開催情報を取得できませんでした");}
-    finally{setLoading(false);}
+    finally{if(!background)setLoading(false);}
   }
 
   async function analyze(race:Pick<Race,"raceId">){
@@ -56,7 +58,18 @@ export default function Home(){
     finally{setLoading(false);}
   }
 
-  useEffect(()=>{void loadSchedule();},[]);
+  useEffect(()=>{
+    void loadSchedule();
+    const refresh=()=>{if(document.visibilityState==="visible")void loadSchedule(true);};
+    const timer=setInterval(refresh,60_000);
+    const clock=setInterval(()=>{
+      const update=(item:Venue)=>({...item,...raceProgress(item.races)}) as Venue;
+      setSchedule(current=>current?{...current,venues:current.venues.map(update)}:null);
+      setVenue(current=>current?update(current):null);
+    },15_000);
+    document.addEventListener("visibilitychange",refresh);
+    return ()=>{clearInterval(timer);clearInterval(clock);document.removeEventListener("visibilitychange",refresh);};
+  },[]);
 
   const back=()=>{if(data){setData(null);setActiveHorse(null);}else setVenue(null);};
   const showBack=Boolean(venue||data);
@@ -96,6 +109,7 @@ export default function Home(){
   ><div className="mx-auto max-w-6xl px-4 pb-20 pt-5 sm:px-6">
     <header className="mb-5 flex items-center justify-between"><div className="flex items-center gap-3">{showBack&&<Button aria-label="戻る" variant="ghost" size="icon" onClick={back} className="text-slate-300 hover:bg-white/10 hover:text-white"><ArrowLeft/></Button>}<div className="grid size-10 place-items-center rounded-xl bg-cyan-400 text-xl font-black text-[#07111f]">R</div><div><p className="text-lg font-bold tracking-[.12em]">REIN</p><p className="text-xs text-slate-400">馬券アカデミア</p></div></div><div className="flex items-center gap-2"><Button aria-label={data?"最新の馬体重・馬場・オッズで再分析":"開催情報を更新"} variant="ghost" size="icon" onClick={()=>{if(data)void analyze({raceId:data.race.raceId});else void loadSchedule();}} disabled={loading} className="text-slate-400 hover:bg-white/10 hover:text-white"><RefreshCw className={loading?"animate-spin":""}/></Button><Badge className="border-cyan-400/25 bg-cyan-400/10 text-cyan-300">PERSONAL</Badge></div></header>
     {error&&<div className="mb-4 flex items-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 p-3 text-sm text-rose-200"><AlertTriangle className="size-4"/>{error}</div>}
+    {data?.warnings?.map(warning=><p key={warning} className="mb-3 rounded-xl border border-amber-400/30 p-3 text-sm text-amber-200">{warning}</p>)}
 
     {!venue&&!data&&<VenueScreen schedule={schedule} loading={loading} onSelect={setVenue}/>}
     {venue&&!data&&<RaceScreen venue={venue} loading={loading} onAnalyze={analyze}/>}
@@ -105,7 +119,7 @@ export default function Home(){
 
 function VenueScreen({schedule,loading,onSelect}:{schedule:Schedule|null;loading:boolean;onSelect:(venue:Venue)=>void}){
   return <><section className="mb-5 rounded-2xl border border-slate-700 bg-gradient-to-br from-[#10233a] to-[#0b1727] p-5"><p className="text-sm font-semibold text-cyan-300">TODAY&apos;S JRA</p><h1 className="mt-1 text-2xl font-black">開催場を選択</h1><p className="mt-2 text-sm text-slate-400">{schedule?.dateLabel||"本日の開催情報を取得中"}</p></section>
-    {loading&&!schedule?<div className="grid min-h-56 place-items-center rounded-2xl border border-slate-800 bg-[#0c192a]"><RefreshCw className="size-8 animate-spin text-cyan-300"/></div>:schedule?.venues.length?<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{schedule.venues.map(item=><button key={item.eventId} onClick={()=>onSelect(item)} className="group rounded-2xl border border-slate-700 bg-[#0c192a] p-5 text-left transition hover:-translate-y-0.5 hover:border-cyan-400/60 hover:bg-[#10233a]"><div className="flex items-start justify-between"><div><p className="text-xs font-semibold tracking-widest text-cyan-300">JRA</p><h2 className="mt-1 text-3xl font-black">{item.name}</h2></div><ChevronRight className="text-slate-600 transition group-hover:translate-x-1 group-hover:text-cyan-300"/></div><div className="mt-6 flex items-end justify-between"><div><p className="text-xs text-slate-500">次レース</p><p className="text-xl font-bold">{item.nextRace}R <span className="text-sm font-normal text-slate-400">{item.nextStart}</span></p></div><Badge className="bg-cyan-400/10 text-cyan-300">全{item.races.length}R</Badge></div></button>)}</div>:<div className="rounded-2xl border border-slate-700 bg-[#0c192a] p-8 text-center text-slate-400">本日のJRA開催はありません</div>}</>;
+    {loading&&!schedule?<div className="grid min-h-56 place-items-center rounded-2xl border border-slate-800 bg-[#0c192a]"><RefreshCw className="size-8 animate-spin text-cyan-300"/></div>:schedule?.venues.length?<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{schedule.venues.map(item=><button key={item.eventId} onClick={()=>onSelect(item)} className="group rounded-2xl border border-slate-700 bg-[#0c192a] p-5 text-left transition hover:-translate-y-0.5 hover:border-cyan-400/60 hover:bg-[#10233a]"><div className="flex items-start justify-between"><div><p className="text-xs font-semibold tracking-widest text-cyan-300">JRA</p><h2 className="mt-1 text-3xl font-black">{item.name}</h2></div><ChevronRight className="text-slate-600 transition group-hover:translate-x-1 group-hover:text-cyan-300"/></div><div className="mt-6 flex items-end justify-between"><div><p className="text-xs text-slate-500">次レース</p><p className="text-xl font-bold">{item.nextRace>12?"本日の発走予定なし":`${item.nextRace}R`} <span className="text-sm font-normal text-slate-400">{item.nextStart}</span></p></div><Badge className="bg-cyan-400/10 text-cyan-300">全{item.races.length}R</Badge></div></button>)}</div>:<div className="rounded-2xl border border-slate-700 bg-[#0c192a] p-8 text-center text-slate-400">本日のJRA開催はありません</div>}</>;
 }
 
 function RaceScreen({venue,loading,onAnalyze}:{venue:Venue;loading:boolean;onAnalyze:(race:Pick<Race,"raceId">)=>void}){

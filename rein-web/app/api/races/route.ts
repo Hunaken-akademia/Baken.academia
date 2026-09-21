@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { responseCache } from "@/lib/response-cache";
+import { raceProgress } from "@/lib/race-progress";
+import { fetchSource } from "@/lib/source-fetch";
 
 const cachedSchedule = responseCache(30_000, 1);
 const publicCache = { "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=30" };
 
 export const runtime = "nodejs";
-export const maxDuration = 40;
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const BASE = "https://sports.yahoo.co.jp/keiba";
@@ -52,15 +54,13 @@ export async function GET() {
 
 async function loadSchedule() {
   try {
-    const homeResponse = await fetch(`${BASE}/`, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) });
-    if (!homeResponse.ok) throw new Error("本日の開催情報を取得できませんでした");
-    const home = await homeResponse.text();
+    const home = await fetchSource(`${BASE}/`, "開催情報");
     const seeds = venueSeeds(home);
     if (!seeds.length) return NextResponse.json({ dateLabel: "本日の開催", venues: [] }, { headers: publicCache });
     const venues = await Promise.all(seeds.map(async (seed) => {
-      const response = await fetch(`${BASE}/race/list/${seed.eventId}`, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) });
-      if (!response.ok) return { ...seed, races: [] };
-      return { ...seed, races: races(await response.text(), seed.nextRace) };
+      const html = await fetchSource(`${BASE}/race/list/${seed.eventId}`, `${seed.name}のレース一覧`);
+      const parsed = races(html, 0);
+      return { ...seed, ...raceProgress(parsed) };
     }));
     const dateLabel = decode(home.match(/<section[^>]*id="raceflash"[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>/i)?.[1] || "本日の開催");
     return NextResponse.json({ dateLabel, updatedAt: new Date().toISOString(), venues }, { headers: publicCache });
