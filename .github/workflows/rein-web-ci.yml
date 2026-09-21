@@ -64,6 +64,7 @@ jobs:
         if: env.VERCEL_TOKEN != ''
         working-directory: rein-web
         run: |
+          npx vercel link --yes --project rein-web --scope hunaken-akademia --token "$VERCEL_TOKEN"
           cron_secret="$(openssl rand -hex 32)"
           echo "::add-mask::$cron_secret"
           printf '%s' "$cron_secret" | npx vercel env add CRON_SECRET production \
