@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVercelOidcToken } from "@vercel/oidc";
+import { getCache } from "@vercel/functions";
+import { timingSafeEqual } from "node:crypto";
 import { loadHistory, scoreHistory } from "@/lib/history";
 import { buildTickets } from "@/lib/tickets";
 import { responseCache } from "@/lib/response-cache";
 
 const cachedAnalysis = responseCache(15_000);
+const sharedCache = getCache({ namespace: "rein-analysis-v1" });
+const publicCacheHeaders = {
+  "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=15",
+};
+
+type FixedWeight = { weight: number; change: number };
+type FixedWeights = Record<string, FixedWeight>;
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -65,7 +74,54 @@ function raceClass(text: string) {
 export async function GET(request: NextRequest) {
   const raceId = request.nextUrl.searchParams.get("raceId") || "";
   if (!/^\d{10,12}$/.test(raceId)) return NextResponse.json({ error: "レースIDは10〜12桁で入力してください" }, { status: 400 });
-  return cachedAnalysis(raceId, () => analyze(request));
+  const forceRefresh = request.nextUrl.searchParams.get("refresh") === "1";
+  if (forceRefresh && !isCronRequest(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!forceRefresh) {
+    try {
+      const snapshot = await sharedCache.get(`snapshot:${raceId}`);
+      if (typeof snapshot === "string") {
+        return new NextResponse(snapshot, {
+          status: 200,
+          headers: {
+            ...publicCacheHeaders,
+            "content-type": "application/json; charset=utf-8",
+            "x-rein-fallback": "0",
+            "x-rein-snapshot": "1",
+          },
+        });
+      }
+    } catch (error) {
+      console.error("REIN snapshot read failed", error instanceof Error ? error.message : "unknown");
+    }
+  }
+
+  const response = forceRefresh
+    ? await analyze(request)
+    : await cachedAnalysis(raceId, () => analyze(request));
+  if (response.ok && response.headers.get("x-rein-fallback") === "0") {
+    try {
+      await sharedCache.set(`snapshot:${raceId}`, await response.clone().text(), {
+        ttl: 15 * 60,
+        tags: [`rein-race-${raceId}`, "rein-live"],
+        name: "REIN race analysis",
+      });
+    } catch (error) {
+      console.error("REIN snapshot write failed", error instanceof Error ? error.message : "unknown");
+    }
+  }
+  response.headers.set("x-rein-snapshot", "0");
+  return response;
+}
+
+function isCronRequest(request: NextRequest) {
+  const secret = process.env.CRON_SECRET || "";
+  if (!secret) return false;
+  const supplied = Buffer.from(request.headers.get("authorization") || "");
+  const expected = Buffer.from(`Bearer ${secret}`);
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 }
 
 async function analyze(request: NextRequest) {
@@ -117,6 +173,14 @@ async function analyze(request: NextRequest) {
       ? `${dateMatch[1]}-${dateMatch[2].padStart(2, "0")}-${dateMatch[3].padStart(2, "0")}`
       : new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
+    let fixedWeights: FixedWeights | undefined;
+    try {
+      const cachedWeights = await sharedCache.get(`weights:${raceId}`);
+      if (cachedWeights && typeof cachedWeights === "object") fixedWeights = cachedWeights as FixedWeights;
+    } catch (error) {
+      console.error("REIN fixed weight read failed", error instanceof Error ? error.message : "unknown");
+    }
+
     const raw = cardRows.map((row) => {
       const cells = row.cells;
       const number = +cells[1];
@@ -126,8 +190,11 @@ async function analyze(request: NextRequest) {
       const sexAge = horseCell.match(/(牡|牝|セ)\s*(\d+)/) || cells.slice(2, 5).join(" ").match(/(牡|牝|セ)\s*(\d+)/);
       const carriedText = cells.slice(2, 6).join(" ");
       const weightCarried = +(carriedText.match(/(?:^|\s)(4[8-9](?:\.\d)?|5\d(?:\.\d)?|6[0-1](?:\.\d)?)(?:\s|$)/)?.[1] || 0);
-      const weight = +(cells[6].match(/\d+/)?.[0] || 0);
-      const change = +(cells[6].match(/\(([+-]?\d+)\)/)?.[1] || 0);
+      const publishedWeight = +(cells[6].match(/\d+/)?.[0] || 0);
+      const publishedChange = +(cells[6].match(/\(([+-]?\d+)\)/)?.[1] || 0);
+      const fixedWeight = fixedWeights?.[String(number)];
+      const weight = fixedWeight?.weight || publishedWeight;
+      const change = fixedWeight ? fixedWeight.change : publishedChange;
       const popOdds = cells[7].match(/(\d+)\((\d+(?:\.\d+)?)\)/);
       const popularity = popOdds && +popOdds[1] > 0 ? +popOdds[1] : (finalPopularity.get(number) ?? 99);
       const odd = oddsMap.get(number) ?? (popOdds ? +popOdds[2] : 999);
@@ -170,6 +237,21 @@ async function analyze(request: NextRequest) {
           .map((component) => ({ label: component.label, samples: component.samples, impact: Math.round(component.signal * 1000) / 10 })),
       };
     });
+    if (!fixedWeights && raw.length && raw.every((horse) => horse.weight > 0)) {
+      const captured = Object.fromEntries(raw.map((horse) => [String(horse.number), {
+        weight: horse.weight,
+        change: horse.weightChange,
+      }]));
+      try {
+        await sharedCache.set(`weights:${raceId}`, captured, {
+          ttl: 12 * 60 * 60,
+          tags: [`rein-race-${raceId}`, "rein-weights"],
+          name: "REIN fixed horse weights",
+        });
+      } catch (error) {
+        console.error("REIN fixed weight write failed", error instanceof Error ? error.message : "unknown");
+      }
+    }
     const frontRunners = raw.filter((horse) => horse.style === "逃げ" || horse.style === "先行");
     const escapeCount = raw.filter((horse) => horse.style === "逃げ").length;
     const pace = escapeCount >= 2 ? "ハイペース寄り" : frontRunners.length >= 4 ? "平均〜やや速い" : frontRunners.length <= 1 ? "スロー" : "スロー〜平均";
@@ -272,7 +354,7 @@ async function analyze(request: NextRequest) {
       tickets: buildTickets(raw),
       review: { isFinished: resultRows.length > 0, finishers },
     }, { headers: {
-      "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=15",
+      ...publicCacheHeaders,
       "x-rein-fallback": roleModel.feature_count ? "0" : "1",
     } });
   } catch (error) {

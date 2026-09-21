@@ -1,6 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "fluid": true,
+  "crons": [
+    {
+      "path": "/api/cron/rein-live",
+      "schedule": "*/10 * * * *"
+    }
+  ],
   "functions": {
     "api/**/*.py": {
       "maxDuration": 300,

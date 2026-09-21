@@ -60,6 +60,15 @@ jobs:
             --header "Content-Type: application/json" \
             --data '{"oidcTokenConfig":{"enabled":true,"issuerMode":"team"}}'
 
+      - name: Configure protected cron authentication
+        if: env.VERCEL_TOKEN != ''
+        working-directory: rein-web
+        run: |
+          cron_secret="$(openssl rand -hex 32)"
+          echo "::add-mask::$cron_secret"
+          printf '%s' "$cron_secret" | npx vercel env add CRON_SECRET production \
+            --force --sensitive --yes --scope hunaken-akademia --token "$VERCEL_TOKEN"
+
       - name: Deploy to Vercel
         if: env.VERCEL_TOKEN != ''
         working-directory: rein-web
