@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // The history profile is fetched by prebuild into data/ and read at runtime through
+  // process.cwd(), which file tracing cannot discover on its own. Declare it so the
+  // bundle keeps serving REIN history adjustments and /api/internal/history-profile.
+  outputFileTracingIncludes: { "/**": ["./data/history-profile.json.gz"] },
   async headers() {
     return [{ source: "/:path*", headers: [
       { key: "X-Content-Type-Options", value: "nosniff" },
