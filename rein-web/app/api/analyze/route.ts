@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVercelOidcToken } from "@vercel/oidc";
 import { getCache } from "@vercel/functions";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { loadHistory, scoreHistory } from "@/lib/history";
 import { buildTickets } from "@/lib/tickets";
 import { responseCache } from "@/lib/response-cache";
@@ -13,8 +13,9 @@ import { failureCacheHeaders, readFailure, writeFailure } from "@/lib/failure-ca
 const cachedAnalysis = responseCache(15_000);
 const sharedCache = getCache({ namespace: "rein-analysis-v1" });
 const publicCacheHeaders = {
-  "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=15",
+  "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=30",
 };
+const ROLE_CACHE_VERSION = "2026-09-23-v1";
 
 // A card that is not published yet is an expected, deterministic state, not an upstream
 // fault, and the CDN only holds cacheable statuses - a 502 is re-fetched by every
@@ -294,28 +295,45 @@ async function analyze(request: NextRequest) {
       // Never forward the service identity to a request-controlled Host header.
       const deploymentHost = process.env.VERCEL_ENV === "production" ? "rein-web.vercel.app" : process.env.VERCEL_URL;
       if (!deploymentHost || !/^[a-zA-Z0-9.-]+\.vercel\.app$/.test(deploymentHost)) throw new Error("Trusted inference host unavailable");
-      const modelResponse = await fetch(`https://${deploymentHost}/api/rein_score`, {
-        signal: AbortSignal.timeout(90_000),
-        method: "POST", cache: "no-store", headers: {
-          "content-type": "application/json",
-          "x-rein-oidc-token": oidcToken,
+      const modelPayload = {
+        race: {
+          race_date: raceDate,
+          racecourse, surface, distance_m: distanceM, going, race_class: className,
         },
-        body: JSON.stringify({
-          race: {
-            race_date: raceDate,
-            racecourse, surface, distance_m: distanceM, going, race_class: className,
+        runners: raw.map((horse) => ({
+          horse_number: horse.number, gate: horse.gate, horse_id: horse.horseId,
+          jockey_id: horse.jockeyId, trainer_id: horse.trainerId,
+          age: horse.age || null, sex: horse.sex || null,
+          weight_carried: horse.weightCarried || null, horse_weight: horse.weight || null,
+          horse_weight_change: horse.weightChange,
+        })),
+      };
+      const modelCacheKey = `role:${ROLE_CACHE_VERSION}:${createHash("sha256")
+        .update(JSON.stringify(modelPayload))
+        .digest("hex")}`;
+      type RoleScore = { version?: string; feature_count?: number; runners?: Array<{horse_number:number;first_probability:number;second_probability:number;third_probability:number}>; error?:string };
+      let scored = await sharedCache.get(modelCacheKey) as RoleScore | null;
+      if (!scored?.runners?.length) {
+        const modelResponse = await fetch(`https://${deploymentHost}/api/rein_score`, {
+          signal: AbortSignal.timeout(90_000),
+          method: "POST", cache: "no-store", headers: {
+            "content-type": "application/json",
+            "x-rein-oidc-token": oidcToken,
           },
-          runners: raw.map((horse) => ({
-            horse_number: horse.number, gate: horse.gate, horse_id: horse.horseId,
-            jockey_id: horse.jockeyId, trainer_id: horse.trainerId,
-            age: horse.age || null, sex: horse.sex || null,
-            weight_carried: horse.weightCarried || null, horse_weight: horse.weight || null,
-            horse_weight_change: horse.weightChange,
-          })),
-        }),
-      });
-      const scored = await modelResponse.json() as { version?: string; feature_count?: number; runners?: Array<{horse_number:number;first_probability:number;second_probability:number;third_probability:number}>; error?:string };
-      if (!modelResponse.ok || !scored.runners?.length) throw new Error(scored.error || "着順モデルの応答が不正です");
+          body: JSON.stringify(modelPayload),
+        });
+        scored = await modelResponse.json() as RoleScore;
+        if (!modelResponse.ok || !scored.runners?.length) throw new Error(scored.error || "着順モデルの応答が不正です");
+        try {
+          await sharedCache.set(modelCacheKey, scored, {
+            ttl: 12 * 60 * 60,
+            tags: [`rein-race-${raceId}`, "rein-role-model"],
+            name: "REIN role-model output",
+          });
+        } catch (error) {
+          console.error("REIN role-model cache write failed", error instanceof Error ? error.message : "unknown");
+        }
+      }
       roleModel = { version: scored.version || "REIN role v4", feature_count: scored.feature_count || 106 };
       const byNumber = new Map(scored.runners.map((runner) => [runner.horse_number, runner]));
       const maxima = {
