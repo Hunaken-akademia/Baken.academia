@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - .github/nar-backfill-8y-request.json
+      - .github/workflows/nar-backfill-8y.yml
+      - scripts/plan_nar_resume.py
+      - scripts/upload_archive_to_supabase.sh
+      - src/baken_academia/nar_backfill.py
 
 permissions:
   contents: read
