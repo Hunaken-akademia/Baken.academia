@@ -8,6 +8,7 @@ import { responseCache } from "@/lib/response-cache";
 import { parseMarket, parsePopularity, parseResultOdds } from "@/lib/market-data";
 import { parsePayouts } from "@/lib/payouts";
 import { fetchSource } from "@/lib/source-fetch";
+import { failureCacheHeaders, readFailure, writeFailure } from "@/lib/failure-cache";
 
 const cachedAnalysis = responseCache(15_000);
 const sharedCache = getCache({ namespace: "rein-analysis-v1" });
@@ -99,6 +100,19 @@ export async function GET(request: NextRequest) {
     } catch (error) {
       console.error("REIN snapshot read failed", error instanceof Error ? error.message : "unknown");
     }
+
+    const failure = await readFailure(`analyze:${raceId}`);
+    if (failure) {
+      return new NextResponse(failure, {
+        status: 502,
+        headers: {
+          ...failureCacheHeaders,
+          "content-type": "application/json; charset=utf-8",
+          "x-rein-snapshot": "0",
+          "x-rein-failure-cache": "1",
+        },
+      });
+    }
   }
 
   const response = forceRefresh
@@ -114,6 +128,8 @@ export async function GET(request: NextRequest) {
     } catch (error) {
       console.error("REIN snapshot write failed", error instanceof Error ? error.message : "unknown");
     }
+  } else if (!response.ok) {
+    await writeFailure(`analyze:${raceId}`, await response.clone().text(), [`rein-race-${raceId}`, "rein-live"]);
   }
   response.headers.set("x-rein-snapshot", "0");
   return response;
@@ -358,6 +374,9 @@ async function analyze(request: NextRequest) {
       "x-rein-fallback": roleModel.feature_count ? "0" : "1",
     } });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "分析データを取得できませんでした" }, { status: 502 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "分析データを取得できませんでした" },
+      { status: 502, headers: failureCacheHeaders },
+    );
   }
 }

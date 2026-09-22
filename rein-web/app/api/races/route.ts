@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { responseCache } from "@/lib/response-cache";
 import { raceProgress } from "@/lib/race-progress";
 import { fetchSource } from "@/lib/source-fetch";
+import { failureCacheHeaders, readFailure, writeFailure } from "@/lib/failure-cache";
 
 const cachedSchedule = responseCache(30_000, 1);
 const publicCache = { "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=30" };
@@ -49,7 +50,20 @@ function races(html: string, nextRace: number) {
 }
 
 export async function GET() {
-  return cachedSchedule("schedule", loadSchedule);
+  // Every visible client polls this once a minute, so an unreusable failure is the
+  // one response that scales with the audience instead of being collapsed by the CDN.
+  const failure = await readFailure("schedule");
+  if (failure) {
+    return new NextResponse(failure, {
+      status: 502,
+      headers: { ...failureCacheHeaders, "content-type": "application/json; charset=utf-8", "x-rein-failure-cache": "1" },
+    });
+  }
+  const response = await cachedSchedule("schedule", loadSchedule);
+  if (!response.ok) {
+    await writeFailure("schedule", await response.clone().text(), ["rein-live"]);
+  }
+  return response;
 }
 
 async function loadSchedule() {
@@ -65,6 +79,9 @@ async function loadSchedule() {
     const dateLabel = decode(home.match(/<section[^>]*id="raceflash"[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>/i)?.[1] || "本日の開催");
     return NextResponse.json({ dateLabel, updatedAt: new Date().toISOString(), venues }, { headers: publicCache });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "開催情報を取得できませんでした" }, { status: 502 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "開催情報を取得できませんでした" },
+      { status: 502, headers: failureCacheHeaders },
+    );
   }
 }

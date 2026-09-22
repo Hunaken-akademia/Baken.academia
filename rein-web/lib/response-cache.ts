@@ -10,9 +10,11 @@ export function responseCache(ttlMs: number, maxEntries = 64) {
     if (hit) return hit.response.clone();
     const running = pending.get(key);
     if (running) return (await running).clone();
+    // Shedding buys nothing while every shed request still reaches an instance, so let
+    // the CDN hold the refusal for the same few seconds the client is asked to wait.
     if (pending.size >= 8) return Response.json(
       { error: "アクセスが集中しています。少し待って再試行してください。" },
-      { status: 503, headers: { "Retry-After": "5", "Cache-Control": "no-store" } },
+      { status: 503, headers: { "Retry-After": "5", "Cache-Control": "public, max-age=0, s-maxage=5" } },
     );
     const work = Promise.resolve().then(run).then((response) => {
       if (response.ok && response.headers.get("x-rein-fallback") !== "1") {
