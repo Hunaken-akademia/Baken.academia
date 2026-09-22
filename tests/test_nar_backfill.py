@@ -1,5 +1,5 @@
 import unittest
-from baken_academia.nar_backfill import parse_result_links, parse_result_page, parse_schedule_links
+from baken_academia.nar_backfill import build_odds_urls, parse_odds_cells, parse_result_links, parse_result_page, parse_schedule_links
 
 
 class NarBackfillTest(unittest.TestCase):
@@ -25,6 +25,19 @@ class NarBackfillTest(unittest.TestCase):
         self.assertEqual(row["race_id"], "20190101-NAR-3-01")
         self.assertEqual(row["distance_m"], 1400)
         self.assertEqual(row["horse_weight_change"], 2)
+
+    def test_all_odds_urls(self):
+        url = "https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?k_raceDate=2019%2F01%2F01&k_raceNo=1&k_babaCode=3"
+        urls = build_odds_urls(url)
+        self.assertEqual(set(urls), {"win_place", "bracket_quinella", "quinella", "exacta", "wide", "trio", "trifecta"})
+        self.assertIn("/OddsTanFuku?", urls["win_place"])
+        self.assertIn("/Odds3LenTan?", urls["trifecta"])
+
+    def test_odds_cells(self):
+        payload = b'<main><section><table class="odds"><tr><th>combination</th><th>odds</th></tr><tr><td>1-2</td><td>3.4</td></tr></table></section></main>'
+        rows = parse_odds_cells(payload, "R1", "quinella", "https://example.test")
+        self.assertTrue(any(row["text"] == "1-2" for row in rows))
+        self.assertTrue(any(row["text"] == "3.4" for row in rows))
 
 
 if __name__ == "__main__": unittest.main()
