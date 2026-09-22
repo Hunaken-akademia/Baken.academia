@@ -1,9 +1,9 @@
 {
-  "requested_at": "2026-09-22T15:00:30Z",
+  "requested_at": "2026-09-22T15:06:00Z",
   "state": "running",
-  "reason": "Retry NAR full final-odds backfill after matrix fix",
+  "reason": "Collect full NAR final odds and payouts from 2019-01 through 2026-09 at one parallel worker",
   "durable_completed_range": "2019-01 through 2019-04 results",
-  "resume_from": "2019-05",
+  "resume_from": "2019-01",
   "max_parallel": 1,
   "bet_types": [
     "win_place",
