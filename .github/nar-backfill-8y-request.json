@@ -1,7 +1,7 @@
 {
-  "requested_at": "2026-09-22T15:15:00Z",
+  "requested_at": "2026-09-23T00:15:00+09:00",
   "state": "running",
-  "reason": "Run NAR full final-odds backfill with two parallel workers while JRA continues",
+  "reason": "Direct verified Supabase archive for NAR full odds backfill",
   "durable_completed_range": "2019-01 through 2019-04 results",
   "resume_from": "2019-01",
   "max_parallel": 2,
@@ -13,5 +13,6 @@
     "wide",
     "trio",
     "trifecta"
-  ]
+  ],
+  "storage": "supabase"
 }
