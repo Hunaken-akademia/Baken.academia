@@ -12,7 +12,17 @@ from lxml import html
 
 BASE_URL = "https://www.keiba.go.jp"
 MONTH_URL = f"{BASE_URL}/KeibaWeb/MonthlyConveneInfo/MonthlyConveneInfoTop"
-USER_AGENT = "BakenAcademia-NAR-Backfill/1.0 (licensed; sequential low-rate requests)"
+USER_AGENT = "BakenAcademia-NAR-Backfill/1.1 (licensed; sequential low-rate requests)"
+
+ODDS_ENDPOINTS = {
+    "win_place": "OddsTanFuku",
+    "bracket_quinella": "OddsWakuLenFukuTan",
+    "quinella": "OddsUmLenFuku",
+    "exacta": "OddsUmLenTan",
+    "wide": "OddsWide",
+    "trio": "Odds3LenFuku",
+    "trifecta": "Odds3LenTan",
+}
 
 
 def _text(node) -> str:
@@ -56,6 +66,48 @@ def parse_result_links(payload: bytes) -> list[str]:
         if a.get("href") and all(k in a.get("href") for k in ("k_raceDate=", "k_raceNo=", "k_babaCode="))
     )
     return sorted(links, key=lambda u: _int(_query(u, "k_raceNo")) or 0)
+
+
+def build_odds_urls(result_url: str) -> dict[str, str]:
+    params = {
+        "k_babaCode": _query(result_url, "k_babaCode"),
+        "k_raceDate": _query(result_url, "k_raceDate"),
+        "k_raceNo": _query(result_url, "k_raceNo"),
+    }
+    if not all(params.values()):
+        raise ValueError(f"NARオッズURLの元情報が不足しています: {result_url}")
+    return {
+        bet_type: f"{BASE_URL}/KeibaWeb/TodayRaceInfo/{endpoint}?{urlencode(params)}"
+        for bet_type, endpoint in ODDS_ENDPOINTS.items()
+    }
+
+
+def parse_odds_cells(payload: bytes, race_id: str, bet_type: str, source_url: str) -> list[dict[str, object]]:
+    """Preserve every table cell from the official final-odds page for lossless re-parsing."""
+    doc = html.fromstring(payload.decode("utf-8-sig", errors="replace"))
+    rows: list[dict[str, object]] = []
+    for table_index, table in enumerate(doc.xpath("//main//table | //section//table")):
+        table_class = " ".join((table.get("class") or "").split())
+        for row_index, tr in enumerate(table.xpath(".//tr")):
+            row_class = " ".join((tr.get("class") or "").split())
+            for cell_index, cell in enumerate(tr.xpath("./th|./td")):
+                text_value = " ".join(" ".join(cell.xpath(".//text()")).split())
+                if not text_value:
+                    continue
+                rows.append({
+                    "race_id": race_id,
+                    "bet_type": bet_type,
+                    "table_index": table_index,
+                    "table_class": table_class,
+                    "row_index": row_index,
+                    "row_class": row_class,
+                    "cell_index": cell_index,
+                    "cell_tag": cell.tag,
+                    "cell_class": " ".join((cell.get("class") or "").split()),
+                    "text": text_value,
+                    "source_url": source_url,
+                })
+    return rows
 
 
 def _payouts(doc):
@@ -207,7 +259,7 @@ async def backfill(args):
     if not args.permission_confirmed:
         raise ValueError("NARの許可確認後、--permission-confirmed を付けてください")
     month_url = f"{MONTH_URL}?{urlencode({'k_year': args.year, 'k_month': args.month})}"
-    errors, paths = [], []
+    errors, odds_errors, paths = [], [], []
     async with PoliteNarClient(args.work_dir / "cache", args.min_delay, args.max_delay) as client:
         venue_days = parse_schedule_links(await client.fetch(month_url))
         result_links = []
@@ -219,9 +271,23 @@ async def backfill(args):
                 if not args.continue_on_error: raise
             if i % 25 == 0 or i == len(venue_days):
                 print(json.dumps({"venue_days": f"{i}/{len(venue_days)}", "races_found": len(result_links), "errors": len(errors)}, ensure_ascii=False), flush=True)
-        result_links = sorted(set(result_links))[:args.max_races] if args.max_races else sorted(set(result_links))
+        result_links = sorted(set(result_links))
+        if args.start_day or args.end_day:
+            start_day = args.start_day or 1
+            end_day = args.end_day or 31
+            filtered = []
+            for result_url in result_links:
+                race_date = _query(result_url, "k_raceDate") or ""
+                matched = re.search(r"/(\d{1,2})$", race_date)
+                if matched and start_day <= int(matched.group(1)) <= end_day:
+                    filtered.append(result_url)
+            result_links = filtered
+        if args.max_races:
+            result_links = result_links[:args.max_races]
+        odds_cells, odds_manifests, payout_rows = [], [], []
         for i, url in enumerate(result_links, 1):
-            path = args.work_dir / "events" / str(args.year) / f"{args.month:02d}" / (hashlib.sha256(url.encode()).hexdigest()[:20] + ".jsonl.gz")
+            race_key = hashlib.sha256(url.encode()).hexdigest()[:20]
+            path = args.work_dir / "events" / str(args.year) / f"{args.month:02d}" / (race_key + ".jsonl.gz")
             paths.append(path)
             if not path.exists():
                 try:
@@ -231,8 +297,38 @@ async def backfill(args):
                 except Exception as exc:
                     errors.append({"url": url, "error": str(exc)})
                     if not args.continue_on_error: raise
-            if i == 1 or i % 50 == 0 or i == len(result_links):
-                print(json.dumps({"progress": f"{i}/{len(result_links)}", "requests": client.stats.network_requests, "errors": len(errors)}, ensure_ascii=False), flush=True)
+            if path.exists():
+                race_rows = _read_rows(path)
+                if race_rows:
+                    race_id = race_rows[0]["race_id"]
+                    try:
+                        for payout in json.loads(race_rows[0].get("payouts") or "[]"):
+                            payout_rows.append({"race_id": race_id, **payout})
+                    except json.JSONDecodeError:
+                        pass
+                    for bet_type, odds_url in build_odds_urls(url).items():
+                        raw_path = args.work_dir / "odds-pages" / str(args.year) / f"{args.month:02d}" / f"{race_key}-{bet_type}.html.gz"
+                        try:
+                            if raw_path.exists():
+                                payload = gzip.decompress(raw_path.read_bytes())
+                            else:
+                                payload = await client.fetch(odds_url)
+                                raw_path.parent.mkdir(parents=True, exist_ok=True)
+                                raw_path.write_bytes(gzip.compress(payload, 6))
+                            cells = parse_odds_cells(payload, race_id, bet_type, odds_url)
+                            odds_cells.extend(cells)
+                            odds_manifests.append({
+                                "race_id": race_id,
+                                "bet_type": bet_type,
+                                "source_url": odds_url,
+                                "raw_path": str(raw_path),
+                                "cells": len(cells),
+                            })
+                        except Exception as exc:
+                            odds_errors.append({"race_id": race_id, "bet_type": bet_type, "url": odds_url, "error": str(exc)})
+                            if not args.continue_on_error: raise
+            if i == 1 or i % 25 == 0 or i == len(result_links):
+                print(json.dumps({"progress": f"{i}/{len(result_links)}", "requests": client.stats.network_requests, "errors": len(errors), "odds_errors": len(odds_errors)}, ensure_ascii=False), flush=True)
         rows = [row for path in paths if path.exists() for row in _read_rows(path)]
         if not rows: raise ValueError("保存できたNARデータがありません")
         frame = pd.DataFrame(rows)
@@ -242,24 +338,39 @@ async def backfill(args):
         frame["is_dead_heat"] = winner_counts > 1
         args.output.parent.mkdir(parents=True, exist_ok=True)
         frame.to_parquet(args.output, index=False)
+        odds_cells_path = args.output.with_name(args.output.stem + "-odds-cells.parquet")
+        odds_manifest_path = args.output.with_name(args.output.stem + "-odds-manifest.parquet")
+        payouts_path = args.output.with_name(args.output.stem + "-payouts.parquet")
+        if odds_cells:
+            pd.DataFrame(odds_cells).drop_duplicates(
+                ["race_id", "bet_type", "table_index", "row_index", "cell_index", "text"]
+            ).to_parquet(odds_cells_path, index=False)
+        if odds_manifests:
+            pd.DataFrame(odds_manifests).drop_duplicates(["race_id", "bet_type"]).to_parquet(odds_manifest_path, index=False)
+        if payout_rows:
+            pd.DataFrame(payout_rows).drop_duplicates(["race_id", "bet_type", "combination"]).to_parquet(payouts_path, index=False)
         report = {"source": "NAR地方競馬情報サイト", "permission_confirmed_by_operator": True,
-                  "year": args.year, "month": args.month, "created_at": datetime.now(timezone.utc).isoformat(),
+                  "year": args.year, "month": args.month, "start_day": args.start_day, "end_day": args.end_day,
+                  "created_at": datetime.now(timezone.utc).isoformat(),
                   "rows": len(frame), "races": frame.race_id.nunique(), "horses": frame.horse_id.nunique(),
-                  "venue_days": len(venue_days), "network_requests": client.stats.network_requests,
-                  "cache_hits": client.stats.cache_hits, "retries": client.stats.retries, "errors": errors,
+                  "bet_types": list(ODDS_ENDPOINTS), "odds_pages": len(odds_manifests), "odds_cells": len(odds_cells),
+                  "payout_rows": len(payout_rows), "venue_days": len(venue_days), "network_requests": client.stats.network_requests,
+                  "cache_hits": client.stats.cache_hits, "retries": client.stats.retries, "errors": errors, "odds_errors": odds_errors,
                   "sha256": hashlib.sha256(args.output.read_bytes()).hexdigest()}
         args.output.with_suffix(".audit.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         return report
 
 
 def main():
-    parser = argparse.ArgumentParser(description="NAR許諾済み結果を低負荷で月単位取得")
+    parser = argparse.ArgumentParser(description="NAR許諾済み結果・全通常券種最終オッズ・払戻を低負荷で取得")
     parser.add_argument("--year", type=int, required=True)
     parser.add_argument("--month", type=int, choices=range(1, 13), required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path, default=Path("data/raw/nar"))
     parser.add_argument("--min-delay", type=float, default=3.0)
     parser.add_argument("--max-delay", type=float, default=4.0)
+    parser.add_argument("--start-day", type=int, choices=range(1, 32))
+    parser.add_argument("--end-day", type=int, choices=range(1, 32))
     parser.add_argument("--max-races", type=int)
     parser.add_argument("--continue-on-error", action="store_true")
     parser.add_argument("--permission-confirmed", action="store_true")
