@@ -16,6 +16,13 @@ const publicCacheHeaders = {
   "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=15",
 };
 
+// A card that is not published yet is an expected, deterministic state, not an upstream
+// fault, and the CDN only holds cacheable statuses - a 502 is re-fetched by every
+// visitor no matter what its Cache-Control says (measured). Answering 404 lets the edge
+// absorb the crowd; the client already branches on response.ok, so the message is
+// unchanged. Genuine source failures stay 502.
+class RaceNotReadyError extends Error {}
+
 type FixedWeight = { weight: number; change: number };
 type FixedWeights = Record<string, FixedWeight>;
 
@@ -103,8 +110,8 @@ export async function GET(request: NextRequest) {
 
     const failure = await readFailure(`analyze:${raceId}`);
     if (failure) {
-      return new NextResponse(failure, {
-        status: 502,
+      return new NextResponse(failure.body, {
+        status: failure.status,
         headers: {
           ...failureCacheHeaders,
           "content-type": "application/json; charset=utf-8",
@@ -129,7 +136,11 @@ export async function GET(request: NextRequest) {
       console.error("REIN snapshot write failed", error instanceof Error ? error.message : "unknown");
     }
   } else if (!response.ok) {
-    await writeFailure(`analyze:${raceId}`, await response.clone().text(), [`rein-race-${raceId}`, "rein-live"]);
+    await writeFailure(
+      `analyze:${raceId}`,
+      { status: response.status, body: await response.clone().text() },
+      [`rein-race-${raceId}`, "rein-live"],
+    );
   }
   response.headers.set("x-rein-snapshot", "0");
   return response;
@@ -160,7 +171,7 @@ async function analyze(request: NextRequest) {
     const resultRows = tableRows(result).filter((row) =>
       /^\d+$/.test(row.cells[0] || "") && /^\d+$/.test(row.cells[2] || "") && parseResultOdds(row.cells[7] || "") !== null
     );
-    if (!cardRows.length) throw new Error("出馬表の形式を読み取れませんでした。発走前の中央競馬レースを指定してください");
+    if (!cardRows.length) throw new RaceNotReadyError("出馬表の形式を読み取れませんでした。発走前の中央競馬レースを指定してください");
     const liveOddsMap = new Map(oddsRows.map((row) => [+row.cells[1], +row.cells[3]]));
     const finalOddsMap = new Map(resultRows.map((row) => [
       +row.cells[2],
@@ -376,7 +387,7 @@ async function analyze(request: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "分析データを取得できませんでした" },
-      { status: 502, headers: failureCacheHeaders },
+      { status: error instanceof RaceNotReadyError ? 404 : 502, headers: failureCacheHeaders },
     );
   }
 }

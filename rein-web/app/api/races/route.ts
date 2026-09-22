@@ -54,14 +54,14 @@ export async function GET() {
   // one response that scales with the audience instead of being collapsed by the CDN.
   const failure = await readFailure("schedule");
   if (failure) {
-    return new NextResponse(failure, {
-      status: 502,
+    return new NextResponse(failure.body, {
+      status: failure.status,
       headers: { ...failureCacheHeaders, "content-type": "application/json; charset=utf-8", "x-rein-failure-cache": "1" },
     });
   }
   const response = await cachedSchedule("schedule", loadSchedule);
   if (!response.ok) {
-    await writeFailure("schedule", await response.clone().text(), ["rein-live"]);
+    await writeFailure("schedule", { status: response.status, body: await response.clone().text() }, ["rein-live"]);
   }
   return response;
 }
