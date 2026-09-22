@@ -4,6 +4,7 @@ import json
 import os
 import re
 import time
+from http.client import IncompleteRead
 from datetime import date, timedelta
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -24,7 +25,7 @@ def get(path):
         except HTTPError as error:
             if error.code not in (429, 500, 502, 503, 504) or attempt == 3:
                 raise
-        except (URLError, TimeoutError):
+        except (URLError, TimeoutError, IncompleteRead, json.JSONDecodeError, ConnectionResetError):
             if attempt == 3:
                 raise
         print(f"Temporary GitHub API failure; retry {attempt + 1}/3: {path}", flush=True)
@@ -52,15 +53,15 @@ def main():
         page = 1
         while True:
             try:
-                jobs = get(f"actions/runs/{run_id}/jobs?filter=all&per_page=100&page={page}")["jobs"]
-            except (HTTPError, URLError, TimeoutError) as exc:
+                jobs = get(f"actions/runs/{run_id}/jobs?filter=all&per_page=50&page={page}")["jobs"]
+            except (HTTPError, URLError, TimeoutError, IncompleteRead, json.JSONDecodeError, ConnectionResetError) as exc:
                 print(f"Skipping temporarily unreadable historical run {run_id}: {exc}", flush=True)
                 break
             for job in jobs:
                 match = JOB.match(job["name"])
                 if match and job["conclusion"] == "success":
                     completed.add(match[1])
-            if len(jobs) < 100:
+            if len(jobs) < 50:
                 break
             page += 1
     with open("data/indices/jra-race-pages-2019-2026.csv") as source:
