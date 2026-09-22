@@ -15,7 +15,7 @@ export function jstMinutes(date: Date) {
   return jst.getUTCHours() * 60 + jst.getUTCMinutes();
 }
 
-export function liveRefreshTargets(venues: RaceVenue[], now: Date, limit = 12) {
+export function liveRefreshTargets(venues: RaceVenue[], now: Date, limit = 8) {
   const current = jstMinutes(now);
   return venues
     .flatMap((venue) => venue.races || [])
@@ -24,7 +24,7 @@ export function liveRefreshTargets(venues: RaceVenue[], now: Date, limit = 12) {
       const [hour, minute] = race.start.split(":").map(Number);
       return { ...race, minutesUntilStart: hour * 60 + minute - current };
     })
-    .filter((race) => race.minutesUntilStart >= 0 && race.minutesUntilStart <= 60)
+    .filter((race) => race.minutesUntilStart >= 0 && race.minutesUntilStart <= 35)
     .sort((a, b) => a.minutesUntilStart - b.minutesUntilStart || a.raceId.localeCompare(b.raceId))
     .slice(0, limit);
 }
