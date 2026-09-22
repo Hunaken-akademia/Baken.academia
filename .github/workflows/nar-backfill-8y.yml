@@ -66,15 +66,14 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 1
-      matrix:
-        period: ${{ fromJSON(needs.plan.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
-      YEAR: ${{ matrix.period.year }}
-      MONTH: ${{ matrix.period.month }}
-      MONTH_PADDED: ${{ matrix.period.month_padded }}
-      START_DAY: ${{ matrix.period.start_day }}
-      END_DAY: ${{ matrix.period.end_day }}
-      SUFFIX: ${{ matrix.period.suffix }}
+      YEAR: ${{ matrix.year }}
+      MONTH: ${{ matrix.month }}
+      MONTH_PADDED: ${{ matrix.month_padded }}
+      START_DAY: ${{ matrix.start_day }}
+      END_DAY: ${{ matrix.end_day }}
+      SUFFIX: ${{ matrix.suffix }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
