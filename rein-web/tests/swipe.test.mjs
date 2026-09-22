@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { JSDOM } from 'jsdom';
 import ts from 'typescript';
 
-test('touch navigation: left/right, boundaries, vertical, edge, and normal tab clicks', async () => {
+test('touch navigation: left advances, right returns, with boundaries, vertical, edge, and normal tab clicks', async () => {
   const dom = new JSDOM('<div id="app"></div>', { url: 'http://localhost', pretendToBeVisual: true });
   for (const name of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'CustomEvent', 'Event']) {
     Object.defineProperty(globalThis, name, { value: dom.window[name], configurable: true });
@@ -40,16 +40,16 @@ test('touch navigation: left/right, boundaries, vertical, edge, and normal tab c
     });
   };
   assert.equal(selected(), 'a');
-  await swipe(100, 100, 250, 100); assert.equal(selected(), 'b'); assert.equal(backCount, 0);
-  await swipe(100, 100, 250, 100); assert.equal(selected(), 'c');
-  await swipe(100, 100, 250, 100); assert.equal(selected(), 'c');
-  await swipe(250, 100, 100, 100); assert.equal(selected(), 'b');
+  await swipe(250, 100, 100, 100); assert.equal(selected(), 'b'); assert.equal(backCount, 0);
+  await swipe(250, 100, 100, 100); assert.equal(selected(), 'c');
+  await swipe(250, 100, 100, 100); assert.equal(selected(), 'c');
+  await swipe(100, 100, 250, 100); assert.equal(selected(), 'b');
   await swipe(250, 100, 230, 250); assert.equal(selected(), 'b');
   await swipe(10, 100, 250, 100); assert.equal(selected(), 'b');
   await swipe(250, 100, 220, 100); assert.equal(selected(), 'b');
   await React.act(async () => document.querySelector('[data-tab-value="a"]').dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true, button: 0 })));
   assert.equal(selected(), 'a');
-  await swipe(250, 100, 100, 100); assert.equal(backCount, 1); assert.equal(selected(), 'a');
+  await swipe(100, 100, 250, 100); assert.equal(backCount, 1); assert.equal(selected(), 'a');
   await React.act(async () => root.unmount());
   dom.window.close();
 });

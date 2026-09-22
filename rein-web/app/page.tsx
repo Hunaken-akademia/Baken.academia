@@ -99,7 +99,7 @@ export default function Home(){
       if(!origin||!event.changedTouches.length)return;
       const dx=event.changedTouches[0].clientX-origin.x;
       const dy=event.changedTouches[0].clientY-origin.y;
-      if(Date.now()-origin.time>800||dx>-70||-dx<Math.abs(dy)*2)return;
+      if(Date.now()-origin.time>800||dx<70||dx<Math.abs(dy)*2)return;
       event.preventDefault();
       suppressPageClickUntil.current=Date.now()+400;
       back();
