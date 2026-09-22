@@ -46,7 +46,7 @@ export default async function LoginPage({
 
           <div className="my-6 rounded-2xl border border-cyan-400/20 bg-cyan-400/[.06] p-4 text-sm">
             <p className="font-bold text-cyan-200">2026年10月1日 公開予定</p>
-            <p className="mt-1 text-slate-300">10月は全3プランを1か月無料で運用予定です。</p>
+            <p className="mt-1 text-slate-300">全3プランでCAMPFIREの「初月無料」を利用予定です。参加した最初の月の参加費が無料になります。</p>
           </div>
 
           <div className="mb-6 grid gap-2 text-sm">
