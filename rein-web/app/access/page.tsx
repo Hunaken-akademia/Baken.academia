@@ -80,7 +80,7 @@ export default async function AccessPage() {
 
           <div className="mt-6 rounded-2xl border border-slate-700 bg-black/15 p-4 text-sm text-slate-400">
             <p>公開予定：2026年10月1日</p>
-            <p className="mt-1">無料期間：2026年10月1日〜10月31日予定</p>
+            <p className="mt-1">CAMPFIRE特典：初月無料（参加した最初の月の参加費が無料）</p>
           </div>
 
           <form action="/auth/signout" method="post" className="mt-6">
