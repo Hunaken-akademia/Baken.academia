@@ -3,7 +3,9 @@ import csv
 import json
 import os
 import re
+import time
 from datetime import date, timedelta
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 JOB = re.compile(r"^collect \((\d{8}-\d{8})(?:,|\))")
@@ -15,8 +17,18 @@ def get(path):
         headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}",
                  "Accept": "application/vnd.github+json"},
     )
-    with urlopen(request, timeout=60) as response:
-        return json.load(response)
+    for attempt in range(4):
+        try:
+            with urlopen(request, timeout=30) as response:
+                return json.load(response)
+        except HTTPError as error:
+            if error.code not in (429, 500, 502, 503, 504) or attempt == 3:
+                raise
+        except (URLError, TimeoutError):
+            if attempt == 3:
+                raise
+        print(f"Temporary GitHub API failure; retry {attempt + 1}/3: {path}", flush=True)
+        time.sleep(2 ** attempt)
 
 
 def periods(completed, race_dates=None):

@@ -3,13 +3,23 @@ import json
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
+from urllib.error import HTTPError
 from datetime import date
 from pathlib import Path
-from scripts.plan_all_odds_resume import JOB, periods
+from scripts.plan_all_odds_resume import JOB, get, periods
 from scripts.validate_jra_archive import validate
 
 
 class ResumeTests(unittest.TestCase):
+    @patch.dict("os.environ", {"GITHUB_REPOSITORY": "owner/repo", "GH_TOKEN": "test"})
+    @patch("scripts.plan_all_odds_resume.time.sleep")
+    @patch("scripts.plan_all_odds_resume.urlopen")
+    def test_transient_api_failure_is_retried(self, urlopen, sleep):
+        urlopen.side_effect = [HTTPError("url", 502, "temporary", {}, None), io.StringIO('{"jobs": []}')]
+        self.assertEqual(get("actions/runs/1/jobs"), {"jobs": []})
+        self.assertEqual(urlopen.call_count, 2)
+
     def test_completed_windows_are_not_retried(self):
         self.assertEqual(len(periods(set())), 202)
         self.assertEqual(len(periods({"20190101-20190114"})), 201)

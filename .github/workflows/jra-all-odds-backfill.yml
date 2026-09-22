@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/jra-all-odds-backfill.yml"
+      - "scripts/plan_all_odds_resume.py"
   workflow_run:
     workflows: ["JRA licensed final odds remaining eight years"]
     types: [completed]
