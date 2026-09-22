@@ -10,6 +10,7 @@ on:
       - scripts/check_supabase_archive.sh
       - scripts/upload_archive_to_supabase.sh
       - src/baken_academia/nar_backfill.py
+      - tests/test_odds_resume.py
 
 permissions:
   contents: read
