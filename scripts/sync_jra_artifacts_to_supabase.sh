@@ -151,6 +151,12 @@ while IFS=$'\t' read -r artifact_id artifact_name; do
     continue
   fi
 
+  if ! python scripts/validate_jra_archive.py "${archive_file}"; then
+    echo "::warning::Skipping empty or incomplete collector artifact ${artifact_name}"
+    skipped=$((skipped + 1))
+    continue
+  fi
+
   sha256="$(sha256sum "${archive_file}" | cut -d' ' -f1)"
   size_bytes="$(stat -c '%s' "${archive_file}")"
 

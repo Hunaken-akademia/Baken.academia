@@ -23,29 +23,23 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       periods: ${{ steps.periods.outputs.periods }}
+      count: ${{ steps.periods.outputs.count }}
     steps:
+      - uses: actions/checkout@v4
+      - name: Check durable race-page index
+        run: test -s data/indices/jra-race-pages-2019-2026.csv
       - id: periods
-        shell: python
-        run: |
-          import json, os
-          from datetime import date, timedelta
-          periods = []
-          start = date(2019, 1, 1)
-          last = date(2026, 9, 18)
-          while start <= last:
-              end = min(start + timedelta(days=13), last)
-              periods.append({"name": f"{start:%Y%m%d}-{end:%Y%m%d}",
-                              "start": start.isoformat(), "end": end.isoformat()})
-              start = end + timedelta(days=1)
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
-              out.write("periods=" + json.dumps(periods, separators=(",", ":")) + "\n")
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/plan_all_odds_resume.py
 
   collect:
     needs: plan
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      needs.plan.outputs.count != '0' &&
+      (github.event_name == 'workflow_dispatch' ||
       github.event_name == 'push' ||
-      github.event.workflow_run.conclusion == 'success'
+      github.event.workflow_run.conclusion == 'success')
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -61,28 +55,24 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
-      - name: Download JRA race history
-        uses: actions/download-artifact@v4
-        with:
-          name: jra-backfill-2019-2026
-          path: .dataset
-          github-token: ${{ github.token }}
-          run-id: "35414533165"
-      - run: tar -xzf .dataset/jra-backfill-result.tar.gz
+      - name: Prepare durable race-page index
+        run: >-
+          python -c "import pandas as pd;
+          pd.read_csv('data/indices/jra-race-pages-2019-2026.csv').to_parquet('race-pages.parquet', index=False)"
       - name: Collect every standard bet type
         run: >-
           python -m baken_academia.jra_all_odds_backfill
-          --input data/raw/jra/races-2019-2026.parquet
+          --input race-pages.parquet
           --start-date ${{ matrix.period.start }} --end-date ${{ matrix.period.end }}
           --output-dir data/raw/jra-all-odds/normalized
           --work-dir data/raw/jra-all-odds
           --min-delay 3 --max-delay 4
           --permission-confirmed --continue-on-error
       - name: Package raw pages and normalized data
-        if: always()
-        run: tar -czf jra-all-odds-${{ matrix.period.name }}.tar.gz data/raw/jra-all-odds
+        run: |
+          tar -czf jra-all-odds-${{ matrix.period.name }}.tar.gz data/raw/jra-all-odds
+          python scripts/validate_jra_archive.py jra-all-odds-${{ matrix.period.name }}.tar.gz
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: jra-all-odds-${{ matrix.period.name }}
           path: jra-all-odds-${{ matrix.period.name }}.tar.gz
