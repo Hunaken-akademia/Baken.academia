@@ -1,29 +1,4 @@
-import { createHash } from "node:crypto";
-import { getCache } from "@vercel/functions";
-
-const sharedSourceCache = getCache({ namespace: "rein-source-v1" });
-
-function cacheKey(url: string) {
-  return "src:" + createHash("sha256").update(url).digest("hex");
-}
-
-export async function fetchSource(
-  url: string,
-  label: string,
-  optional = false,
-  cacheTtlSeconds = 0,
-): Promise<string> {
-  const key = cacheKey(url);
-
-  if (cacheTtlSeconds > 0) {
-    try {
-      const cached = await sharedSourceCache.get(key);
-      if (typeof cached === "string") return cached;
-    } catch (error) {
-      console.error("REIN source cache read failed", label, error instanceof Error ? error.message : "unknown");
-    }
-  }
-
+export async function fetchSource(url: string, label: string, optional = false): Promise<string> {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const response = await fetch(url, {
@@ -31,33 +6,9 @@ export async function fetchSource(
         cache: "no-store",
         signal: AbortSignal.timeout(12_000),
       });
-
-      if (optional && response.status === 404) {
-        if (cacheTtlSeconds > 0) {
-          try {
-            await sharedSourceCache.set(key, "", {
-              ttl: cacheTtlSeconds,
-              name: `REIN source: ${label}`,
-            });
-          } catch {}
-        }
-        return "";
-      }
-
+      if (optional && response.status === 404) return "";
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const body = await response.text();
-
-      if (cacheTtlSeconds > 0) {
-        try {
-          await sharedSourceCache.set(key, body, {
-            ttl: cacheTtlSeconds,
-            name: `REIN source: ${label}`,
-          });
-        } catch (error) {
-          console.error("REIN source cache write failed", label, error instanceof Error ? error.message : "unknown");
-        }
-      }
-      return body;
+      return await response.text();
     } catch (error) {
       console.warn(JSON.stringify({
         event: "race_source_failed",
