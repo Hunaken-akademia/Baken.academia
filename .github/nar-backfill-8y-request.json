@@ -1,7 +1,8 @@
 {
-  "requested_at": "2026-09-19T14:10:19Z",
-  "state": "paused",
-  "reason": "Prioritize JRA final odds backfill",
+  "requested_at": "2026-09-22T14:42:00Z",
+  "state": "running",
+  "reason": "Resume NAR backfill at one parallel worker while JRA odds continues at four parallel workers",
   "durable_completed_range": "2019-01 through 2019-04",
-  "resume_from": "2019-05"
+  "resume_from": "2019-05",
+  "max_parallel": 1
 }
