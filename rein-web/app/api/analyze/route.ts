@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
   if (response.ok && response.headers.get("x-rein-fallback") === "0") {
     try {
       await sharedCache.set(`snapshot-market-v2:${raceId}`, await response.clone().text(), {
-        ttl: 15 * 60,
+        ttl: response.headers.get("x-rein-final") === "1" ? 24 * 60 * 60 : 5 * 60,
         tags: [`rein-race-${raceId}`, "rein-live"],
         name: "REIN race analysis",
       });
@@ -161,10 +161,14 @@ async function analyze(request: NextRequest) {
   const base = "https://sports.yahoo.co.jp/keiba/race";
   try {
     const [card, detail, odds, result, history] = await Promise.all([
-      fetchSource(`${base}/denma/${raceId}`, "出馬表"),
-      fetchSource(`${base}/denma/${raceId}?detail=1`, "出走履歴"),
-      fetchSource(`${base}/odds/tfw/${raceId}`, "単勝オッズ", true),
-      fetchSource(`${base}/result/${raceId}`, "確定結果", true),
+      // Card can still change through scratches/jockey changes, so keep it fresh.
+      fetchSource(`${base}/denma/${raceId}`, "出馬表", false, 5 * 60),
+      // Past-performance detail is effectively static once the card is published.
+      fetchSource(`${base}/denma/${raceId}?detail=1`, "出走履歴", false, 12 * 60 * 60),
+      // Market data is intentionally refreshed on a five-minute cadence.
+      fetchSource(`${base}/odds/tfw/${raceId}`, "単勝オッズ", true, 5 * 60),
+      // Before confirmation this usually 404s; cache that expected state briefly.
+      fetchSource(`${base}/result/${raceId}`, "確定結果", true, 5 * 60),
       loadHistory(),
     ]);
     const cardRows = tableRows(card).filter((row) => /^\d+$/.test(row.cells[1] || "") && /\d+\([+-]?\d+\)/.test(row.cells[6] || ""));
@@ -270,7 +274,7 @@ async function analyze(request: NextRequest) {
       }]));
       try {
         await sharedCache.set(`weights:${raceId}`, captured, {
-          ttl: 12 * 60 * 60,
+          ttl: 36 * 60 * 60,
           tags: [`rein-race-${raceId}`, "rein-weights"],
           name: "REIN fixed horse weights",
         });
@@ -401,6 +405,7 @@ async function analyze(request: NextRequest) {
     }, { headers: {
       ...publicCacheHeaders,
       "x-rein-fallback": roleModel.feature_count ? "0" : "1",
+      "x-rein-final": resultRows.length ? "1" : "0",
     } });
   } catch (error) {
     return NextResponse.json(
