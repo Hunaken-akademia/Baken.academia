@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import ctypes
+import gzip
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -110,6 +111,8 @@ class ReinRuntime:
     history: pd.DataFrame
     schema: dict[str, Any]
     models: dict[str, lgb.Booster]
+    second_joint_schema: dict[str, Any]
+    second_joint_model: lgb.Booster
     version: str
 
     @classmethod
@@ -117,10 +120,25 @@ class ReinRuntime:
         schema = json.loads((root / "schema.json").read_text(encoding="utf-8"))
         history = prepare_inference_history(pd.read_parquet(root / "data" / "history.parquet"))
         models = {role: lgb.Booster(model_file=str(root / "models" / f"{role}.txt"))
-                  for role in ("first", "second", "third")}
-        return cls(history=history, schema=schema, models=models, version=version)
+                  for role in ("first", "third")}
+        packaged = Path(__file__).resolve().parent / "models"
+        second_joint_schema = json.loads(
+            (packaged / "second_joint_v5.schema.json").read_text(encoding="utf-8")
+        )
+        with gzip.open(packaged / "second_joint_v5.txt.gz", "rt", encoding="utf-8") as model_file:
+            second_joint_model = lgb.Booster(model_str=model_file.read())
+        if second_joint_model.num_feature() != len(second_joint_schema["feature_order"]):
+            raise RuntimeError("REIN second-place model schema mismatch")
+        return cls(
+            history=history,
+            schema=schema,
+            models=models,
+            second_joint_schema=second_joint_schema,
+            second_joint_model=second_joint_model,
+            version=f"{version}+{second_joint_schema['version']}",
+        )
 
-    def feature_frame(self, race: dict[str, Any], runners: list[dict[str, Any]]) -> pd.DataFrame:
+    def _feature_frame_full(self, race: dict[str, Any], runners: list[dict[str, Any]]) -> pd.DataFrame:
         race_date = pd.Timestamp(race["race_date"])
         history = self.history.loc[self.history["race_date"].lt(race_date)]
         field_size = len(runners)
@@ -148,7 +166,14 @@ class ReinRuntime:
                 "race_class": race.get("race_class") or "__missing__",
                 "jockey_id": jockey_id, "trainer_id": trainer_id,
                 "horse_weight": float(runner.get("horse_weight") or np.nan),
-                "horse_weight_change": float(runner.get("horse_weight_change") or np.nan),
+                # A zero change is a real value for the new second-place model.
+                "horse_weight_change": (
+                    float(runner["horse_weight_change"])
+                    if runner.get("horse_weight_change") is not None
+                    and runner.get("horse_weight_change") != ""
+                    and pd.notna(runner.get("horse_weight_change"))
+                    else math.nan
+                ),
                 "field_size": float(field_size),
                 "horse_number_pct": int(runner["horse_number"]) / field_size,
                 "gate_pct": int(runner["gate"]) / max(max_gate, 1),
@@ -171,6 +196,13 @@ class ReinRuntime:
             row["horse_recent5_avg_finish"] = _safe_mean(finish5)
             row["horse_recent5_win_rate"] = float(finish5.eq(1).mean()) if len(finish5) else math.nan
             row["horse_recent5_top3_rate"] = float(finish5.between(1, 3).mean()) if len(finish5) else math.nan
+            finish_all = pd.to_numeric(horse["finish_position"], errors="coerce")
+            for position in (1, 2, 3):
+                for window in (5, 10):
+                    recent_finish = finish_all.tail(window)
+                    row[f"history_exact_{position}_last{window}"] = (
+                        float(recent_finish.eq(position).mean()) if len(recent_finish) else math.nan
+                    )
             for signal in SIGNALS:
                 row[f"prior_{signal}"] = float(previous[signal]) if previous is not None and pd.notna(previous[signal]) else math.nan
                 row[f"recent3_{signal}"] = _safe_mean(recent3[signal])
@@ -222,14 +254,45 @@ class ReinRuntime:
         frame["closer_pressure_help"] = frame["closer_style"] * frame["front_pressure_share"]
         frame["relative_late"] = frame["prior_late_pct"] - frame["prior_late_pct"].mean()
         frame["closing_pressure_fit"] = -frame["recent3_closing3f_z"] * frame["front_pressure_share"]
+        for column in (
+            "recent3_speed_relative", "recent3_closing3f_z", "horse_win_rate",
+            "horse_top3_rate", "horse_recent5_avg_finish", "recent3_result_strength",
+        ):
+            values = pd.to_numeric(frame[column], errors="coerce")
+            frame[f"{column}_field_rank"] = values.rank(pct=True)
+            frame[f"{column}_field_gap"] = values - values.mean()
         for column in CATEGORICAL:
             frame[column] = frame[column].fillna("__missing__").astype("category")
-        return frame[self.schema["feature_order"]]
+        return frame
+
+    def feature_frame(self, race: dict[str, Any], runners: list[dict[str, Any]]) -> pd.DataFrame:
+        return self._legacy_feature_frame(self._feature_frame_full(race, runners), runners)
+
+    def _legacy_feature_frame(
+        self, full_frame: pd.DataFrame, runners: list[dict[str, Any]]
+    ) -> pd.DataFrame:
+        """Preserve the existing first/third model inputs byte-for-byte."""
+        frame = full_frame[self.schema["feature_order"]].copy()
+        if "horse_weight_change" in frame.columns:
+            frame["horse_weight_change"] = [
+                float(runner.get("horse_weight_change") or np.nan) for runner in runners
+            ]
+        return frame
 
     def score(self, race: dict[str, Any], runners: list[dict[str, Any]]) -> dict[str, Any]:
-        frame = self.feature_frame(race, runners)
-        role_values = {role: np.clip(model.predict(frame), 1e-12, None)
-                       for role, model in self.models.items()}
+        full_frame = self._feature_frame_full(race, runners)
+        frame = self._legacy_feature_frame(full_frame, runners)
+        role_values = {
+            role: np.clip(self.models[role].predict(frame), 1e-12, None)
+            for role in ("first", "third")
+        }
+        second_frame = full_frame[self.second_joint_schema["feature_order"]]
+        second_output = self.second_joint_model.predict(second_frame)
+        if second_output.ndim != 2 or second_output.shape[1] <= int(self.second_joint_schema["second_class_index"]):
+            raise RuntimeError("REIN second-place model returned invalid output")
+        role_values["second"] = np.clip(
+            second_output[:, int(self.second_joint_schema["second_class_index"])], 1e-12, None
+        )
         normalized = {role: values / values.sum() for role, values in role_values.items()}
         output = []
         for index, runner in enumerate(runners):
