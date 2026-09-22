@@ -11,6 +11,7 @@ on:
       - "scripts/upload_archive_to_supabase.sh"
       - "scripts/validate_jra_archive.py"
       - "src/baken_academia/jra_all_odds_backfill.py"
+      - "tests/test_odds_resume.py"
   workflow_run:
     workflows: ["JRA licensed final odds remaining eight years"]
     types: [completed]
