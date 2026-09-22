@@ -71,19 +71,29 @@ size_bytes="$(stat -c '%s' "${ARCHIVE_FILE}")"
 manifest_path="${ARCHIVE_OBJECT_PATH%.tar.gz}.manifest.json"
 
 broker_call "exists" "${ARCHIVE_OBJECT_PATH}"
-if [[ "$(jq -r '.exists' <<<"${BROKER_RESPONSE}")" == "true" ]]; then
-  echo "Supabase archive already exists: ${ARCHIVE_OBJECT_PATH}"
-  exit 0
-fi
-
-upload_signed "${ARCHIVE_OBJECT_PATH}" "${ARCHIVE_FILE}" "application/gzip"
+archive_exists="$(jq -r '.exists' <<<"${BROKER_RESPONSE}")"
 
 verify_file="$(mktemp)"
 manifest_file="$(mktemp)"
 trap 'rm -f "${verify_file}" "${manifest_file}"' EXIT
 
-download_signed "${ARCHIVE_OBJECT_PATH}" "${verify_file}"
-verified_sha256="$(sha256sum "${verify_file}" | cut -d' ' -f1)"
+if [[ "${archive_exists}" == "true" ]]; then
+  download_signed "${ARCHIVE_OBJECT_PATH}" "${verify_file}"
+  verified_sha256="$(sha256sum "${verify_file}" | cut -d' ' -f1)"
+  if [[ "${verified_sha256}" != "${sha256}" ]]; then
+    echo "Existing archive differs; replacing: ${ARCHIVE_OBJECT_PATH}"
+    upload_signed "${ARCHIVE_OBJECT_PATH}" "${ARCHIVE_FILE}" "application/gzip"
+    download_signed "${ARCHIVE_OBJECT_PATH}" "${verify_file}"
+    verified_sha256="$(sha256sum "${verify_file}" | cut -d' ' -f1)"
+  else
+    echo "Existing Supabase archive checksum matches: ${ARCHIVE_OBJECT_PATH}"
+  fi
+else
+  upload_signed "${ARCHIVE_OBJECT_PATH}" "${ARCHIVE_FILE}" "application/gzip"
+  download_signed "${ARCHIVE_OBJECT_PATH}" "${verify_file}"
+  verified_sha256="$(sha256sum "${verify_file}" | cut -d' ' -f1)"
+fi
+
 if [[ "${verified_sha256}" != "${sha256}" ]]; then
   echo "::error::Checksum mismatch after Supabase upload: ${ARCHIVE_OBJECT_PATH}"
   exit 1
