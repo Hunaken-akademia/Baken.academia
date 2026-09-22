@@ -62,7 +62,7 @@ export default function Home(){
   useEffect(()=>{
     void loadSchedule();
     const refresh=()=>{if(document.visibilityState==="visible")void loadSchedule(true);};
-    const timer=setInterval(refresh,60_000);
+    const timer=setInterval(refresh,300_000);
     const clock=setInterval(()=>{
       const update=(item:Venue)=>({...item,...raceProgress(item.races)}) as Venue;
       setSchedule(current=>current?{...current,venues:current.venues.map(update)}:null);
