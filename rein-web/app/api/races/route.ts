@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
+import { getCache } from "@vercel/functions";
 import { responseCache } from "@/lib/response-cache";
 import { raceProgress } from "@/lib/race-progress";
 import { fetchSource } from "@/lib/source-fetch";
 import { failureCacheHeaders, readFailure, writeFailure } from "@/lib/failure-cache";
 
-const cachedSchedule = responseCache(30_000, 1);
-const publicCache = { "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=30" };
+const cachedSchedule = responseCache(120_000, 1);
+const sharedSchedule = getCache({ namespace: "rein-schedule-v1" });
+const publicCache = { "Cache-Control": "public, max-age=0, s-maxage=120, stale-while-revalidate=300" };
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -50,8 +52,23 @@ function races(html: string, nextRace: number) {
 }
 
 export async function GET() {
-  // Every visible client polls this once a minute, so an unreusable failure is the
-  // one response that scales with the audience instead of being collapsed by the CDN.
+  try {
+    const shared = await sharedSchedule.get("today");
+    if (typeof shared === "string") {
+      return new NextResponse(shared, {
+        status: 200,
+        headers: {
+          ...publicCache,
+          "content-type": "application/json; charset=utf-8",
+          "x-rein-shared-cache": "1",
+        },
+      });
+    }
+  } catch (error) {
+    console.error("REIN schedule cache read failed", error instanceof Error ? error.message : "unknown");
+  }
+
+  // Expected failures are cached too, so an upstream outage does not fan out with audience size.
   const failure = await readFailure("schedule");
   if (failure) {
     return new NextResponse(failure.body, {
@@ -60,7 +77,17 @@ export async function GET() {
     });
   }
   const response = await cachedSchedule("schedule", loadSchedule);
-  if (!response.ok) {
+  if (response.ok) {
+    try {
+      await sharedSchedule.set("today", await response.clone().text(), {
+        ttl: 120,
+        tags: ["rein-live", "rein-schedule"],
+        name: "REIN schedule",
+      });
+    } catch (error) {
+      console.error("REIN schedule cache write failed", error instanceof Error ? error.message : "unknown");
+    }
+  } else {
     await writeFailure("schedule", { status: response.status, body: await response.clone().text() }, ["rein-live"]);
   }
   return response;
