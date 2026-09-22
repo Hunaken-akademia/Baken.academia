@@ -3,36 +3,38 @@ import json
 import tarfile
 import tempfile
 import unittest
-from unittest.mock import patch
-from urllib.error import HTTPError
 from datetime import date
 from pathlib import Path
-from scripts.plan_all_odds_resume import JOB, get, periods
+
+from scripts.plan_all_odds_resume import periods
+from scripts.plan_nar_resume import build_periods
 from scripts.validate_jra_archive import validate
 
 
 class ResumeTests(unittest.TestCase):
-    @patch.dict("os.environ", {"GITHUB_REPOSITORY": "owner/repo", "GH_TOKEN": "test"})
-    @patch("scripts.plan_all_odds_resume.time.sleep")
-    @patch("scripts.plan_all_odds_resume.urlopen")
-    def test_transient_api_failure_is_retried(self, urlopen, sleep):
-        urlopen.side_effect = [HTTPError("url", 502, "temporary", {}, None), io.StringIO('{"jobs": []}')]
-        self.assertEqual(get("actions/runs/1/jobs"), {"jobs": []})
-        self.assertEqual(urlopen.call_count, 2)
+    def test_jra_period_plan(self):
+        planned = periods()
+        self.assertEqual(len(planned), 202)
+        self.assertEqual(planned[0]["name"], "20190101-20190114")
+        self.assertEqual(planned[-1]["name"], "20260915-20260918")
 
-    def test_completed_windows_are_not_retried(self):
-        self.assertEqual(len(periods(set())), 202)
-        self.assertEqual(len(periods({"20190101-20190114"})), 201)
-        self.assertEqual(JOB.match("collect (20190101-20190114, 2019-01-01, 2019-01-14)")[1], "20190101-20190114")
+    def test_empty_jra_date_windows_are_excluded(self):
+        planned = periods({date(2026, 9, 13)})
+        self.assertEqual(len(planned), 1)
+        self.assertEqual(planned[0]["name"], "20260901-20260914")
 
-    def test_empty_date_windows_are_excluded(self):
-        self.assertEqual(len(periods(set(), {date(2026, 9, 13)})), 1)
-        self.assertEqual(periods(set(), {date(2026, 9, 13)})[0]["name"], "20260901-20260914")
+    def test_nar_half_month_plan(self):
+        planned = build_periods()
+        self.assertEqual(len(planned), 186)
+        self.assertEqual(planned[0]["period"], "20190101-20190115")
+        self.assertEqual(planned[-1]["period"], "20260916-20260930")
 
     def test_archive_validation(self):
-        for payload, expected in [({}, False),
-                                  ({"audit.json": json.dumps({"errors": []}).encode(), "pages.parquet": b"PAR1"}, True),
-                                  ({"audit.json": json.dumps({"errors": ["fetch failed"]}).encode(), "pages.parquet": b"PAR1"}, False)]:
+        for payload, expected in [
+            ({}, False),
+            ({"audit.json": json.dumps({"errors": []}).encode(), "pages.parquet": b"PAR1"}, True),
+            ({"audit.json": json.dumps({"errors": ["fetch failed"]}).encode(), "pages.parquet": b"PAR1"}, False),
+        ]:
             with self.subTest(payload=payload), tempfile.TemporaryDirectory() as directory:
                 path = Path(directory) / "data.tar.gz"
                 with tarfile.open(path, "w:gz") as archive:
@@ -45,3 +47,7 @@ class ResumeTests(unittest.TestCase):
                 else:
                     with self.assertRaises(ValueError):
                         validate(path)
+
+
+if __name__ == "__main__":
+    unittest.main()
