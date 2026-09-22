@@ -4,6 +4,7 @@ import json
 import os
 import re
 import time
+from http.client import IncompleteRead
 from datetime import date
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -28,7 +29,7 @@ def get(path):
         except HTTPError as error:
             if error.code not in (429, 500, 502, 503, 504) or attempt == 3:
                 raise
-        except (URLError, TimeoutError):
+        except (URLError, TimeoutError, IncompleteRead, json.JSONDecodeError, ConnectionResetError):
             if attempt == 3:
                 raise
         time.sleep(2 ** attempt)
@@ -67,8 +68,8 @@ def main():
         page = 1
         while True:
             try:
-                jobs = get(f"actions/runs/{run['id']}/jobs?filter=all&per_page=100&page={page}")["jobs"]
-            except (HTTPError, URLError, TimeoutError) as exc:
+                jobs = get(f"actions/runs/{run['id']}/jobs?filter=all&per_page=50&page={page}")["jobs"]
+            except (HTTPError, URLError, TimeoutError, IncompleteRead, json.JSONDecodeError, ConnectionResetError) as exc:
                 print(f"Skipping temporarily unreadable historical run {run['id']}: {exc}", flush=True)
                 break
             for job in jobs:
@@ -76,7 +77,7 @@ def main():
                 if match and job["conclusion"] == "success":
                     year, month, start_day, end_day, _ = match.groups()
                     completed.add(key(int(year), int(month), int(start_day), int(end_day)))
-            if len(jobs) < 100:
+            if len(jobs) < 50:
                 break
             page += 1
 
