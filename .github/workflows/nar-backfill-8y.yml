@@ -1,4 +1,4 @@
-name: NAR licensed eight-year backfill
+name: NAR licensed eight-year backfill with all final odds
 
 on:
   push:
@@ -11,13 +11,13 @@ permissions:
 
 concurrency:
   group: nar-licensed-eight-year-backfill-v2
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   plan:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.months.outputs.matrix }}
+      matrix: ${{ steps.periods.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -26,24 +26,38 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
-      - id: months
-        name: Build remaining 2019-05 through 2026-09 month plan
+      - id: periods
+        name: Build 2019-05 through 2026-09 half-month plan
         shell: python
         run: |
-          import json, os
-          months = []
+          import calendar, json, os
+          periods = []
           for year in range(2019, 2027):
               first_month = 5 if year == 2019 else 1
               last_month = 9 if year == 2026 else 12
               for month in range(first_month, last_month + 1):
-                  months.append({
-                      "year": year,
-                      "month": month,
-                      "month_padded": f"{month:02d}",
-                  })
+                  last_day = calendar.monthrange(year, month)[1]
+                  periods.extend([
+                      {
+                          "year": year,
+                          "month": month,
+                          "month_padded": f"{month:02d}",
+                          "start_day": 1,
+                          "end_day": 15,
+                          "suffix": "a",
+                      },
+                      {
+                          "year": year,
+                          "month": month,
+                          "month_padded": f"{month:02d}",
+                          "start_day": 16,
+                          "end_day": last_day,
+                          "suffix": "b",
+                      },
+                  ])
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
-              out.write("matrix=" + json.dumps({"include": months}, separators=(",", ":")) + "\n")
-          print(f"planned months: {len(months)}")
+              out.write("matrix=" + json.dumps({"include": periods}, separators=(",", ":")) + "\n")
+          print(f"planned half-month periods: {len(periods)}")
 
   backfill:
     needs: plan
@@ -58,6 +72,9 @@ jobs:
       YEAR: ${{ matrix.period.year }}
       MONTH: ${{ matrix.period.month }}
       MONTH_PADDED: ${{ matrix.period.month_padded }}
+      START_DAY: ${{ matrix.period.start_day }}
+      END_DAY: ${{ matrix.period.end_day }}
+      SUFFIX: ${{ matrix.period.suffix }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -65,24 +82,26 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements.txt
-      - name: Backfill one NAR month sequentially
+      - name: Backfill NAR results, all final odds and payouts
         run: >-
           python -m baken_academia.nar_backfill
           --year "$YEAR" --month "$MONTH"
-          --output "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}.parquet"
+          --start-day "$START_DAY" --end-day "$END_DAY"
+          --output "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.parquet"
           --min-delay 3 --max-delay 4
           --permission-confirmed --continue-on-error
-      - name: Package result and audit
+      - name: Package result, odds pages, normalized odds and audit
         if: always()
         run: |
-          tar -czf "nar-${YEAR}-${MONTH_PADDED}.tar.gz" \
-            "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}.parquet" \
-            "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}.audit.json" \
-            "data/raw/nar/events/${YEAR}/${MONTH_PADDED}" 2>/dev/null || true
+          tar -czf "nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.tar.gz" \
+            data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}*.parquet \
+            "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.audit.json" \
+            "data/raw/nar/events/${YEAR}/${MONTH_PADDED}" \
+            "data/raw/nar/odds-pages/${YEAR}/${MONTH_PADDED}" 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: nar-${{ env.YEAR }}-${{ env.MONTH_PADDED }}
-          path: nar-${{ env.YEAR }}-${{ env.MONTH_PADDED }}.tar.gz
+          name: nar-${{ env.YEAR }}-${{ env.MONTH_PADDED }}-${{ env.SUFFIX }}
+          path: nar-${{ env.YEAR }}-${{ env.MONTH_PADDED }}-${{ env.SUFFIX }}.tar.gz
           if-no-files-found: error
           retention-days: 30
