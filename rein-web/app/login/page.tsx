@@ -46,7 +46,19 @@ export default async function LoginPage({
 
           <div className="my-6 rounded-2xl border border-cyan-400/20 bg-cyan-400/[.06] p-4 text-sm">
             <p className="font-bold text-cyan-200">2026年10月1日 公開予定</p>
-            <p className="mt-1 text-slate-300">10月は1か月無料期間として運用予定です。</p>
+            <p className="mt-1 text-slate-300">10月は全3プランを1か月無料で運用予定です。</p>
+          </div>
+
+          <div className="mb-6 grid gap-2 text-sm">
+            <div className="flex items-center justify-between rounded-xl border border-slate-700 bg-black/10 px-4 py-3">
+              <span className="font-semibold">地方競馬</span><span className="text-amber-300">月額 1,000円</span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-slate-700 bg-black/10 px-4 py-3">
+              <span className="font-semibold">中央競馬</span><span className="text-cyan-300">月額 1,000円</span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-cyan-400/25 bg-cyan-400/[.05] px-4 py-3">
+              <span className="font-semibold">地方＋中央</span><span className="font-bold text-cyan-200">月額 1,500円</span>
+            </div>
           </div>
 
           {oauthError ? (
