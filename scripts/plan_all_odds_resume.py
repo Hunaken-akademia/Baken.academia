@@ -51,7 +51,11 @@ def main():
     for run_id in sorted(run_ids):
         page = 1
         while True:
-            jobs = get(f"actions/runs/{run_id}/jobs?filter=all&per_page=100&page={page}")["jobs"]
+            try:
+                jobs = get(f"actions/runs/{run_id}/jobs?filter=all&per_page=100&page={page}")["jobs"]
+            except (HTTPError, URLError, TimeoutError) as exc:
+                print(f"Skipping temporarily unreadable historical run {run_id}: {exc}", flush=True)
+                break
             for job in jobs:
                 match = JOB.match(job["name"])
                 if match and job["conclusion"] == "success":
