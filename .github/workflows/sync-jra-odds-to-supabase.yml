@@ -4,14 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       run_id:
-        description: "Source jra-all-odds-backfill workflow run ID (blank = latest)"
+        description: "Legacy source workflow run ID for manual recovery"
         required: false
         type: string
-  workflow_run:
-    workflows:
-      - "JRA all bet types odds and payouts backfill"
-      - "JRA eight-year payouts backfill"
-    types: [completed]
 
 permissions:
   actions: read
