@@ -48,15 +48,15 @@ export default function Home(){
     finally{if(!background)setLoading(false);}
   }
 
-  async function analyze(race:Pick<Race,"raceId">){
-    setLoading(true); setError("");
+  async function analyze(race:Pick<Race,"raceId">,background=false){
+    if(!background){setLoading(true); setError("");}
     try{
       const response=await fetch(`/api/analyze?raceId=${race.raceId}`);
       const result=await response.json() as Analysis&{error?:string};
       if(!response.ok)throw new Error(result.error||"分析できませんでした");
       setData(result); setActiveHorse(null);
-    }catch(value){setError(value instanceof Error?value.message:"分析に失敗しました");}
-    finally{setLoading(false);}
+    }catch(value){if(!background)setError(value instanceof Error?value.message:"分析に失敗しました");}
+    finally{if(!background)setLoading(false);}
   }
 
   useEffect(()=>{
@@ -71,6 +71,14 @@ export default function Home(){
     document.addEventListener("visibilitychange",refresh);
     return ()=>{clearInterval(timer);clearInterval(clock);document.removeEventListener("visibilitychange",refresh);};
   },[]);
+
+  useEffect(()=>{
+    const raceId=data?.race.raceId;
+    if(!raceId||data?.review?.isFinished)return;
+    const refresh=()=>{if(document.visibilityState==="visible")void analyze({raceId},true);};
+    const timer=setInterval(refresh,300_000);
+    return ()=>clearInterval(timer);
+  },[data?.race.raceId,data?.review?.isFinished]);
 
   const back=()=>{if(data){setData(null);setActiveHorse(null);}else setVenue(null);};
   const showBack=Boolean(venue||data);
