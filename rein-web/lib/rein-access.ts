@@ -8,7 +8,8 @@ type ReinMembership = {
   status: "active" | "paused" | "cancelled";
   access_starts_at: string;
   access_ends_at: string | null;
-  free_period_ends_at: string;
+  free_period_ends_at: string | null;
+  first_month_free?: boolean;
 };
 
 export const REIN_PLANS: Record<ReinPlan, {
