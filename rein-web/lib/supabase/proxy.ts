@@ -1,7 +1,41 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { canAccessReinArea, hasActiveReinAccess, type ReinArea } from "@/lib/rein-access";
+import {
+  canAccessReinArea,
+  hasActiveReinAccess,
+  type ReinArea,
+  type ReinEntitlement,
+} from "@/lib/rein-access";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./config";
+
+const ENTITLEMENT_TTL_MS = 60_000;
+const entitlementCache = new Map<string, { expires: number; value: ReinEntitlement | null }>();
+
+function getCachedEntitlement(userId: string) {
+  const hit = entitlementCache.get(userId);
+  if (!hit) return undefined;
+  if (hit.expires <= Date.now()) {
+    entitlementCache.delete(userId);
+    return undefined;
+  }
+  return hit.value;
+}
+
+function putCachedEntitlement(userId: string, value: ReinEntitlement | null) {
+  if (entitlementCache.size >= 2048) {
+    const oldest = entitlementCache.keys().next().value;
+    if (oldest) entitlementCache.delete(oldest);
+  }
+  entitlementCache.set(userId, { expires: Date.now() + ENTITLEMENT_TTL_MS, value });
+}
+
+function isTrustedInternalRequest(request: NextRequest) {
+  const secret = process.env.CRON_SECRET || "";
+  if (!secret) return false;
+  const path = request.nextUrl.pathname;
+  if (!(path === "/api/races" || path === "/api/analyze")) return false;
+  return request.headers.get("authorization") === `Bearer ${secret}`;
+}
 
 function authError(
   request: NextRequest,
@@ -46,6 +80,12 @@ function requiredAreaForPath(pathname: string): ReinArea | null {
 }
 
 export async function updateSessionAndAuthorize(request: NextRequest) {
+  if (isTrustedInternalRequest(request)) {
+    const response = NextResponse.next({ request });
+    response.headers.set("cache-control", "private, no-store");
+    return response;
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -71,16 +111,26 @@ export async function updateSessionAndAuthorize(request: NextRequest) {
   );
 
   const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
-  if (claimsError || !claimsData?.claims?.sub) {
+  const userId = typeof claimsData?.claims?.sub === "string" ? claimsData.claims.sub : "";
+  if (claimsError || !userId) {
     return authError(request, 401, "Googleログインが必要です");
   }
 
-  const { data: membership, error: membershipError } = await supabase
-    .from("rein_memberships")
-    .select("member_key,google_email,plan,status,access_starts_at,access_ends_at,free_period_ends_at")
-    .maybeSingle();
+  let membership = getCachedEntitlement(userId);
+  if (membership === undefined) {
+    const { data, error: membershipError } = await supabase
+      .from("rein_memberships")
+      .select("plan,status,access_starts_at,access_ends_at")
+      .maybeSingle();
 
-  if (membershipError || !hasActiveReinAccess(membership)) {
+    if (membershipError) {
+      return authError(request, 403, "REINの利用権を確認できません");
+    }
+    membership = data as ReinEntitlement | null;
+    putCachedEntitlement(userId, membership);
+  }
+
+  if (!hasActiveReinAccess(membership)) {
     return authError(request, 403, "REINの利用権を確認できません");
   }
 
