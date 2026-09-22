@@ -8,7 +8,7 @@ import {
 } from "@/lib/rein-access";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./config";
 
-const ENTITLEMENT_TTL_MS = 60_000;
+const ENTITLEMENT_TTL_MS = 300_000;
 const entitlementCache = new Map<string, { expires: number; value: ReinEntitlement | null }>();
 
 function getCachedEntitlement(userId: string) {
