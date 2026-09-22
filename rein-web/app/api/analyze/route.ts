@@ -17,6 +17,33 @@ const publicCacheHeaders = {
 };
 const ROLE_CACHE_VERSION = "2026-09-23-v1";
 
+async function fetchCachedSource(
+  url: string,
+  label: string,
+  optional: boolean,
+  ttlSeconds: number,
+) {
+  const key = "source:" + createHash("sha256").update(url).digest("hex");
+  try {
+    const cached = await sharedCache.get(key);
+    if (typeof cached === "string") return cached;
+  } catch (error) {
+    console.error("REIN source cache read failed", label, error instanceof Error ? error.message : "unknown");
+  }
+
+  const body = await fetchSource(url, label, optional);
+  try {
+    await sharedCache.set(key, body, {
+      ttl: ttlSeconds,
+      tags: ["rein-source"],
+      name: `REIN source: ${label}`,
+    });
+  } catch (error) {
+    console.error("REIN source cache write failed", label, error instanceof Error ? error.message : "unknown");
+  }
+  return body;
+}
+
 // A card that is not published yet is an expected, deterministic state, not an upstream
 // fault, and the CDN only holds cacheable statuses - a 502 is re-fetched by every
 // visitor no matter what its Cache-Control says (measured). Answering 404 lets the edge
@@ -162,13 +189,13 @@ async function analyze(request: NextRequest) {
   try {
     const [card, detail, odds, result, history] = await Promise.all([
       // Card can still change through scratches/jockey changes, so keep it fresh.
-      fetchSource(`${base}/denma/${raceId}`, "出馬表", false, 5 * 60),
+      fetchCachedSource(`${base}/denma/${raceId}`, "出馬表", false, 5 * 60),
       // Past-performance detail is effectively static once the card is published.
-      fetchSource(`${base}/denma/${raceId}?detail=1`, "出走履歴", false, 12 * 60 * 60),
+      fetchCachedSource(`${base}/denma/${raceId}?detail=1`, "出走履歴", false, 12 * 60 * 60),
       // Market data is intentionally refreshed on a five-minute cadence.
-      fetchSource(`${base}/odds/tfw/${raceId}`, "単勝オッズ", true, 5 * 60),
+      fetchCachedSource(`${base}/odds/tfw/${raceId}`, "単勝オッズ", true, 5 * 60),
       // Before confirmation this usually 404s; cache that expected state briefly.
-      fetchSource(`${base}/result/${raceId}`, "確定結果", true, 5 * 60),
+      fetchCachedSource(`${base}/result/${raceId}`, "確定結果", true, 5 * 60),
       loadHistory(),
     ]);
     const cardRows = tableRows(card).filter((row) => /^\d+$/.test(row.cells[1] || "") && /\d+\([+-]?\d+\)/.test(row.cells[6] || ""));
