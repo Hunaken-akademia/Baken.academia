@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
   try {
     const scheduleResponse = await fetch(`${origin}/api/races`, {
       cache: "no-store",
+      headers: { authorization: `Bearer ${secret}` },
       signal: AbortSignal.timeout(30_000),
     });
     if (!scheduleResponse.ok) throw new Error(`schedule:${scheduleResponse.status}`);
