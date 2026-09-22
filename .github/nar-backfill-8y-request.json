@@ -1,9 +1,17 @@
 {
-  "requested_at": "2026-09-22T14:58:00Z",
+  "requested_at": "2026-09-22T15:00:30Z",
   "state": "running",
-  "reason": "Collect JRA-equivalent NAR final odds and payouts with one parallel worker",
+  "reason": "Retry NAR full final-odds backfill after matrix fix",
   "durable_completed_range": "2019-01 through 2019-04 results",
   "resume_from": "2019-05",
   "max_parallel": 1,
-  "bet_types": ["win_place", "bracket_quinella", "quinella", "exacta", "wide", "trio", "trifecta"]
+  "bet_types": [
+    "win_place",
+    "bracket_quinella",
+    "quinella",
+    "exacta",
+    "wide",
+    "trio",
+    "trifecta"
+  ]
 }
