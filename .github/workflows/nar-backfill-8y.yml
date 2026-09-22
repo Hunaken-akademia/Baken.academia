@@ -7,12 +7,12 @@ on:
       - .github/nar-backfill-8y-request.json
       - .github/workflows/nar-backfill-8y.yml
       - scripts/plan_nar_resume.py
+      - scripts/check_supabase_archive.sh
       - scripts/upload_archive_to_supabase.sh
       - src/baken_academia/nar_backfill.py
 
 permissions:
   contents: read
-  actions: read
   id-token: write
 
 concurrency:
@@ -28,8 +28,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: periods
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: python scripts/plan_nar_resume.py
 
   backfill:
@@ -53,13 +51,22 @@ jobs:
       ARCHIVE_DATASET: "nar-results-all-bet-types-odds-and-payouts"
     steps:
       - uses: actions/checkout@v4
+      - id: archive
+        name: Skip if verified archive already exists in Supabase
+        run: |
+          export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v1/${YEAR}/${PERIOD}.tar.gz"
+          bash scripts/check_supabase_archive.sh
       - uses: actions/setup-python@v5
+        if: steps.archive.outputs.exists != 'true'
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install -r requirements.txt
-      - run: python -m unittest discover -s tests -v
+      - if: steps.archive.outputs.exists != 'true'
+        run: pip install -r requirements.txt
+      - if: steps.archive.outputs.exists != 'true'
+        run: python -m unittest discover -s tests -v
       - name: Backfill NAR results, all final odds and payouts
+        if: steps.archive.outputs.exists != 'true'
         run: >-
           python -m baken_academia.nar_backfill
           --year "$YEAR" --month "$MONTH"
@@ -68,6 +75,7 @@ jobs:
           --min-delay 3 --max-delay 4
           --permission-confirmed --continue-on-error
       - name: Package verified NAR archive
+        if: steps.archive.outputs.exists != 'true'
         run: |
           tar -czf "nar-${PERIOD}.tar.gz" \
             data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}*.parquet \
@@ -76,6 +84,7 @@ jobs:
             "data/raw/nar/odds-pages/${YEAR}/${MONTH_PADDED}"
           test -s "nar-${PERIOD}.tar.gz"
       - name: Archive verified chunk directly to Supabase
+        if: steps.archive.outputs.exists != 'true'
         run: |
           export ARCHIVE_FILE="nar-${PERIOD}.tar.gz"
           export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v1/${YEAR}/${PERIOD}.tar.gz"
