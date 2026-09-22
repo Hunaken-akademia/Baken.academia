@@ -1,13 +1,16 @@
 export type ReinPlan = "nar" | "jra" | "all";
 export type ReinArea = "nar" | "jra";
 
-type ReinMembership = {
-  member_key: string;
-  google_email: string;
+export type ReinEntitlement = {
   plan: ReinPlan;
   status: "active" | "paused" | "cancelled";
   access_starts_at: string;
   access_ends_at: string | null;
+};
+
+type ReinMembership = ReinEntitlement & {
+  member_key: string;
+  google_email: string;
   free_period_ends_at: string | null;
   first_month_free?: boolean;
 };
@@ -43,7 +46,7 @@ export const REIN_PLANS: Record<ReinPlan, {
 };
 
 export function hasActiveReinAccess(
-  membership: ReinMembership | null | undefined,
+  membership: ReinEntitlement | null | undefined,
   now = new Date(),
 ) {
   if (!membership || membership.status !== "active") return false;
@@ -57,7 +60,7 @@ export function hasActiveReinAccess(
 }
 
 export function canAccessReinArea(
-  membership: ReinMembership | null | undefined,
+  membership: ReinEntitlement | null | undefined,
   area: ReinArea,
   now = new Date(),
 ) {
