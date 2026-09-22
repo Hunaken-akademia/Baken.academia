@@ -1,10 +1,10 @@
 {
-  "requested_at": "2026-09-22T15:06:00Z",
+  "requested_at": "2026-09-22T15:15:00Z",
   "state": "running",
-  "reason": "Collect full NAR final odds and payouts from 2019-01 through 2026-09 at one parallel worker",
+  "reason": "Run NAR full final-odds backfill with two parallel workers while JRA continues",
   "durable_completed_range": "2019-01 through 2019-04 results",
   "resume_from": "2019-01",
-  "max_parallel": 1,
+  "max_parallel": 2,
   "bet_types": [
     "win_place",
     "bracket_quinella",
