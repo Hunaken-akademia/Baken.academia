@@ -66,7 +66,11 @@ def main():
     for run in runs["workflow_runs"]:
         page = 1
         while True:
-            jobs = get(f"actions/runs/{run['id']}/jobs?filter=all&per_page=100&page={page}")["jobs"]
+            try:
+                jobs = get(f"actions/runs/{run['id']}/jobs?filter=all&per_page=100&page={page}")["jobs"]
+            except (HTTPError, URLError, TimeoutError) as exc:
+                print(f"Skipping temporarily unreadable historical run {run['id']}: {exc}", flush=True)
+                break
             for job in jobs:
                 match = JOB.match(job["name"])
                 if match and job["conclusion"] == "success":
