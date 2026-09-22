@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/jra-all-odds-backfill.yml"
       - "scripts/plan_all_odds_resume.py"
+      - "scripts/check_supabase_archive.sh"
       - "scripts/upload_archive_to_supabase.sh"
       - "scripts/validate_jra_archive.py"
       - "src/baken_academia/jra_all_odds_backfill.py"
@@ -16,7 +17,6 @@ on:
 
 permissions:
   contents: read
-  actions: read
   id-token: write
 
 concurrency:
@@ -34,8 +34,6 @@ jobs:
       - name: Check durable race-page index
         run: test -s data/indices/jra-race-pages-2019-2026.csv
       - id: periods
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: python scripts/plan_all_odds_resume.py
 
   collect:
@@ -48,40 +46,53 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 4
-      matrix:
-        period: ${{ fromJSON(needs.plan.outputs.periods) }}
+      matrix: ${{ fromJSON(needs.plan.outputs.periods) }}
     runs-on: ubuntu-latest
     timeout-minutes: 210
+    env:
+      PERIOD: ${{ matrix.name }}
+      START_DATE: ${{ matrix.start }}
+      END_DATE: ${{ matrix.end }}
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+      ARCHIVE_DATASET: "jra-all-bet-types-odds-and-payouts"
     steps:
       - uses: actions/checkout@v4
+      - id: archive
+        name: Skip if verified archive already exists in Supabase
+        run: |
+          export ARCHIVE_OBJECT_PATH="jra/odds/all-bets/v1/${PERIOD:0:4}/${PERIOD}.tar.gz"
+          bash scripts/check_supabase_archive.sh
       - uses: actions/setup-python@v5
+        if: steps.archive.outputs.exists != 'true'
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install -r requirements.txt
-      - run: python -m unittest discover -s tests -v
+      - if: steps.archive.outputs.exists != 'true'
+        run: pip install -r requirements.txt
+      - if: steps.archive.outputs.exists != 'true'
+        run: python -m unittest discover -s tests -v
       - name: Prepare durable race-page index
+        if: steps.archive.outputs.exists != 'true'
         run: >-
           python -c "import pandas as pd;
           pd.read_csv('data/indices/jra-race-pages-2019-2026.csv').to_parquet('race-pages.parquet', index=False)"
       - name: Collect every standard bet type
+        if: steps.archive.outputs.exists != 'true'
         run: >-
           python -m baken_academia.jra_all_odds_backfill
           --input race-pages.parquet
-          --start-date ${{ matrix.period.start }} --end-date ${{ matrix.period.end }}
+          --start-date "$START_DATE" --end-date "$END_DATE"
           --output-dir data/raw/jra-all-odds/normalized
           --work-dir data/raw/jra-all-odds
           --min-delay 3 --max-delay 4
           --permission-confirmed --continue-on-error
       - name: Package raw pages and normalized data
+        if: steps.archive.outputs.exists != 'true'
         run: |
-          tar -czf jra-all-odds-${{ matrix.period.name }}.tar.gz data/raw/jra-all-odds
-          python scripts/validate_jra_archive.py jra-all-odds-${{ matrix.period.name }}.tar.gz
+          tar -czf "jra-all-odds-${PERIOD}.tar.gz" data/raw/jra-all-odds
+          python scripts/validate_jra_archive.py "jra-all-odds-${PERIOD}.tar.gz"
       - name: Archive verified chunk directly to Supabase
-        env:
-          SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
-          ARCHIVE_DATASET: "jra-all-bet-types-odds-and-payouts"
-          PERIOD: ${{ matrix.period.name }}
+        if: steps.archive.outputs.exists != 'true'
         run: |
           export ARCHIVE_FILE="jra-all-odds-${PERIOD}.tar.gz"
           export ARCHIVE_OBJECT_PATH="jra/odds/all-bets/v1/${PERIOD:0:4}/${PERIOD}.tar.gz"
