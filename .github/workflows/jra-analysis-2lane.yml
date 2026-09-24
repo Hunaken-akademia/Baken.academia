@@ -1,0 +1,74 @@
+name: JRA durable two-lane analysis
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/jra-analysis-2lane-request.json
+      - .github/workflows/jra-analysis-2lane.yml
+      - scripts/download_supabase_archive.sh
+      - scripts/rein_research_v3.py
+      - scripts/rein_ticket_research_v4.py
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: jra-durable-two-lane-analysis
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        lane: [ranking, tickets]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+      ARCHIVE_OBJECT_PATH: "jra/2019-01-01_2026-09-18/jra-backfill-result.tar.gz"
+      ARCHIVE_OUTPUT: ".dataset/jra-backfill-result.tar.gz"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest tests.test_ranking_quality tests.test_all_bet_hit_rate -v
+      - name: Download durable JRA history from Supabase
+        run: |
+          mkdir -p .dataset
+          bash scripts/download_supabase_archive.sh
+      - name: Extract durable JRA history
+        run: |
+          tar --no-same-owner -xzf .dataset/jra-backfill-result.tar.gz
+          test -s data/raw/jra/races-2019-2026.parquet
+          mkdir -p data/raw
+          cp data/raw/jra/races-2019-2026.parquet data/raw/history.parquet
+      - name: Ranking and feature analysis
+        if: matrix.lane == 'ranking'
+        run: python scripts/rein_research_v3.py
+      - name: Ticket and role analysis
+        if: matrix.lane == 'tickets'
+        env:
+          REIN_HISTORY_PATH: data/raw/jra/races-2019-2026.parquet
+          REIN_MODEL_DIR: artifacts/rein-role-model-v4-analysis
+        run: python scripts/rein_ticket_research_v4.py
+      - name: Upload ranking report
+        if: matrix.lane == 'ranking'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jra-analysis-ranking
+          path: reports/rein-research-v3
+          retention-days: 30
+      - name: Upload ticket report
+        if: matrix.lane == 'tickets'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jra-analysis-tickets
+          path: reports/rein-ticket-research-v4
+          retention-days: 30
