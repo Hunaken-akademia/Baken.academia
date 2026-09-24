@@ -65,7 +65,10 @@ def train_compare(raw):
     base,_,_=build_feature_frame(x)
     inherited=[c for c in x if c.startswith(("prior_","recent3_")) or "_recent90_" in c]+["expected_front_count","relative_early"]
     standard=list(dict.fromkeys(inherited+advanced))
-    added=["horse_direction_prior_starts","horse_direction_prior_top3_rate","horse_wet_prior_starts","horse_wet_prior_top3_rate","recent3_fastest_closing_count"]
+    candidate_features=["horse_direction_prior_starts","horse_direction_prior_top3_rate","horse_wet_prior_starts","horse_wet_prior_top3_rate","recent3_fastest_closing_count"]
+    # recent3_* fields are already part of the inherited REIN baseline.
+    # Compare only genuinely new candidates so LightGBM gets unique names.
+    added=[c for c in candidate_features if c not in standard]
     baseline=pd.concat([base,x[standard]],axis=1)
     enhanced=pd.concat([baseline,x[added]],axis=1)
     flat=x["surface"].isin(["芝","ダート"])
