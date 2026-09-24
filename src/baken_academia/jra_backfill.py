@@ -164,6 +164,20 @@ def parse_results_page(payload: bytes, source_cname: str) -> list[dict[str, obje
             jockey_link = _first(runner, "./td[contains(@class,'jockey')]/a")
             trainer_link = _first(runner, "./td[contains(@class,'trainer')]/a")
             gate_img = _first(runner, "./td[contains(@class,'waku')]//img")
+            # JRA's public result pages mark blinkers with an image whose alt/title
+            # contains "ブリンカー".  Keep this as a race-day fact; first use is
+            # derived later in chronological order to avoid future leakage.
+            equipment_text = " ".join(
+                filter(
+                    None,
+                    [
+                        _text(runner),
+                        *runner.xpath(".//img/@alt"),
+                        *runner.xpath(".//img/@title"),
+                    ],
+                )
+            )
+            blinkers = "ブリンカー" in equipment_text
             corners = [
                 _text(item)
                 for item in runner.xpath("./td[contains(@class,'corner')]//li")
@@ -189,6 +203,7 @@ def parse_results_page(payload: bytes, source_cname: str) -> list[dict[str, obje
                     "start_time": start_time,
                     "horse_id": horse_id,
                     "horse_name": horse_name,
+                    "blinkers": blinkers,
                     "finish_position": _int(place_raw) if place_raw.isdigit() else None,
                     "finish_status": place_raw,
                     "gate": _int(gate_img.get("alt") if gate_img is not None else None),
