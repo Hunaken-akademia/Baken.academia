@@ -144,7 +144,10 @@ def main():
     payouts=load_many(list(Path(".odds-normalized/payouts").glob("*.parquet")))
     win_place=load_many(list(Path(".odds-normalized/win-place").glob("*.parquet")))
     roi,checked=ticket_roi(tickets,payouts)
-    ev=win_ev(audit,win_place,raw)
+    # EV calibration needs the full scored history: 2025 is used only for
+    # calibration/threshold selection and 2026 remains the held-out audit.
+    # Passing audit here leaves no 2025 rows and makes every split invalid.
+    ev=win_ev(runners,win_place,raw)
     out=Path("reports/jra-roi-ev-v1"); out.mkdir(parents=True,exist_ok=True)
     report={"scope":"2026 held-out style audit using market70_role30","roi":roi,"win_expected_value":ev}
     (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2,allow_nan=False))
