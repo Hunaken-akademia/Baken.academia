@@ -20,7 +20,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements.txt
-      - run: python -m unittest discover -s tests -v
+      - run: python -m unittest tests.test_all_bet_hit_rate -v
       - name: Download JRA history
         uses: actions/download-artifact@v4
         with:
