@@ -1,6 +1,7 @@
 from __future__ import annotations
 import json, os, time
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 import pandas as pd
 
@@ -22,12 +23,47 @@ def token():
     _token_at=now
     return _token
 
-def post(kind,rows):
+def post(kind,rows,attempt=1):
+    """Idempotent batch upsert with bounded retry and fault isolation."""
+    global _token, _token_at
     data=json.dumps({"kind":kind,"rows":rows},ensure_ascii=False,default=str).encode()
     req=Request(IMPORT_URL,data=data,headers={"Authorization":"Bearer "+token(),"Content-Type":"application/json"},method="POST")
-    with urlopen(req,timeout=90) as r:
-        out=json.load(r)
-    if not out.get("ok"):raise RuntimeError(out)
+    try:
+        with urlopen(req,timeout=90) as r:
+            out=json.load(r)
+        if not out.get("ok"):raise RuntimeError(out)
+        return
+    except HTTPError as e:
+        detail=e.read().decode("utf-8",errors="replace")[:4000]
+        status=e.code
+        if status==401:
+            _token=None; _token_at=0.0
+        retryable=status in (401,408,409,425,429,500,502,503,504)
+        if retryable and attempt<=4:
+            delay=min(20,2**attempt)
+            print(f"retry {kind} rows={len(rows)} status={status} attempt={attempt} detail={detail}",flush=True)
+            time.sleep(delay)
+            return post(kind,rows,attempt+1)
+        if status>=500 and len(rows)>25:
+            middle=len(rows)//2
+            print(f"split {kind} rows={len(rows)} after status={status} detail={detail}",flush=True)
+            post(kind,rows[:middle])
+            post(kind,rows[middle:])
+            return
+        identity=[{k:r.get(k) for k in ("race_id","horse_id","horse_number","bet_type","selection_key") if k in r} for r in rows[:3]]
+        raise RuntimeError(f"{kind} import failed status={status} rows={len(rows)} identity={identity} detail={detail}") from e
+    except (URLError,TimeoutError) as e:
+        if attempt<=4:
+            delay=min(20,2**attempt)
+            print(f"retry {kind} rows={len(rows)} transport={e} attempt={attempt}",flush=True)
+            time.sleep(delay)
+            return post(kind,rows,attempt+1)
+        if len(rows)>25:
+            middle=len(rows)//2
+            post(kind,rows[:middle])
+            post(kind,rows[middle:])
+            return
+        raise
 
 def batches(rows,n=400):
     for i in range(0,len(rows),n):yield rows[i:i+n]
