@@ -9,6 +9,7 @@ const REF = "refs/heads/main"
 const WORKFLOW_REF = `${REPOSITORY}/.github/workflows/rein-role-model-to-supabase.yml@${REF}`
 const BUCKET = "baken-archive"
 const PATH_PATTERN = /^rein\/models\/v4\/(rein-role-v4-[0-9a-f]{7,40})\/(?:bundle\.tar\.gz|manifest\.json)$/
+const JRA_HISTORY_PATH = "jra/2019-01-01_2026-09-18/jra-backfill-result.tar.gz"
 const JWKS = createRemoteJWKSet(new URL(`${GITHUB_ISSUER}/.well-known/jwks`))
 
 function json(body: unknown, status = 200) {
@@ -79,7 +80,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const path = String(body.path ?? "")
-    if (!PATH_PATTERN.test(path)) return json({ error: "Object path is not allowed" }, 400)
+    const isModelPath = PATH_PATTERN.test(path)
+    const isJraHistoryDownload = action === "sign-download" && path === JRA_HISTORY_PATH
+    if (!isModelPath && !isJraHistoryDownload) {
+      return json({ error: "Object path is not allowed" }, 400)
+    }
     const storage = supabase.storage.from(BUCKET)
     if (action === "exists") {
       const { data } = await storage.exists(path)

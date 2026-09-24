@@ -7,7 +7,7 @@ set -Eeuo pipefail
 : "${ACTIONS_ID_TOKEN_REQUEST_URL:?GitHub OIDC request URL is required}"
 : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?GitHub OIDC request token is required}"
 
-OIDC_AUDIENCE="rein-supabase-archive-v1"
+OIDC_AUDIENCE="${OIDC_AUDIENCE:-rein-supabase-archive-v1}"
 
 token_response="$(curl --fail-with-body --silent --show-error --retry 3   -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}"   "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${OIDC_AUDIENCE}")"
 oidc_token="$(jq -er '.value' <<<"${token_response}")"
