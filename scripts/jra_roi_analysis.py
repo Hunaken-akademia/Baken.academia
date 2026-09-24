@@ -76,6 +76,7 @@ def ticket_roi(tickets,payouts):
             per_race=g.groupby("race_id",observed=True)["hit"].any() if races else pd.Series(dtype=bool)
             out[bet_type][group]={
                 "races":int(races),"bets":int(len(g)),
+                "race_hits":int(per_race.sum()),"ticket_hits":int(g["hit"].sum()),
                 "points_per_race":float(len(g)/races) if races else 0.0,
                 "race_hit_rate":float(per_race.mean()) if races else 0.0,
                 "stake_yen":int(stake),"return_yen":ret,
@@ -91,6 +92,7 @@ def frame_result(frame):
     per_race=frame.groupby("race_id",observed=True)["hit"].any() if races else pd.Series(dtype=bool)
     return {
         "races":races,"bets":bets,
+        "race_hits":int(per_race.sum()),"ticket_hits":int(frame["hit"].sum()),
         "points_per_race":float(bets/races) if races else 0.0,
         "race_hit_rate":float(per_race.mean()) if races else 0.0,
         "stake_yen":stake,"return_yen":returned,
@@ -194,6 +196,9 @@ def filter_candidates(tune_checked,audit_checked):
                 tune=tune.loc[tune["ticket_type"].eq(group)]
                 audit=audit.loc[audit["ticket_type"].eq(group)]
             base_tune=frame_result(tune); base_audit=frame_result(audit)
+            tune_h1=tune.loc[tune["race_date"].lt("2025-07-01")]
+            tune_h2=tune.loc[tune["race_date"].ge("2025-07-01")]
+            base_h1=frame_result(tune_h1); base_h2=frame_result(tune_h2)
             scans=[]
             definitions=[]
             for q in (.25,.5,.75,.9):
@@ -213,14 +218,24 @@ def filter_candidates(tune_checked,audit_checked):
                 tr=frame_result(tuned); ar=frame_result(audited)
                 if tr["races"]<150 or tr["bets"]<300:
                     continue
-                scans.append({"condition":name,"value":value,"tune_2025":tr,"audit_2026":ar})
+                h1=frame_result(tune_h1.loc[predicate(tune_h1)])
+                h2=frame_result(tune_h2.loc[predicate(tune_h2)])
+                scans.append({"condition":name,"value":value,"tune_2025":tr,"tune_2025_h1":h1,"tune_2025_h2":h2,"audit_2026":ar})
             scans.sort(key=lambda x:(x["tune_2025"]["return_rate"],x["tune_2025"]["races"]),reverse=True)
             chosen=scans[0] if scans else None
             if chosen:
                 chosen=dict(chosen)
                 chosen["audit_return_rate_change_pp"]=100*(chosen["audit_2026"]["return_rate"]-base_audit["return_rate"])
-                chosen["adoption_candidate"]=bool(chosen["audit_2026"]["return_rate"]>base_audit["return_rate"] and chosen["audit_2026"]["races"]>=100)
-            candidates[bet_type][group]={"baseline_tune_2025":base_tune,"baseline_audit_2026":base_audit,"selected_on_2025":chosen,"top_2025_scans":scans[:5]}
+                chosen["stable_improvement"]=bool(
+                    chosen["tune_2025"]["return_rate"]>base_tune["return_rate"] and
+                    chosen["tune_2025_h1"]["return_rate"]>base_h1["return_rate"] and
+                    chosen["tune_2025_h2"]["return_rate"]>base_h2["return_rate"] and
+                    chosen["audit_2026"]["return_rate"]>base_audit["return_rate"] and
+                    min(chosen["tune_2025_h1"]["races"],chosen["tune_2025_h2"]["races"],chosen["audit_2026"]["races"])>=100
+                )
+                chosen["profitable_all_periods"]=bool(min(chosen["tune_2025_h1"]["return_rate"],chosen["tune_2025_h2"]["return_rate"],chosen["audit_2026"]["return_rate"])>=1.0)
+                chosen["adoption_candidate"]=bool(chosen["stable_improvement"] and chosen["profitable_all_periods"])
+            candidates[bet_type][group]={"baseline_tune_2025":base_tune,"baseline_tune_2025_h1":base_h1,"baseline_tune_2025_h2":base_h2,"baseline_audit_2026":base_audit,"selected_on_2025":chosen,"top_2025_scans":scans[:5]}
     return candidates
 
 def role_rank_metrics(runners):
@@ -331,6 +346,7 @@ def main():
             "surface":categorical_breakdown(checked,"surface"),
             "going":categorical_breakdown(checked,"going"),
             "direction":categorical_breakdown(checked,"direction"),
+            "distance_m":breakdown(checked,"distance_m",[-np.inf,1401,1801,2201,2601,np.inf],["1400m以下","1401-1800m","1801-2200m","2201-2600m","2601m超"]),
         },
         "filter_selection_2025_audit_2026":filter_candidates(tune_checked,checked),
         "limitations":["Final selection odds are available for win/place only. For the other six bet types, payout bands are post-race evaluation only and are not used to select bets."],
