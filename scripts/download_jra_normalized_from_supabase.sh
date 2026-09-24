@@ -13,20 +13,39 @@ OIDC_TOKEN=""
 OIDC_REFRESHED_AT=0
 
 refresh_oidc() {
-  local now token_response
+  local force="${1:-false}" now token_response
   now="$(date +%s)"
-  if [[ -n "${OIDC_TOKEN}" ]] && (( now - OIDC_REFRESHED_AT < 240 )); then
+  if [[ "${force}" != "true" && -n "${OIDC_TOKEN}" ]] && (( now - OIDC_REFRESHED_AT < 180 )); then
     return
   fi
-  token_response="$(curl --fail-with-body --silent --show-error --retry 3     -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}"     "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${OIDC_AUDIENCE}")"
+  token_response="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 2     -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}"     "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${OIDC_AUDIENCE}")"
   OIDC_TOKEN="$(jq -er '.value' <<<"${token_response}")"
   OIDC_REFRESHED_AT="${now}"
 }
 
 broker() {
-  local action="$1" path="$2"
-  refresh_oidc
-  curl --fail-with-body --silent --show-error --retry 3     -X POST "${SUPABASE_BROKER_URL}"     -H "Authorization: Bearer ${OIDC_TOKEN}"     -H "Content-Type: application/json"     --data "$(jq -nc --arg action "${action}" --arg path "${path}" '{action:$action,path:$path}')"
+  local action="$1" path="$2" attempt response_file http_code
+  response_file="$(mktemp)"
+  for attempt in 1 2 3 4 5; do
+    refresh_oidc
+    http_code="$(curl --silent --show-error       --connect-timeout 20 --max-time 90       -o "${response_file}" -w '%{http_code}'       -X POST "${SUPABASE_BROKER_URL}"       -H "Authorization: Bearer ${OIDC_TOKEN}"       -H "Content-Type: application/json"       --data "$(jq -nc --arg action "${action}" --arg path "${path}" '{action:$action,path:$path}')" || true)"
+    if [[ "${http_code}" =~ ^2 ]]; then
+      cat "${response_file}"
+      rm -f "${response_file}"
+      return 0
+    fi
+    if [[ "${http_code}" == "401" ]]; then
+      OIDC_TOKEN=""
+      OIDC_REFRESHED_AT=0
+      refresh_oidc true
+    fi
+    echo "broker ${action} retry ${attempt}/5 for HTTP ${http_code}" >&2
+    sleep $((attempt * 2))
+  done
+  echo "broker ${action} failed for ${path}" >&2
+  cat "${response_file}" >&2
+  rm -f "${response_file}"
+  return 1
 }
 
 python - <<'PY' > /tmp/jra-periods.txt
@@ -49,7 +68,7 @@ while read -r period; do
   [[ "${exists}" == "true" ]] || continue
 
   signed="$(broker sign-download "${path}" | jq -er '.signed_url')"
-  curl --fail-with-body --silent --show-error --retry 3 "${signed}" -o "${tmp}"
+  curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 "${signed}" -o "${tmp}"
 
   payout_member="data/raw/jra-all-odds/normalized/payouts.parquet"
   win_member="data/raw/jra-all-odds/normalized/win-place.parquet"
