@@ -105,6 +105,7 @@ def ticket_roi(tickets,payouts):
                 "race_hits":int(per_race.sum()),"ticket_hits":int(g["hit"].sum()),
                 "points_per_race":float(len(g)/races) if races else 0.0,
                 "race_hit_rate":float(per_race.mean()) if races else 0.0,
+                "ticket_hit_rate":float(g["hit"].mean()) if len(g) else 0.0,
                 "stake_yen":int(stake),"return_yen":ret,
                 "profit_yen":ret-stake,"return_rate":ret/stake if stake else 0.0,
             }
@@ -121,6 +122,7 @@ def frame_result(frame):
         "race_hits":int(per_race.sum()),"ticket_hits":int(frame["hit"].sum()),
         "points_per_race":float(bets/races) if races else 0.0,
         "race_hit_rate":float(per_race.mean()) if races else 0.0,
+        "ticket_hit_rate":float(frame["hit"].mean()) if bets else 0.0,
         "stake_yen":stake,"return_yen":returned,
         "profit_yen":returned-stake,
         "return_rate":returned/stake if stake else 0.0,
