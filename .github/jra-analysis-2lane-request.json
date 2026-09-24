@@ -1,8 +1,9 @@
 {
-  "requested_at": "2026-09-24T17:20:00+09:00",
+  "requested_at": "2026-09-24T18:06:00+09:00",
   "source": "supabase-durable-jra-history-and-final-odds",
   "lanes": [
     "roi",
     "venue"
-  ]
+  ],
+  "retry_after_fix": true
 }
