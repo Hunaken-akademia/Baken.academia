@@ -102,9 +102,14 @@ def win_ev(runners,win_place,raw):
     learned=learned/learned.groupby(frame["race_id"]).transform("sum")
     frame["win_probability"]=.7*market+.3*learned
     frame=frame.merge(wp[["race_id","horse_number","win_odds"]],on=["race_id","horse_number"],how="left")
-    winners=raw[["race_id","horse_number","finish_position"]].copy()
-    winners["race_id"]=winners["race_id"].astype(str)
-    frame=frame.merge(winners,on=["race_id","horse_number"],how="left")
+    # The scored runner frame normally already carries the observed finish.
+    # Only join it from raw data when absent; otherwise pandas suffixes both
+    # copies and removes the canonical finish_position column name.
+    if "finish_position" not in frame.columns:
+        winners=raw[["race_id","horse_number","finish_position"]].copy()
+        winners["race_id"]=winners["race_id"].astype(str)
+        winners["horse_number"]=pd.to_numeric(winners["horse_number"],errors="coerce")
+        frame=frame.merge(winners,on=["race_id","horse_number"],how="left")
     frame["is_win"]=pd.to_numeric(frame["finish_position"],errors="coerce").eq(1)
     eligible=frame.loc[frame["win_odds"].notna() & frame["win_odds"].gt(0)].copy()
     calibration=eligible.loc[eligible["race_date"].between("2025-03-01","2025-07-31")].copy()
