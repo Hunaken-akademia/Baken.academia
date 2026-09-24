@@ -41,14 +41,22 @@ class SecondRoleModelTests(unittest.TestCase):
         joint = RecordingModel([[0.1, 0.2, 0.8, 0.3], [0.1, 0.2, 0.2, 0.3]])
         runtime = ReinRuntime(
             history=pd.DataFrame(),
-            schema={"feature_order": ["horse_weight_change"]},
+            schema={
+                "feature_order": ["horse_weight_change"],
+                "role_feature_order": {
+                    "third": ["horse_weight_change", "horse_wet_prior_top3_rate"]
+                },
+            },
             models={"first": first, "third": third},
             second_joint_schema={"feature_order": ["horse_weight_change"], "second_class_index": 2},
             second_joint_model=joint,
             version="test",
         )
         runtime._feature_frame_full = lambda race, runners: pd.DataFrame(
-            {"horse_weight_change": [0.0, 2.0]}
+            {
+                "horse_weight_change": [0.0, 2.0],
+                "horse_wet_prior_top3_rate": [0.4, 0.6],
+            }
         )
 
         result = runtime.score({}, [
@@ -57,7 +65,11 @@ class SecondRoleModelTests(unittest.TestCase):
         ])
 
         self.assertTrue(np.isnan(first.seen.iloc[0, 0]))
+        self.assertEqual(list(third.seen.columns), [
+            "horse_weight_change", "horse_wet_prior_top3_rate"
+        ])
         self.assertTrue(np.isnan(third.seen.iloc[0, 0]))
+        self.assertEqual(third.seen.iloc[0, 1], 0.4)
         self.assertEqual(joint.seen.iloc[0, 0], 0.0)
         self.assertEqual(
             [runner["first_probability"] for runner in result["runners"]],
