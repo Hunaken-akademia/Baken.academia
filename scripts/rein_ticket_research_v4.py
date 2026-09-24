@@ -280,6 +280,19 @@ def main() -> None:
     inherited += ["expected_front_count", "relative_early"]
     feature_names = list(dict.fromkeys(inherited + added))
     frame = pd.concat([base, x[feature_names]], axis=1)
+    # Third-place-only wet-track suitability.  The current race result is
+    # excluded from both counters, so this is point-in-time safe.
+    x["wet_for_role"] = x["going"].isin(["重", "不良"]).astype(int)
+    x["placed_for_wet_role"] = pd.to_numeric(
+        x["finish_position"], errors="coerce"
+    ).between(1, 3).astype(float)
+    wet_group = x.groupby(["horse_id", "wet_for_role"], observed=True, dropna=False)
+    x["horse_wet_prior_starts"] = wet_group.cumcount().astype(float)
+    x["horse_wet_prior_top3_rate"] = (
+        wet_group["placed_for_wet_role"].cumsum() - x["placed_for_wet_role"] + 4.5
+    ) / (x["horse_wet_prior_starts"] + 20)
+    third_features = ["horse_wet_prior_starts", "horse_wet_prior_top3_rate"]
+    third_frame = pd.concat([frame, x[third_features]], axis=1)
     flat = x["surface"].isin(["芝", "ダート"])
     train = x["race_date"].lt("2025-01-01") & flat
     model_info = {}
@@ -294,9 +307,10 @@ def main() -> None:
             bagging_freq=1, reg_lambda=8, n_jobs=4, verbosity=-1,
             random_state=900 + position,
         )
-        model.fit(frame.loc[train], y.loc[train])
-        x[f"v4_{role}_probability"] = model.predict_proba(frame)[:, 1]
-        model_info[role] = {"iterations": 650}
+        role_frame = third_frame if role == "third" else frame
+        model.fit(role_frame.loc[train], y.loc[train])
+        x[f"v4_{role}_probability"] = model.predict_proba(role_frame)[:, 1]
+        model_info[role] = {"iterations": 650, "feature_count": len(role_frame.columns)}
         model.booster_.save_model(str(model_dir / f"{role}.txt"))
 
     (model_dir / "schema.json").write_text(json.dumps({
@@ -304,6 +318,12 @@ def main() -> None:
         "base_features": list(base.columns),
         "advanced_features": feature_names,
         "feature_order": list(frame.columns),
+        "role_feature_order": {
+            "first": list(frame.columns),
+            "second": list(frame.columns),
+            "third": list(third_frame.columns),
+        },
+        "third_only_features": third_features,
         "trained_through": "2024-12-31",
     }, ensure_ascii=False, indent=2))
     if os.environ.get("REIN_TRAIN_ONLY") == "1":
