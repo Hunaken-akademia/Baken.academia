@@ -2,9 +2,6 @@ name: JRA eight-year payouts backfill
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["JRA all bet types odds and payouts backfill"]
-    types: [completed]
 
 permissions:
   contents: read
