@@ -42,7 +42,10 @@ def build(history: Path, model_dir: Path, output: Path, version: str,
     if schema.get("version") != "rein-role-v4":
         raise ValueError("Unexpected model schema version")
     if len(schema.get("feature_order", [])) != 106:
-        raise ValueError("REIN v4 must contain exactly 106 ordered features")
+        raise ValueError("REIN v4 first-place model must contain exactly 106 ordered features")
+    role_orders = schema.get("role_feature_order", {})
+    if len(role_orders.get("third", [])) != 108:
+        raise ValueError("REIN v4 wet-track third-place model must contain exactly 108 ordered features")
 
     history_frame = pd.read_parquet(history)
     missing = sorted(REQUIRED_HISTORY_COLUMNS - set(history_frame.columns))
