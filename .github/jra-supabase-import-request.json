@@ -1,5 +1,5 @@
 {
-  "requested_at": "2026-09-24T18:44:00+09:00",
+  "requested_at": "2026-09-24T18:55:00+09:00",
   "action": "import_jra_analysis_data",
-  "retry_after_authorization_fix": true
+  "retry_after_rpc_fix": true
 }
