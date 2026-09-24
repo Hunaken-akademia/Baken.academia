@@ -310,8 +310,16 @@ def main() -> None:
         print(f"[model] exported to {model_dir}", flush=True)
         return
 
-    predictions = pd.read_parquet(".model/test_predictions.parquet")
-    predictions["race_id"] = predictions["race_id"].astype(str)
+    prediction_path = Path(".model/test_predictions.parquet")
+    if prediction_path.exists():
+        predictions = pd.read_parquet(prediction_path)
+        predictions["race_id"] = predictions["race_id"].astype(str)
+    else:
+        # Durable-analysis fallback: use the freshly trained first-place role model
+        # as the current probability baseline when the old GitHub artifact has expired.
+        predictions = x[["race_id", "horse_id", "race_date"]].copy()
+        predictions["race_id"] = predictions["race_id"].astype(str)
+        predictions["win_probability"] = x["v4_first_probability"].astype(float)
     columns = ["race_id", "horse_id", "horse_number", "gate", "popularity",
                "v4_first_probability", "v4_second_probability", "v4_third_probability"]
     runners = predictions.merge(x[columns], on=["race_id", "horse_id"], how="left", validate="one_to_one")
