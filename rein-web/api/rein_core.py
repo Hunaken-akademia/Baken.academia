@@ -186,6 +186,13 @@ class ReinRuntime:
             _put_rate(row, "horse_surface", horse.loc[horse["surface"].eq(race["surface"])])
             _put_rate(row, "horse_distance", horse.loc[horse["distance_bucket"].eq(bucket)])
             _put_rate(row, "horse_course", horse.loc[horse["racecourse"].eq(race["racecourse"])])
+            current_wet = (race.get("going") or "") in ("重", "不良")
+            wet_history = horse.loc[horse["going"].isin(["重", "不良"]).eq(current_wet)]
+            wet_finish = pd.to_numeric(wet_history["finish_position"], errors="coerce").dropna()
+            row["horse_wet_prior_starts"] = float(len(wet_finish))
+            row["horse_wet_prior_top3_rate"] = float(
+                (wet_finish.between(1, 3).sum() + 4.5) / (len(wet_finish) + 20)
+            )
 
             previous = horse.iloc[-1] if len(horse) else None
             row["days_since_last_start"] = (race_date - previous["race_date"]).days if previous is not None else math.nan
@@ -282,9 +289,13 @@ class ReinRuntime:
     def score(self, race: dict[str, Any], runners: list[dict[str, Any]]) -> dict[str, Any]:
         full_frame = self._feature_frame_full(race, runners)
         frame = self._legacy_feature_frame(full_frame, runners)
+        third_order = self.schema.get("role_feature_order", {}).get(
+            "third", self.schema["feature_order"]
+        )
+        third_frame = full_frame[third_order]
         role_values = {
-            role: np.clip(self.models[role].predict(frame), 1e-12, None)
-            for role in ("first", "third")
+            "first": np.clip(self.models["first"].predict(frame), 1e-12, None),
+            "third": np.clip(self.models["third"].predict(third_frame), 1e-12, None),
         }
         second_frame = full_frame[self.second_joint_schema["feature_order"]]
         second_output = self.second_joint_model.predict(second_frame)
