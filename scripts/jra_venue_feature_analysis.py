@@ -6,7 +6,7 @@ from pathlib import Path
 import lightgbm as lgb
 import pandas as pd
 
-from rein_research import metrics, prepare
+from rein_research import prepare
 from rein_research_v3 import add_v3_features
 from baken_academia.features import build_feature_frame
 
@@ -15,7 +15,7 @@ DIRECTION = {
     "札幌": "右", "函館": "右", "福島": "右", "新潟": "左", "東京": "左",
     "中山": "右", "中京": "左", "京都": "右", "阪神": "右", "小倉": "右",
 }
-AUDIT_METRICS = ("rank1_win", "rank1_top3", "winner_in_top3", "two_placed", "three_placed")
+ROLE_TARGETS = {"first": 1, "second": 2, "third": 3}
 
 
 def add_smoothed_prior_rate(x: pd.DataFrame, keys: list[str], prefix: str) -> list[str]:
@@ -90,22 +90,57 @@ def venue_summary(raw: pd.DataFrame) -> list[dict[str, object]]:
     return rows
 
 
-def compact_metrics(value: dict[str, object]) -> dict[str, float | int]:
-    rank1 = value["by_rank"][0]
+def role_rank_metrics(rows: pd.DataFrame, prediction, position: int) -> dict[str, object]:
+    """Measure one exact finishing-position model without involving ticket ROI."""
+    z = rows[["race_id", "finish_position"]].copy()
+    z["score"] = prediction
+    z["role_rank"] = z.groupby("race_id", observed=True)["score"].rank(method="first", ascending=False)
+    finish = pd.to_numeric(z["finish_position"], errors="coerce")
+    actual = z.loc[finish.eq(position)]
+    per_rank = []
+    cumulative = []
+    for rank in range(1, 6):
+        selected = z.loc[z["role_rank"].eq(rank)]
+        selected_finish = pd.to_numeric(selected["finish_position"], errors="coerce")
+        per_rank.append({
+            "rank": rank,
+            "horses": int(len(selected)),
+            "actual_position_rate": float(selected_finish.eq(position).mean()) if len(selected) else 0.0,
+        })
+        cumulative.append({
+            "top_n": rank,
+            "actual_horses": int(len(actual)),
+            "actual_horse_in_top_n_rate": float(actual["role_rank"].le(rank).mean()) if len(actual) else 0.0,
+        })
     return {
-        "races": int(value["races"]), "rank1_win": float(rank1["win"]),
-        "rank1_top3": float(rank1["top3"]), "winner_in_top3": float(value["winner_in_top3"]),
-        "two_placed": float(value["two_placed"]), "three_placed": float(value["three_placed"]),
+        "races": int(z["race_id"].nunique()),
+        "target_finish_position": position,
+        "per_rank": per_rank,
+        "cumulative": cumulative,
+        "rank1_exact_rate": per_rank[0]["actual_position_rate"],
+        "actual_in_top3_rate": cumulative[2]["actual_horse_in_top_n_rate"],
+        "actual_in_top5_rate": cumulative[4]["actual_horse_in_top_n_rate"],
     }
 
 
-def objective(value: dict[str, float | int]) -> float:
-    return float(value["rank1_win"] + value["rank1_top3"] + value["winner_in_top3"]
-                 + value["two_placed"] + 0.5 * value["three_placed"])
+def objective(value: dict[str, object]) -> float:
+    return float(value["rank1_exact_rate"] + 0.5 * value["actual_in_top3_rate"]
+                 + 0.25 * value["actual_in_top5_rate"])
 
 
-def metric_delta(candidate: dict[str, float | int], baseline: dict[str, float | int]) -> dict[str, float]:
-    result = {name + "_pp": 100 * (float(candidate[name]) - float(baseline[name])) for name in AUDIT_METRICS}
+def metric_delta(candidate: dict[str, object], baseline: dict[str, object]) -> dict[str, object]:
+    summary = ("rank1_exact_rate", "actual_in_top3_rate", "actual_in_top5_rate")
+    result: dict[str, object] = {
+        name + "_pp": 100 * (float(candidate[name]) - float(baseline[name])) for name in summary
+    }
+    result["per_rank_actual_position_rate_pp"] = [
+        100 * (float(c["actual_position_rate"]) - float(b["actual_position_rate"]))
+        for c, b in zip(candidate["per_rank"], baseline["per_rank"])
+    ]
+    result["cumulative_top_n_rate_pp"] = [
+        100 * (float(c["actual_horse_in_top_n_rate"]) - float(b["actual_horse_in_top_n_rate"]))
+        for c, b in zip(candidate["cumulative"], baseline["cumulative"])
+    ]
     result["objective_pp"] = 100 * (objective(candidate) - objective(baseline))
     return result
 
@@ -162,21 +197,21 @@ def train_compare(raw: pd.DataFrame) -> tuple[dict[str, object], dict[str, objec
         "targets": {}, "candidate_decisions": {}, "existing_feature_evidence": {},
     }
 
-    for target in ("win", "place"):
-        y = x["finish_position"].eq(1) if target == "win" else x["finish_position"].between(1, 3)
+    for target, position in ROLE_TARGETS.items():
+        y = pd.to_numeric(x["finish_position"], errors="coerce").eq(position)
         target_report: dict[str, object] = {}
         for name, spec in variants.items():
             frame = spec["frame"]
             model = lgb.LGBMClassifier(
                 n_estimators=650, learning_rate=0.03, num_leaves=15, min_child_samples=250,
                 feature_fraction=0.8, bagging_fraction=0.9, bagging_freq=1, reg_lambda=8,
-                n_jobs=4, verbosity=-1, random_state=1200 + (target == "place"),
+                n_jobs=4, verbosity=-1, random_state=1200 + position,
             )
             model.fit(frame.loc[train], y.loc[train])
             prediction = model.predict_proba(frame)[:, 1]
             target_report[name] = {
                 "kind": spec["kind"], "feature_columns": spec["feature_columns"],
-                "periods": {period: compact_metrics(metrics(x.loc[mask], prediction[mask])[0])
+                "periods": {period: role_rank_metrics(x.loc[mask], prediction[mask], position)
                             for period, mask in periods.items()},
             }
 
@@ -195,15 +230,21 @@ def train_compare(raw: pd.DataFrame) -> tuple[dict[str, object], dict[str, objec
     for group in candidate_groups:
         name = "plus_" + group
         by_target = {}
-        for target in ("win", "place"):
+        for target in ROLE_TARGETS:
             deltas = report["targets"][target][name]["delta_vs_current_rein"]
-            tune_stable = all(deltas[p]["objective_pp"] > 0 for p in ("tune_2025", "tune_2025_h1", "tune_2025_h2"))
-            audit_confirmed = deltas["audit_2026"]["objective_pp"] > 0
+            tune_stable = all(
+                deltas[p]["objective_pp"] > 0 and deltas[p]["rank1_exact_rate_pp"] >= 0
+                for p in ("tune_2025", "tune_2025_h1", "tune_2025_h2")
+            )
+            audit_confirmed = (
+                deltas["audit_2026"]["objective_pp"] > 0
+                and deltas["audit_2026"]["rank1_exact_rate_pp"] >= 0
+            )
             by_target[target] = {"tune_2025_stable": tune_stable, "audit_2026_confirmed": audit_confirmed,
                                  "adoption_candidate": tune_stable and audit_confirmed}
         report["candidate_decisions"][group] = {
             "by_target": by_target,
-            "adoption_candidate": by_target["win"]["adoption_candidate"] and by_target["place"]["adoption_candidate"],
+            "adoption_candidate": all(value["adoption_candidate"] for value in by_target.values()),
             "production_applied": False,
         }
 
@@ -213,7 +254,7 @@ def train_compare(raw: pd.DataFrame) -> tuple[dict[str, object], dict[str, objec
             target: {
                 "tune_2025_objective_pp": report["targets"][target][name]["delta_vs_current_rein"]["tune_2025"]["objective_pp"],
                 "audit_2026_objective_pp": report["targets"][target][name]["delta_vs_current_rein"]["audit_2026"]["objective_pp"],
-            } for target in ("win", "place")
+            } for target in ROLE_TARGETS
         }
     return report, availability
 
