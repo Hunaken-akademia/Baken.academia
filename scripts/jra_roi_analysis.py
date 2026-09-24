@@ -7,10 +7,10 @@ import pandas as pd
 
 from scripts.rein_research import prepare
 from scripts.rein_research_v3 import add_v3_features
-from src.baken_academia.features import build_feature_frame
-from src.baken_academia.all_bet_hit_rate import BET_CAPS
+from baken_academia.features import build_feature_frame
+from baken_academia.all_bet_hit_rate import BET_CAPS
 from scripts.rein_ticket_research_v4 import generate_all, MIXES
-from src.baken_academia.expected_value import choose_threshold, select_bets, evaluate_bets, normalize_per_race
+from baken_academia.expected_value import choose_threshold, select_bets, evaluate_bets, normalize_per_race
 
 COURSE_CODE = {
     "01":"札幌","02":"函館","03":"福島","04":"新潟","05":"東京",
