@@ -19,6 +19,19 @@ COURSE_CODE = {
 UNORDERED={"bracket_quinella","quinella","wide","trio"}
 GROUPS=("main","counter","longshot","combined")
 
+def add_recent3_fastest_closing(x):
+    """Point-in-time count of fastest final-3F performances in the prior three starts."""
+    z=x.sort_values(["race_date","race_id","horse_number"]).copy()
+    closing=pd.to_numeric(z["avg_1f"],errors="coerce").where(z["surface"].isin(["芝","ダート"]))
+    race_min=closing.groupby(z["race_id"],observed=True).transform("min")
+    fastest=(closing-race_min).abs().le(1e-9).astype(float)
+    prior=fastest.groupby(z["horse_id"],observed=True).shift(1)
+    z["recent3_fastest_closing_count"]=(
+        prior.groupby(z["horse_id"],observed=True)
+        .rolling(3,min_periods=1).sum().reset_index(level=0,drop=True)
+    )
+    return z.sort_index()
+
 def load_many(paths):
     frames=[pd.read_parquet(p) for p in paths if p.stat().st_size]
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
@@ -31,12 +44,14 @@ def make_selection(row):
     return tuple(vals)
 
 def train_roles(raw):
-    x, added = add_v3_features(prepare(raw))
+    x=add_recent3_fastest_closing(prepare(raw))
+    x, added = add_v3_features(x)
     base, _, _ = build_feature_frame(x)
-    inherited=[c for c in x if c.startswith(("prior_","recent3_")) or "_recent90_" in c]
+    inherited=[c for c in x if (c.startswith(("prior_","recent3_")) or "_recent90_" in c) and c!="recent3_fastest_closing_count"]
     inherited += ["expected_front_count","relative_early"]
     feature_names=list(dict.fromkeys(inherited+added))
     frame=pd.concat([base, x[feature_names]], axis=1)
+    enhanced=pd.concat([frame,x[["recent3_fastest_closing_count"]]],axis=1)
     flat=x["surface"].isin(["芝","ダート"])
     train=x["race_date"].lt("2025-01-01") & flat
     for role,pos in (("first",1),("second",2),("third",3)):
@@ -48,8 +63,19 @@ def train_roles(raw):
         )
         model.fit(frame.loc[train],y.loc[train])
         x[f"v4_{role}_probability"]=model.predict_proba(frame)[:,1]
+        if role=="first":
+            candidate=lgb.LGBMClassifier(
+                n_estimators=650,learning_rate=.03,num_leaves=15,min_child_samples=250,
+                feature_fraction=.8,bagging_fraction=.9,bagging_freq=1,reg_lambda=8,
+                n_jobs=4,verbosity=-1,random_state=900+pos,
+            )
+            candidate.fit(enhanced.loc[train],y.loc[train])
+            x["candidate_first_probability"]=candidate.predict_proba(enhanced)[:,1]
     x["win_probability"]=x["v4_first_probability"]
-    return x
+    candidate=x.copy()
+    candidate["v4_first_probability"]=candidate["candidate_first_probability"]
+    candidate["win_probability"]=candidate["candidate_first_probability"]
+    return x,candidate
 
 def ticket_roi(tickets,payouts):
     payouts=payouts.copy()
@@ -99,6 +125,58 @@ def frame_result(frame):
         "profit_yen":returned-stake,
         "return_rate":returned/stake if stake else 0.0,
     }
+
+def checked_roi(checked):
+    out={}
+    for bet_type in BET_CAPS:
+        out[bet_type]={}
+        bet=checked.loc[checked["bet_type"].eq(bet_type)]
+        for group in GROUPS:
+            g=bet if group=="combined" else bet.loc[bet["ticket_type"].eq(group)]
+            out[bet_type][group]=frame_result(g)
+    return out
+
+def recent3_fastest_ticket_comparison(base_tune,candidate_tune,base_audit,candidate_audit):
+    periods={
+        "tune_2025_h1":(
+            base_tune.loc[base_tune["race_date"].lt("2025-07-01")],
+            candidate_tune.loc[candidate_tune["race_date"].lt("2025-07-01")],
+        ),
+        "tune_2025_h2":(
+            base_tune.loc[base_tune["race_date"].ge("2025-07-01")],
+            candidate_tune.loc[candidate_tune["race_date"].ge("2025-07-01")],
+        ),
+        "audit_2026":(base_audit,candidate_audit),
+    }
+    result={"scope":"Only the first-place role model adds recent3_fastest_closing_count; production is unchanged","bet_types":{}}
+    summaries={name:(checked_roi(base),checked_roi(candidate)) for name,(base,candidate) in periods.items()}
+    for bet_type in BET_CAPS:
+        result["bet_types"][bet_type]={}
+        for group in GROUPS:
+            rows={}
+            for period,(baseline,candidate) in summaries.items():
+                b=baseline[bet_type][group]; c=candidate[bet_type][group]
+                rows[period]={
+                    "baseline":b,"candidate":c,
+                    "return_rate_change_pp":100*(c["return_rate"]-b["return_rate"]),
+                    "race_hit_rate_change_pp":100*(c["race_hit_rate"]-b["race_hit_rate"]),
+                }
+            stable_improvement=all(rows[p]["return_rate_change_pp"]>0 for p in rows)
+            profitable_all=all(rows[p]["candidate"]["return_rate"]>=1 for p in rows)
+            enough_data=all(rows[p]["candidate"]["races"]>=100 for p in rows)
+            result["bet_types"][bet_type][group]={
+                "periods":rows,
+                "stable_improvement":stable_improvement,
+                "profitable_all_periods":profitable_all,
+                "adoption_candidate":stable_improvement and profitable_all and enough_data,
+            }
+    result["adoption_candidates"]=[
+        {"bet_type":bet_type,"group":group}
+        for bet_type,groups in result["bet_types"].items()
+        for group,value in groups.items() if value["adoption_candidate"]
+    ]
+    result["production_applied"]=False
+    return result
 
 def normalized_win_place(win_place):
     wp=win_place.copy()
@@ -316,17 +394,25 @@ def main():
     raw=pd.read_parquet("data/raw/jra/races-2019-2026.parquet")
     raw["race_id"]=raw["race_id"].astype(str)
     raw["race_date"]=pd.to_datetime(raw["race_date"])
-    runners=train_roles(raw)
+    runners,candidate_runners=train_roles(raw)
     tune=runners.loc[runners["race_date"].between("2025-01-01","2025-12-31")].copy()
     audit=runners.loc[runners["race_date"].ge("2026-01-01")].copy()
+    candidate_tune=candidate_runners.loc[candidate_runners["race_date"].between("2025-01-01","2025-12-31")].copy()
+    candidate_audit=candidate_runners.loc[candidate_runners["race_date"].ge("2026-01-01")].copy()
     tune_tickets=generate_all(tune, MIXES["market70_role30"])
     tickets=generate_all(audit, MIXES["market70_role30"])
+    candidate_tune_tickets=generate_all(candidate_tune,MIXES["market70_role30"])
+    candidate_tickets=generate_all(candidate_audit,MIXES["market70_role30"])
     payouts=load_many(list(Path(".odds-normalized/payouts").glob("*.parquet")))
     win_place=load_many(list(Path(".odds-normalized/win-place").glob("*.parquet")))
     _,tune_checked=ticket_roi(tune_tickets,payouts)
     roi,checked=ticket_roi(tickets,payouts)
+    _,candidate_tune_checked=ticket_roi(candidate_tune_tickets,payouts)
+    _,candidate_checked=ticket_roi(candidate_tickets,payouts)
     tune_checked=add_ticket_context(tune_checked,runners,win_place)
     checked=add_ticket_context(checked,runners,win_place)
+    candidate_tune_checked=add_ticket_context(candidate_tune_checked,candidate_runners,win_place)
+    candidate_checked=add_ticket_context(candidate_checked,candidate_runners,win_place)
     # EV calibration needs the full scored history: 2025 is used only for
     # calibration/threshold selection and 2026 remains the held-out audit.
     # Passing `audit` here leaves no 2025 rows and makes every split invalid.
@@ -349,6 +435,9 @@ def main():
             "distance_m":breakdown(checked,"distance_m",[-np.inf,1401,1801,2201,2601,np.inf],["1400m以下","1401-1800m","1801-2200m","2201-2600m","2601m超"]),
         },
         "filter_selection_2025_audit_2026":filter_candidates(tune_checked,checked),
+        "recent3_fastest_ticket_test":recent3_fastest_ticket_comparison(
+            tune_checked,candidate_tune_checked,checked,candidate_checked
+        ),
         "limitations":["Final selection odds are available for win/place only. For the other six bet types, payout bands are post-race evaluation only and are not used to select bets."],
     }
     (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2,allow_nan=False))
