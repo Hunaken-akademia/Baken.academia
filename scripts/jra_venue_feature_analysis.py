@@ -7,7 +7,7 @@ import pandas as pd
 
 from scripts.rein_research import prepare, metrics
 from scripts.rein_research_v3 import add_v3_features
-from src.baken_academia.features import build_feature_frame
+from baken_academia.features import build_feature_frame
 
 DIRECTION={"札幌":"右","函館":"右","福島":"右","新潟":"左","東京":"左","中山":"右","中京":"左","京都":"右","阪神":"右","小倉":"右"}
 
