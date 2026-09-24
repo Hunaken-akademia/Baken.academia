@@ -40,7 +40,7 @@ def clean(v):
 
 def import_runners():
     df=pd.read_parquet("data/raw/jra/races-2019-2026.parquet")
-    cols=["race_id","race_date","racecourse","race_no","race_name","race_class","surface","distance_m","going","weather","horse_id","horse_number","gate","horse_name","finish_position","finish_status","popularity","horse_weight","horse_weight_change","weight_carried","jockey_id","jockey_name","trainer_id","trainer_name","avg_1f","source_cname"]
+    cols=["race_id","race_date","racecourse","race_no","race_name","race_class","surface","distance_m","course_detail","going","weather","horse_id","horse_number","gate","horse_name","blinkers","breeder_name","breeder_source_cname","finish_position","finish_status","popularity","horse_weight","horse_weight_change","weight_carried","jockey_id","jockey_name","trainer_id","trainer_name","avg_1f","source_cname"]
     rows=[{c:clean(row.get(c)) for c in cols} for row in df.to_dict("records")]
     for i,b in enumerate(batches(rows),1):
         post("runners",b)
