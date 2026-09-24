@@ -17,6 +17,7 @@ COURSE_CODE = {
     "06":"中山","07":"中京","08":"京都","09":"阪神","10":"小倉",
 }
 UNORDERED={"bracket_quinella","quinella","wide","trio"}
+GROUPS=("main","counter","longshot","combined")
 
 def load_many(paths):
     frames=[pd.read_parquet(p) for p in paths if p.stat().st_size]
@@ -82,6 +83,168 @@ def ticket_roi(tickets,payouts):
             }
     return out,t
 
+def frame_result(frame):
+    races=int(frame["race_id"].nunique())
+    bets=int(len(frame))
+    stake=bets*100
+    returned=float(frame["payout"].sum())
+    per_race=frame.groupby("race_id",observed=True)["hit"].any() if races else pd.Series(dtype=bool)
+    return {
+        "races":races,"bets":bets,
+        "points_per_race":float(bets/races) if races else 0.0,
+        "race_hit_rate":float(per_race.mean()) if races else 0.0,
+        "stake_yen":stake,"return_yen":returned,
+        "profit_yen":returned-stake,
+        "return_rate":returned/stake if stake else 0.0,
+    }
+
+def normalized_win_place(win_place):
+    wp=win_place.copy()
+    wp["race_date"]=pd.to_datetime(wp["race_date"])
+    wp["racecourse"]=wp["course_code"].astype(str).str.zfill(2).map(COURSE_CODE)
+    wp=wp.loc[wp["racecourse"].notna()].copy()
+    wp["race_id"]=wp["race_date"].dt.strftime("%Y%m%d")+"-"+wp["racecourse"]+"-"+wp["race_no"].astype(int).astype(str).str.zfill(2)
+    wp["horse_number"]=pd.to_numeric(wp["horse_number"],errors="coerce")
+    for col in ("win_odds","place_odds_min","place_odds_max"):
+        if col in wp:
+            wp[col]=pd.to_numeric(wp[col],errors="coerce")
+    if {"place_odds_min","place_odds_max"}.issubset(wp):
+        wp["place_odds"]=(wp["place_odds_min"]+wp["place_odds_max"])/2
+    return wp
+
+def add_ticket_context(checked,runners,win_place):
+    t=checked.copy()
+    race_ids=set(t["race_id"].astype(str).unique())
+    runner=runners.loc[runners["race_id"].astype(str).isin(race_ids)].copy()
+    runner["race_id"]=runner["race_id"].astype(str)
+    runner["horse_number"]=pd.to_numeric(runner["horse_number"],errors="coerce")
+    pop_lookup=runner.set_index(["race_id","horse_number"])["popularity"].to_dict()
+
+    def popularity_stats(row):
+        values=[pd.to_numeric(pop_lookup.get((str(row.race_id),float(n))),errors="coerce") for n in row.selection]
+        values=[float(v) for v in values if pd.notna(v)]
+        return (min(values),max(values),sum(values)/len(values)) if values else (np.nan,np.nan,np.nan)
+
+    stats=t.apply(popularity_stats,axis=1,result_type="expand")
+    stats.columns=["best_popularity","worst_popularity","mean_popularity"]
+    t=pd.concat([t,stats],axis=1)
+
+    race_cols=["race_id","racecourse","surface","going","distance_m","field_size"]
+    available=[c for c in race_cols if c in runner]
+    race=runner.sort_values(["race_id","horse_number"]).drop_duplicates("race_id")[available]
+    if "racecourse" not in race:
+        race["racecourse"]=race["race_id"].str.split("-").str[1]
+    if "field_size" not in race:
+        sizes=runner.groupby("race_id",observed=True).size().rename("field_size")
+        race=race.merge(sizes,on="race_id",how="left")
+    direction={"東京":"左","中京":"左","新潟":"左"}
+    race["direction"]=race["racecourse"].map(direction).fillna("右")
+
+    gaps=[]
+    for rid,g in runner.groupby("race_id",sort=False,observed=True):
+        values=pd.to_numeric(g["v4_first_probability"],errors="coerce").dropna().sort_values(ascending=False).to_numpy()
+        gaps.append((rid,float(values[0]-values[1]) if len(values)>1 else np.nan,float(values[0]) if len(values) else np.nan))
+    gap=pd.DataFrame(gaps,columns=["race_id","first_probability_gap","top_first_probability"])
+    race=race.merge(gap,on="race_id",how="left")
+    t=t.merge(race,on="race_id",how="left")
+
+    wp=normalized_win_place(win_place)
+    odds=wp[[c for c in ["race_id","horse_number","win_odds","place_odds"] if c in wp]].drop_duplicates(["race_id","horse_number"])
+    odds_lookup=odds.set_index(["race_id","horse_number"]).to_dict()
+    def final_odds(row):
+        if row.bet_type not in {"win","place"} or len(row.selection)!=1:
+            return np.nan
+        col="win_odds" if row.bet_type=="win" else "place_odds"
+        return odds_lookup.get(col,{}).get((str(row.race_id),float(row.selection[0])),np.nan)
+    t["final_odds"]=t.apply(final_odds,axis=1)
+    t["group_points"]=t.groupby(["race_id","bet_type","ticket_type"],observed=True)["race_id"].transform("size")
+    return t
+
+def breakdown(checked,column,bins,labels):
+    work=checked.loc[checked[column].notna()].copy()
+    work["band"]=pd.cut(work[column],bins=bins,labels=labels,include_lowest=True,right=False)
+    result={}
+    for bet_type in BET_CAPS:
+        result[bet_type]={}
+        bet=work.loc[work["bet_type"].eq(bet_type)]
+        for group in GROUPS:
+            g=bet if group=="combined" else bet.loc[bet["ticket_type"].eq(group)]
+            result[bet_type][group]={str(label):frame_result(g.loc[g["band"].eq(label)]) for label in labels}
+    return result
+
+def categorical_breakdown(checked,column):
+    result={}
+    values=[v for v in checked[column].dropna().unique().tolist()]
+    for bet_type in BET_CAPS:
+        result[bet_type]={}
+        bet=checked.loc[checked["bet_type"].eq(bet_type)]
+        for group in GROUPS:
+            g=bet if group=="combined" else bet.loc[bet["ticket_type"].eq(group)]
+            result[bet_type][group]={str(v):frame_result(g.loc[g[column].eq(v)]) for v in values}
+    return result
+
+def filter_candidates(tune_checked,audit_checked):
+    candidates={}
+    for bet_type in BET_CAPS:
+        candidates[bet_type]={}
+        for group in GROUPS:
+            tune=tune_checked.loc[tune_checked["bet_type"].eq(bet_type)]
+            audit=audit_checked.loc[audit_checked["bet_type"].eq(bet_type)]
+            if group!="combined":
+                tune=tune.loc[tune["ticket_type"].eq(group)]
+                audit=audit.loc[audit["ticket_type"].eq(group)]
+            base_tune=frame_result(tune); base_audit=frame_result(audit)
+            scans=[]
+            definitions=[]
+            for q in (.25,.5,.75,.9):
+                value=float(tune["probability"].quantile(q))
+                definitions.append((f"probability_gte_q{int(q*100)}",lambda x,v=value:x["probability"].ge(v),value))
+            for max_pop in (3,5,8,10):
+                definitions.append((f"worst_popularity_lte_{max_pop}",lambda x,v=max_pop:x["worst_popularity"].le(v),max_pop))
+            for q in (.5,.75,.9):
+                value=float(tune["first_probability_gap"].quantile(q))
+                definitions.append((f"first_gap_gte_q{int(q*100)}",lambda x,v=value:x["first_probability_gap"].ge(v),value))
+            if bet_type in {"win","place"}:
+                for lo,hi in ((1,3),(3,5),(5,10),(10,20),(20,50),(50,1e9)):
+                    definitions.append((f"final_odds_{lo:g}_{hi:g}",lambda x,a=lo,b=hi:x["final_odds"].ge(a)&x["final_odds"].lt(b),[lo,hi]))
+            for name,predicate,value in definitions:
+                tuned=tune.loc[predicate(tune)]
+                audited=audit.loc[predicate(audit)]
+                tr=frame_result(tuned); ar=frame_result(audited)
+                if tr["races"]<150 or tr["bets"]<300:
+                    continue
+                scans.append({"condition":name,"value":value,"tune_2025":tr,"audit_2026":ar})
+            scans.sort(key=lambda x:(x["tune_2025"]["return_rate"],x["tune_2025"]["races"]),reverse=True)
+            chosen=scans[0] if scans else None
+            if chosen:
+                chosen=dict(chosen)
+                chosen["audit_return_rate_change_pp"]=100*(chosen["audit_2026"]["return_rate"]-base_audit["return_rate"])
+                chosen["adoption_candidate"]=bool(chosen["audit_2026"]["return_rate"]>base_audit["return_rate"] and chosen["audit_2026"]["races"]>=100)
+            candidates[bet_type][group]={"baseline_tune_2025":base_tune,"baseline_audit_2026":base_audit,"selected_on_2025":chosen,"top_2025_scans":scans[:5]}
+    return candidates
+
+def role_rank_metrics(runners):
+    audit=runners.loc[runners["race_date"].ge("2026-01-01") & runners["surface"].isin(["芝","ダート"])].copy()
+    result={}
+    for role,position in (("first",1),("second",2),("third",3)):
+        score=f"v4_{role}_probability"
+        audit["role_rank"]=audit.groupby("race_id",observed=True)[score].rank(method="first",ascending=False)
+        per_rank=[]
+        cumulative=[]
+        for rank in range(1,6):
+            selected=audit.loc[audit["role_rank"].eq(rank)]
+            per_rank.append({
+                "rank":rank,"horses":int(len(selected)),
+                "actual_position_rate":float(pd.to_numeric(selected["finish_position"],errors="coerce").eq(position).mean()),
+            })
+            actual=audit.loc[pd.to_numeric(audit["finish_position"],errors="coerce").eq(position)]
+            cumulative.append({
+                "top_n":rank,"races":int(actual["race_id"].nunique()),
+                "actual_horse_in_top_n_rate":float(actual["role_rank"].le(rank).mean()),
+            })
+        result[role]={"target_finish_position":position,"per_rank":per_rank,"cumulative":cumulative}
+    return result
+
 def win_ev(runners,win_place,raw):
     wp=win_place.copy()
     wp["race_date"]=pd.to_datetime(wp["race_date"])
@@ -103,8 +266,8 @@ def win_ev(runners,win_place,raw):
     frame["win_probability"]=.7*market+.3*learned
     frame=frame.merge(wp[["race_id","horse_number","win_odds"]],on=["race_id","horse_number"],how="left")
     # The scored runner frame normally already carries the observed finish.
-    # Only join it from raw data when absent; otherwise pandas suffixes both
-    # copies and removes the canonical finish_position column name.
+    # Only join it from the raw data when it is genuinely absent; otherwise
+    # pandas suffixes the two copies and removes the canonical column name.
     if "finish_position" not in frame.columns:
         winners=raw[["race_id","horse_number","finish_position"]].copy()
         winners["race_id"]=winners["race_id"].astype(str)
@@ -139,17 +302,39 @@ def main():
     raw["race_id"]=raw["race_id"].astype(str)
     raw["race_date"]=pd.to_datetime(raw["race_date"])
     runners=train_roles(raw)
+    tune=runners.loc[runners["race_date"].between("2025-01-01","2025-12-31")].copy()
     audit=runners.loc[runners["race_date"].ge("2026-01-01")].copy()
+    tune_tickets=generate_all(tune, MIXES["market70_role30"])
     tickets=generate_all(audit, MIXES["market70_role30"])
     payouts=load_many(list(Path(".odds-normalized/payouts").glob("*.parquet")))
     win_place=load_many(list(Path(".odds-normalized/win-place").glob("*.parquet")))
+    _,tune_checked=ticket_roi(tune_tickets,payouts)
     roi,checked=ticket_roi(tickets,payouts)
+    tune_checked=add_ticket_context(tune_checked,runners,win_place)
+    checked=add_ticket_context(checked,runners,win_place)
     # EV calibration needs the full scored history: 2025 is used only for
     # calibration/threshold selection and 2026 remains the held-out audit.
-    # Passing audit here leaves no 2025 rows and makes every split invalid.
+    # Passing `audit` here leaves no 2025 rows and makes every split invalid.
     ev=win_ev(runners,win_place,raw)
     out=Path("reports/jra-roi-ev-v1"); out.mkdir(parents=True,exist_ok=True)
-    report={"scope":"2026 held-out style audit using market70_role30","roi":roi,"win_expected_value":ev}
+    report={
+        "scope":"trained through 2024, filters selected on 2025, final audit on 2026 using market70_role30",
+        "roi":roi,
+        "win_expected_value":ev,
+        "role_rank_top5_2026":role_rank_metrics(runners),
+        "breakdowns_2026":{
+            "model_probability":breakdown(checked,"probability",[-np.inf,.001,.0025,.005,.01,.02,.05,.1,.2,np.inf],["<0.1%","0.1-0.25%","0.25-0.5%","0.5-1%","1-2%","2-5%","5-10%","10-20%","20%+"]),
+            "selection_popularity":breakdown(checked,"worst_popularity",[-np.inf,2,4,7,11,np.inf],["1人気","2-3人気","4-6人気","7-10人気","11人気以下"]),
+            "final_odds_win_place_only":breakdown(checked,"final_odds",[-np.inf,2,3,5,10,20,50,np.inf],["<2倍","2-3倍","3-5倍","5-10倍","10-20倍","20-50倍","50倍+"]),
+            "points_per_race":categorical_breakdown(checked,"group_points"),
+            "racecourse":categorical_breakdown(checked,"racecourse"),
+            "surface":categorical_breakdown(checked,"surface"),
+            "going":categorical_breakdown(checked,"going"),
+            "direction":categorical_breakdown(checked,"direction"),
+        },
+        "filter_selection_2025_audit_2026":filter_candidates(tune_checked,checked),
+        "limitations":["Final selection odds are available for win/place only. For the other six bet types, payout bands are post-race evaluation only and are not used to select bets."],
+    }
     (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2,allow_nan=False))
     checked.to_parquet(out/"tickets-with-payouts.parquet",index=False)
     print(json.dumps(report,ensure_ascii=False))
