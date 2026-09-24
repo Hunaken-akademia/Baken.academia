@@ -9,11 +9,23 @@ OIDC_AUDIENCE="rein-supabase-archive-v1"
 OUT_DIR="${1:-.odds-normalized}"
 mkdir -p "${OUT_DIR}/payouts" "${OUT_DIR}/win-place"
 
-token_response="$(curl --fail-with-body --silent --show-error --retry 3   -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}"   "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${OIDC_AUDIENCE}")"
-OIDC_TOKEN="$(jq -er '.value' <<<"${token_response}")"
+OIDC_TOKEN=""
+OIDC_REFRESHED_AT=0
+
+refresh_oidc() {
+  local now token_response
+  now="$(date +%s)"
+  if [[ -n "${OIDC_TOKEN}" ]] && (( now - OIDC_REFRESHED_AT < 240 )); then
+    return
+  fi
+  token_response="$(curl --fail-with-body --silent --show-error --retry 3     -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}"     "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${OIDC_AUDIENCE}")"
+  OIDC_TOKEN="$(jq -er '.value' <<<"${token_response}")"
+  OIDC_REFRESHED_AT="${now}"
+}
 
 broker() {
   local action="$1" path="$2"
+  refresh_oidc
   curl --fail-with-body --silent --show-error --retry 3     -X POST "${SUPABASE_BROKER_URL}"     -H "Authorization: Bearer ${OIDC_TOKEN}"     -H "Content-Type: application/json"     --data "$(jq -nc --arg action "${action}" --arg path "${path}" '{action:$action,path:$path}')"
 }
 
@@ -35,17 +47,20 @@ while read -r period; do
   path="jra/odds/all-bets/v1/${year}/${period}.tar.gz"
   exists="$(broker exists "${path}" | jq -r '.exists')"
   [[ "${exists}" == "true" ]] || continue
+
   signed="$(broker sign-download "${path}" | jq -er '.signed_url')"
   curl --fail-with-body --silent --show-error --retry 3 "${signed}" -o "${tmp}"
 
   payout_member="data/raw/jra-all-odds/normalized/payouts.parquet"
   win_member="data/raw/jra-all-odds/normalized/win-place.parquet"
-  if tar -tzf "${tmp}" | grep -qx "${payout_member}"; then
+
+  if tar -tzf "${tmp}" "${payout_member}" >/dev/null 2>&1; then
     tar -xOzf "${tmp}" "${payout_member}" > "${OUT_DIR}/payouts/${period}.parquet"
   fi
-  if tar -tzf "${tmp}" | grep -qx "${win_member}"; then
+  if tar -tzf "${tmp}" "${win_member}" >/dev/null 2>&1; then
     tar -xOzf "${tmp}" "${win_member}" > "${OUT_DIR}/win-place/${period}.parquet"
   fi
+
   count=$((count+1))
   if (( count % 20 == 0 )); then echo "processed ${count} archives"; fi
 done < /tmp/jra-periods.txt
