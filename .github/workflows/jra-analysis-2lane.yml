@@ -70,5 +70,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: jra-analysis-venue-features
-          path: reports/jra-venue-features-v1
+          path: reports/jra-venue-features-v2
           retention-days: 30
