@@ -539,6 +539,11 @@ async function analyze(request: NextRequest) {
             top3Rate: component.top3Rate,
             averageFinish: component.averageFinish,
           })),
+        roleReasons: {
+          first: [] as Array<{ feature: string; contribution: number }>,
+          second: [] as Array<{ feature: string; contribution: number }>,
+          third: [] as Array<{ feature: string; contribution: number }>,
+        },
         parameterFactors: historical.components.map((component) => ({
           label: component.label,
           samples: component.samples,
