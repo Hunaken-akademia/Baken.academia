@@ -2,6 +2,12 @@ name: NAR rolling partial analysis
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/nar-partial-analysis-request.json
+      - .github/workflows/nar-partial-analysis.yml
+      - scripts/nar_partial_analysis.py
   schedule:
     - cron: "17 */6 * * *"
   workflow_run:
