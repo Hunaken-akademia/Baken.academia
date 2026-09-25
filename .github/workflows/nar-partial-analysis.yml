@@ -33,6 +33,7 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Download every completed NAR archive currently in Supabase
+        id: archives
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -78,22 +79,32 @@ jobs:
           done < /tmp/nar-periods.txt
 
           echo "Completed NAR chunks downloaded: ${completed}"
-          test "${completed}" -gt 0
+          echo "completed=${completed}" >> "${GITHUB_OUTPUT}"
+
+      - name: Report that corrected archives are not ready yet
+        if: steps.archives.outputs.completed == '0'
+        run: |
+          echo "## NAR修正版データ待機中" >> "${GITHUB_STEP_SUMMARY}"
+          echo "v2チャンクがまだ完成していないため、今回は正常終了します。" >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Analyze acquired NAR data
+        if: steps.archives.outputs.completed != '0'
         run: >-
           python scripts/nar_partial_analysis.py
           --input-dir .nar-dataset
           --output-dir artifacts/nar-partial-analysis
 
       - name: Publish summary
+        if: steps.archives.outputs.completed != '0'
         shell: bash
         run: cat artifacts/nar-partial-analysis/summary.md >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Remove temporary combined parquet before artifact upload
+        if: steps.archives.outputs.completed != '0'
         run: rm -f artifacts/nar-partial-analysis/nar-partial-combined.parquet
 
       - uses: actions/upload-artifact@v4
+        if: steps.archives.outputs.completed != '0'
         with:
           name: nar-partial-analysis-v2
           path: artifacts/nar-partial-analysis
