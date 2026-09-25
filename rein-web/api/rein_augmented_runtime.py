@@ -10,7 +10,7 @@ class ReinRuntime(BaseRuntime):
             base["market_difference_ready"] = False
             return base
         full = self._feature_frame_full(race, runners)
-        for column in ("racecourse", "going", "race_class", "sex", "surface"):
+        for column in ("racecourse", "going", "race_class", "sex", "surface", "jockey_id", "trainer_id"):
             if column in full:
                 full[column] = full[column].astype(object)
         scores = score_market_difference(self, full, race, runners)
