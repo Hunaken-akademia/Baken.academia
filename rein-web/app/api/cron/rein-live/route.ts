@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const schedule = await scheduleResponse.json() as { venues?: RaceVenue[] };
     const targets = liveRefreshTargets(schedule.venues || [], new Date());
 
-    const results = await mapWithConcurrency(targets, 2, async (race) => {
+    const results = await mapWithConcurrency(targets, 3, async (race) => {
       try {
         const response = await fetch(`${origin}/api/analyze?raceId=${encodeURIComponent(race.raceId)}&refresh=1`, {
           cache: "no-store",

@@ -563,7 +563,9 @@ async function analyze(request: NextRequest) {
       );
       try {
         await sharedCache.set(`weights:${raceId}`, captured, {
-          ttl: 36 * 60 * 60,
+          // Horse weights do not change after publication. Capture them once and
+          // keep using that immutable snapshot for the remainder of the race day.
+          ttl: 72 * 60 * 60,
           tags: [`rein-race-${raceId}`, "rein-weights"],
           name: "REIN fixed horse weights",
         });
