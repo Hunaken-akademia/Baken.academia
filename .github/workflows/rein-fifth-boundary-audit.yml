@@ -1,15 +1,23 @@
-name: REIN fifth boundary audit
+name: REIN fifth boundary audit fast
 on:
   push:
-    branches: [main]
-    paths: [.github/workflows/rein-fifth-boundary-audit.yml]
+    branches: [automation/rein-fifth-boundary-fast]
+    paths: [scripts/rein_fifth_boundary_audit.py]
+  workflow_dispatch:
 permissions:
   contents: read
   actions: read
+concurrency:
+  group: rein-fifth-boundary-fast-audit
+  cancel-in-progress: false
 jobs:
   audit:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PYTHONUNBUFFERED: "1"
+      OPENBLAS_NUM_THREADS: "2"
+      OMP_NUM_THREADS: "2"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with: {persist-credentials: false}
@@ -22,9 +30,12 @@ jobs:
           path: .real-odds-model
           github-token: ${{ github.token }}
           run-id: "36135569462"
-      - run: python scripts/rein_fifth_boundary_audit.py
+      - name: Validate fifth-place boundary without production writes
+        run: python scripts/rein_fifth_boundary_audit.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
         with:
-          name: rein-fifth-boundary-audit-20260925
+          name: rein-fifth-boundary-fast-${{ github.run_id }}
           path: reports/rein-fifth-boundary
+          if-no-files-found: warn
           retention-days: 30
