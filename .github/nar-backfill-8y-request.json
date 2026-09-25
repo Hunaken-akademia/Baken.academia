@@ -1,10 +1,11 @@
 {
-  "requested_at": "2026-09-23T00:15:00+09:00",
+  "requested_at": "2026-09-25T06:42:04.541Z",
   "state": "running",
-  "reason": "Direct verified Supabase archive for NAR full odds backfill",
-  "durable_completed_range": "2019-01 through 2019-04 results",
+  "reason": "Restart corrected NAR v2 backfill after parser and Supabase archive path fix",
+  "durable_completed_range": "v1 retained as legacy; v2 rebuild starts from 2019-01",
   "resume_from": "2019-01",
-  "max_parallel": 2,
+  "max_parallel": 6,
+  "parser_version": 2,
   "bet_types": [
     "win_place",
     "bracket_quinella",
