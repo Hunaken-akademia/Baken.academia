@@ -43,6 +43,8 @@ jobs:
           echo "MODEL_VERSION=$version" >> "$GITHUB_ENV"
           echo "MODEL_BUNDLE=artifacts/$version.bundle.tar.gz" >> "$GITHUB_ENV"
           echo "MODEL_MANIFEST=artifacts/$version.bundle.manifest.json" >> "$GITHUB_ENV"
+          printf '{"comparison":{}}\n' > artifacts/activation-metrics.json
+          echo "MODEL_METRICS=artifacts/activation-metrics.json" >> "$GITHUB_ENV"
       - name: Upload and atomically activate augmented bundle
         run: bash scripts/upload_rein_model_to_supabase.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
