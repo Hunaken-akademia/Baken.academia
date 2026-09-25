@@ -7,7 +7,7 @@ export type Ticket = { type: string; tiers: TicketTier[] };
 
 const caps: Record<string, [number, number, number]> = {
   単勝: [1, 1, 1], 複勝: [1, 1, 1], 枠連: [3, 4, 4], 馬連: [5, 6, 6],
-  ワイド: [4, 5, 5], 馬単: [8, 10, 10], 三連複: [10, 12, 12], 三連単: [15, 22, 22],
+  ワイド: [4, 5, 5], 馬単: [8, 10, 10], 三連複: [10, 12, 12],
 };
 type RoleHorse = TicketHorse & { first: number; second: number; third: number };
 type Candidate = { selection: number[]; probability: number };
@@ -62,7 +62,6 @@ function candidates(horses: TicketHorse[]) {
     if (new Set([first.number, second.number, third.number]).size < 3) continue;
     const probability = first.first * second.second / Math.max(1 - first.second, 1e-12)
       * third.third / Math.max(1 - first.third - second.third, 1e-12);
-    add(values.三連単, [first.number, second.number, third.number], probability);
     add(values.三連複, [first.number, second.number, third.number].sort((a, b) => a - b), probability);
     add(values.ワイド, [first.number, second.number].sort((a, b) => a - b), probability);
     add(values.ワイド, [first.number, third.number].sort((a, b) => a - b), probability);
