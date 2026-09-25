@@ -536,6 +536,56 @@ function RaceScreen({
   );
 }
 
+const venueTraits: Record<string, string> = {
+  札幌: "小回りで直線は短め。平坦で、器用さと好位で運ぶ力が重要。",
+  函館: "小回り・直線短め。コーナーで動ける機動力と持続力を重視。",
+  福島: "小回りで高低差があり、早めに動ける持続力とコーナー適性が鍵。",
+  新潟: "広いコース。外回りは長い直線、内回りは位置取りと持続力が重要。",
+  東京: "直線が長く坂もある。末脚の持続力と直線での加速力を重視。",
+  中山: "小回りで起伏が大きい。器用さ、位置取り、急坂をこなす力が重要。",
+  中京: "左回りで直線に坂がある。持続力と坂を越えて伸びる力を重視。",
+  京都: "3〜4コーナーの坂が特徴。下りから加速し、脚を長く使える馬が有利。",
+  阪神: "直線に坂がある。外回りは末脚、内回りは位置取りと持続力を重視。",
+  小倉: "小回りで平坦。先行力、コーナー加速、ロスなく運ぶ器用さが重要。",
+};
+
+function courseGuide(race: Analysis["race"]) {
+  const venue = Object.keys(venueTraits).find((name) => race.title.includes(name));
+  const distance = +(race.course.match(/(\d{3,4})m/)?.[1] || 0);
+  const distanceTrait = distance <= 1200
+    ? "短距離：序盤の加速、先行力、スピードの持続が中心。"
+    : distance <= 1400
+      ? "1400m前後：短距離の速さに加え、折り合いと終盤の持続力も必要。"
+      : distance <= 1600
+        ? "マイル：位置取り、折り合い、直線の加速力のバランスが重要。"
+        : distance <= 1800
+          ? "1800m前後：コーナー運びと折り合い、長く脚を使う力を重視。"
+          : distance <= 2000
+            ? "2000m前後：先行力・持続力・スタミナの総合力が問われる。"
+            : distance <= 2400
+              ? "中長距離：折り合い、スタミナ、仕掛けどころへの対応が重要。"
+              : "長距離：スタミナと折り合いを最優先。瞬発力だけでなく持続力が必要。";
+  const layout = [
+    race.course.includes("左") ? "左回り" : race.course.includes("右") ? "右回り" : "",
+    race.course.includes("外") ? "外回り" : race.course.includes("内") ? "内回り" : "",
+    race.course.startsWith("芝") ? "芝" : race.course.startsWith("ダート") ? "ダート" : "",
+  ].filter(Boolean).join("・");
+  return {
+    venue: venue || "コース",
+    venueTrait: venue ? venueTraits[venue] : "当日のコース形状と脚質の相性を比較。",
+    distanceTrait,
+    layout: `${layout || race.course}。馬場は${race.condition || "未発表"}。`,
+  };
+}
+
+function visibleMark(mark: string | undefined) {
+  return mark === "消" ? "・" : mark || "・";
+}
+
+function visibleVerdict(verdict: string | undefined) {
+  return verdict === "見送り" ? "候補" : verdict || "候補";
+}
+
 function AnalysisScreen({
   data,
   activeHorse,
@@ -550,6 +600,7 @@ function AnalysisScreen({
   onHorse: (horse: Horse) => void;
 }) {
   const top3 = data.review?.finishers.slice(0, 3) ?? [];
+  const guide = courseGuide(data.race);
   return (
     <>
       {data.model && (
@@ -599,7 +650,7 @@ function AnalysisScreen({
                   <p className="mt-2 text-xs text-slate-400">
                     予想{" "}
                     <span className="font-bold text-white">
-                      {predicted?.mark ?? "－"}
+                      {visibleMark(predicted?.mark)}
                     </span>
                     ・{predicted?.score ?? "－"}pt
                   </p>
@@ -710,6 +761,29 @@ function AnalysisScreen({
           </Card>
         </div>
       </section>
+      <section className="mb-5 rounded-2xl border border-cyan-400/20 bg-[#0c192a] p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold tracking-widest text-cyan-300">COURSE GUIDE</p>
+            <h2 className="mt-1 text-lg font-bold">{guide.venue}・この条件の特徴</h2>
+          </div>
+          <Badge className="bg-cyan-400/10 text-cyan-300">予想の前提</Badge>
+        </div>
+        <div className="mt-4 grid gap-2 md:grid-cols-3">
+          <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
+            <p className="text-xs font-semibold text-amber-300">競馬場</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{guide.venueTrait}</p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
+            <p className="text-xs font-semibold text-emerald-300">距離</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{guide.distanceTrait}</p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
+            <p className="text-xs font-semibold text-violet-300">今回の条件</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{guide.layout}</p>
+          </div>
+        </div>
+      </section>
       <Tabs defaultValue="ranking" onSwipeBack={onBack}>
         <TabsList className="mb-4 grid h-auto min-h-11 w-full grid-cols-4 bg-[#0c192a]">
           <TabsTrigger value="ranking" className="px-1 text-xs sm:text-sm">
@@ -744,10 +818,10 @@ function AnalysisScreen({
                     </span>
                     <div className="min-w-0">
                       <p className="truncate font-semibold">
-                        {horse.mark} {horse.name}
+                        {visibleMark(horse.mark)} {horse.name}
                       </p>
                       <p className="truncate text-xs text-slate-500">
-                        {horse.style}・{horse.verdict}
+                        {horse.style}・{visibleVerdict(horse.verdict)}
                         <span className="hidden sm:inline">
                           　履歴 {horse.historySamples ?? 0}走 / 補正{" "}
                           {horse.historyAdjustment &&
@@ -1050,7 +1124,7 @@ function HorseDetails({ horse, horses }: { horse: Horse; horses: Horse[] }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-lg font-bold sm:text-xl">
-            {horse.mark} {horse.number} {horse.name}
+            {visibleMark(horse.mark)} {horse.number} {horse.name}
           </p>
           <p className="mt-1 text-xs text-slate-400">
             {horse.gate}枠・{horse.popularity > 0 ? `${horse.popularity}人気` : "人気未発表"}・単勝{" "}
