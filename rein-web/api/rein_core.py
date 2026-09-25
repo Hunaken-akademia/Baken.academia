@@ -305,6 +305,19 @@ class ReinRuntime:
             second_output[:, int(self.second_joint_schema["second_class_index"])], 1e-12, None
         )
         normalized = {role: values / values.sum() for role, values in role_values.items()}
+        contribution_frames = {
+            "first": (self.models["first"].predict(frame, pred_contrib=True), list(frame.columns)),
+            "third": (self.models["third"].predict(third_frame, pred_contrib=True), list(third_frame.columns)),
+        }
+        second_contribution = self.second_joint_model.predict(second_frame, pred_contrib=True)
+        if second_contribution.ndim == 3:
+            second_contribution = second_contribution[:, int(self.second_joint_schema["second_class_index"]), :]
+        contribution_frames["second"] = (second_contribution, list(second_frame.columns))
+        def local_reasons(role, index):
+            values, columns = contribution_frames[role]
+            row = np.asarray(values[index])[:-1]
+            order = np.argsort(np.abs(row))[::-1][:5]
+            return [{"feature": columns[int(i)], "contribution": float(row[int(i)])} for i in order if np.isfinite(row[int(i)])]
         output = []
         for index, runner in enumerate(runners):
             output.append({
@@ -312,5 +325,8 @@ class ReinRuntime:
                 "first_probability": float(normalized["first"][index]),
                 "second_probability": float(normalized["second"][index]),
                 "third_probability": float(normalized["third"][index]),
+                "first_reasons": local_reasons("first", index),
+                "second_reasons": local_reasons("second", index),
+                "third_reasons": local_reasons("third", index),
             })
         return {"version": self.version, "feature_count": len(frame.columns), "runners": output}
