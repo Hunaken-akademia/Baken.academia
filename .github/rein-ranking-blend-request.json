@@ -1,5 +1,6 @@
 {
-  "requested_at": "2026-09-25T19:31:00+09:00",
+  "requested_at": "2026-09-25T19:40:00+09:00",
   "scope": "JRA popularity REIN blend validation for overall ranking and role top5 accuracy",
-  "production_change": false
+  "production_change": false,
+  "retry_reason": "use durable Supabase JRA archive because GitHub artifact expired"
 }
