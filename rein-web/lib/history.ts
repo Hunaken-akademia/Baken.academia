@@ -42,7 +42,16 @@ export type HistoryScore = {
   samples: number;
   reasons: string[];
   risks: string[];
-  components: { label: string; samples: number; signal: number }[];
+  components: {
+    label: string;
+    samples: number;
+    signal: number;
+    wins: number;
+    top3: number;
+    winRate: number;
+    top3Rate: number;
+    averageFinish: number;
+  }[];
 };
 
 let cached: Promise<HistoryBundle> | undefined;
@@ -62,6 +71,18 @@ function rateSignal(rate: Rate): number {
   return Math.tanh(lift) * confidence;
 }
 
+function rateDetails(rate: Rate) {
+  const wins = Math.max(0, Math.round(rate.w * (rate.n + 20) - 1.5));
+  const top3 = Math.max(0, Math.round(rate.t * (rate.n + 20) - 4.5));
+  return {
+    wins,
+    top3,
+    winRate: rate.n ? Math.round((wins / rate.n) * 1000) / 10 : 0,
+    top3Rate: rate.n ? Math.round((top3 / rate.n) * 1000) / 10 : 0,
+    averageFinish: rate.f,
+  };
+}
+
 export function scoreHistory(bundle: HistoryBundle, input: HistoryInput): HistoryScore {
   const horse = cleanId(input.horseId);
   const jockey = cleanId(input.jockeyId);
@@ -77,7 +98,14 @@ export function scoreHistory(bundle: HistoryBundle, input: HistoryInput): Histor
     ["厩舎傾向", 0.06, bundle.trainer[trainer]],
   ];
   const components = candidates.flatMap(([label, weight, rate]) =>
-    rate ? [{ label, samples: rate.n, signal: rateSignal(rate) * weight }] : [],
+    rate
+      ? [{
+          label,
+          samples: rate.n,
+          signal: rateSignal(rate) * weight,
+          ...rateDetails(rate),
+        }]
+      : [],
   );
   const availableWeight = candidates.reduce((sum, [, weight, rate]) => sum + (rate ? weight : 0), 0);
   const combined = components.reduce((sum, part) => sum + part.signal, 0) / Math.max(availableWeight, 0.25);
