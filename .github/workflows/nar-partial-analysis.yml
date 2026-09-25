@@ -1,0 +1,102 @@
+name: NAR rolling partial analysis
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/nar-partial-analysis-request.json
+      - .github/workflows/nar-partial-analysis.yml
+      - scripts/nar_partial_analysis.py
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: nar-rolling-partial-analysis-v1
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Download every completed NAR archive currently in Supabase
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p .nar-archives .nar-dataset
+
+          token_response="$(curl --fail-with-body --silent --show-error --retry 3 \
+            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=rein-supabase-archive-v1")"
+          oidc_token="$(jq -er '.value' <<<"${token_response}")"
+
+          python scripts/plan_nar_resume.py >/tmp/nar-plan.log
+          python - <<'PY' > /tmp/nar-periods.txt
+          from scripts.plan_nar_resume import build_periods
+          for p in build_periods():
+              print(f"{p['year']} {p['period']}")
+          PY
+
+          completed=0
+          while read -r year period; do
+            path="nar/archive/all-bets/v1/${year}/${period}.tar.gz"
+            payload="$(jq -nc --arg path "${path}" '{action:"exists",path:$path}')"
+            response="$(curl --fail-with-body --silent --show-error --retry 3 \
+              -X POST "${SUPABASE_BROKER_URL}" \
+              -H "Authorization: Bearer ${oidc_token}" \
+              -H "Content-Type: application/json" \
+              --data "${payload}")"
+            exists="$(jq -r '.exists // false' <<<"${response}")"
+            if [[ "${exists}" != "true" ]]; then
+              continue
+            fi
+
+            payload="$(jq -nc --arg path "${path}" '{action:"sign-download",path:$path}')"
+            response="$(curl --fail-with-body --silent --show-error --retry 3 \
+              -X POST "${SUPABASE_BROKER_URL}" \
+              -H "Authorization: Bearer ${oidc_token}" \
+              -H "Content-Type: application/json" \
+              --data "${payload}")"
+            signed_url="$(jq -er '.signed_url' <<<"${response}")"
+            archive=".nar-archives/${period}.tar.gz"
+            curl --fail-with-body --silent --show-error --retry 3 "${signed_url}" -o "${archive}"
+            tar --no-same-owner -xzf "${archive}" -C .nar-dataset
+            completed=$((completed + 1))
+          done < /tmp/nar-periods.txt
+
+          echo "Completed NAR chunks downloaded: ${completed}"
+          test "${completed}" -gt 0
+
+      - name: Analyze acquired NAR data
+        run: >-
+          python scripts/nar_partial_analysis.py
+          --input-dir .nar-dataset
+          --output-dir artifacts/nar-partial-analysis
+
+      - name: Publish summary
+        shell: bash
+        run: cat artifacts/nar-partial-analysis/summary.md >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Remove temporary combined parquet before artifact upload
+        run: rm -f artifacts/nar-partial-analysis/nar-partial-combined.parquet
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nar-partial-analysis-v1
+          path: artifacts/nar-partial-analysis
+          if-no-files-found: error
+          retention-days: 90
