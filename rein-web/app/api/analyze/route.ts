@@ -642,6 +642,8 @@ async function analyze(request: NextRequest) {
           weight_carried: horse.weightCarried || null,
           horse_weight: horse.weight || null,
           horse_weight_change: horse.weightChange,
+          popularity: horse.popularity,
+          win_odds: horse.odds,
         })),
       };
       const modelCacheKey = `role:${ROLE_CACHE_VERSION}:${createHash("sha256")
@@ -650,11 +652,18 @@ async function analyze(request: NextRequest) {
       type RoleScore = {
         version?: string;
         feature_count?: number;
+        market_difference_ready?: boolean;
         runners?: Array<{
           horse_number: number;
           first_probability: number;
           second_probability: number;
           third_probability: number;
+          market_first_probability?: number | null;
+          market_second_probability?: number | null;
+          market_third_probability?: number | null;
+          rein_market_first_probability?: number | null;
+          rein_market_second_probability?: number | null;
+          rein_market_third_probability?: number | null;
           first_reasons?: Array<{ feature: string; contribution: number }>;
           second_reasons?: Array<{ feature: string; contribution: number }>;
           third_reasons?: Array<{ feature: string; contribution: number }>;
