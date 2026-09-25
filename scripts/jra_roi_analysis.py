@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import os
 from pathlib import Path
 import lightgbm as lgb
 import numpy as np
@@ -445,4 +446,62 @@ def main():
     (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2,allow_nan=False))
     checked.to_parquet(out/"tickets-with-payouts.parquet",index=False)
     print(json.dumps(report,ensure_ascii=False))
-if __name__=="__main__": main()
+
+def real_odds_ticket_audit():
+    from rein_ticket_research_v4 import candidates
+    root=Path(".real-odds-model")
+    raw=pd.read_parquet("data/raw/jra/races-2019-2026.parquet")
+    raw["race_id"]=raw["race_id"].astype(str); raw["race_date"]=pd.to_datetime(raw["race_date"])
+    payouts=load_many(list(Path(".odds-normalized/payouts").glob("*.parquet")))
+    bet_types=("win","place","bracket_quinella","quinella","wide","exacta","trio")
+    caps={"win":(1,1,1),"place":(1,1,2),"bracket_quinella":(3,4,5),"quinella":(5,6,8),"wide":(4,5,7),"exacta":(8,10,12),"trio":(10,12,15)}
+    def runners(model):
+        parts=[]
+        for role in ("first","second","third"):
+            p=pd.read_parquet(root/role/"predictions.parquet")
+            p["race_id"]=p["race_id"].astype(str)
+            parts.append(p[["race_id","horse_number",model]].rename(columns={model:role}))
+        x=parts[0]
+        for p in parts[1:]: x=x.merge(p,on=["race_id","horse_number"],validate="one_to_one")
+        meta=raw[["race_id","horse_number","gate","race_date"]].copy()
+        meta["horse_number"]=pd.to_numeric(meta["horse_number"],errors="coerce")
+        return x.merge(meta,on=["race_id","horse_number"],validate="one_to_one").dropna(subset=["gate"])
+    def one_race(g):
+        z=g.copy();z["win_probability"]=z["first"];z["popularity"]=1
+        for role in ("first","second","third"):z[f"v4_{role}_probability"]=z[role]
+        frames=candidates(z,(0.,0.,1.));out=[]
+        for bt in bet_types:
+            left=frames[bt].sort_values("probability",ascending=False)
+            for label,n in zip(("main","counter","longshot"),caps[bt]):
+                pick=left.head(n).copy();pick["ticket_type"]=label;pick["bet_type"]=bt;out.append(pick)
+                left=left.loc[~left["selection"].isin(pick["selection"])]
+        q=pd.concat(out,ignore_index=True);q["race_id"]=g["race_id"].iloc[0];q["race_date"]=g["race_date"].iloc[0]
+        return q
+    def all_tickets(r,ids):
+        return pd.concat([one_race(g) for _,g in r.loc[r.race_id.isin(ids)].groupby("race_id",observed=True,sort=False) if len(g)>=4],ignore_index=True)
+    report={"scope":"real final odds + REIN role models; trifecta excluded; 100 yen per ticket; production unchanged","periods":{}}
+    rs={"market":runners("real_odds_market"),"rein":runners("real_odds_without_people")}
+    for period,lo,hi in (("confirmation_2025H2","2025-07-01","2025-12-31"),("audit_2026","2026-01-01","2026-12-31")):
+        ids=set(raw.loc[raw.race_date.between(lo,hi),"race_id"]) & set(rs["market"].race_id) & set(rs["rein"].race_id)
+        report["periods"][period]={}
+        for name,r in rs.items():
+            metrics,_=ticket_roi(all_tickets(r,ids),payouts)
+            report["periods"][period][name]={bt:metrics[bt] for bt in bet_types}
+    report["comparison"]={}
+    for bt in bet_types:
+        report["comparison"][bt]={}
+        for group in ("main","combined"):
+            report["comparison"][bt][group]={}
+            for period in report["periods"]:
+                m=report["periods"][period]["market"][bt][group];r=report["periods"][period]["rein"][bt][group]
+                report["comparison"][bt][group][period]={"market":m,"rein":r,
+                    "hit_change_pp":100*(r["race_hit_rate"]-m["race_hit_rate"]),
+                    "return_change_pp":100*(r["return_rate"]-m["return_rate"])}
+    out=Path("reports/rein-real-odds-ticket-audit");out.mkdir(parents=True,exist_ok=True)
+    (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2,allow_nan=False))
+    print(json.dumps({"real_odds_ticket_audit":"complete"},ensure_ascii=False))
+
+if __name__=="__main__":
+    if os.environ.get("REIN_REAL_ODDS_TICKET_AUDIT")=="1": real_odds_ticket_audit()
+    else: main()
+
