@@ -113,6 +113,7 @@ class ReinRuntime:
     models: dict[str, lgb.Booster]
     second_joint_schema: dict[str, Any]
     second_joint_model: lgb.Booster
+    market_models: dict[str, dict[str, lgb.Booster]] | None
     version: str
 
     @classmethod
@@ -129,12 +130,23 @@ class ReinRuntime:
             second_joint_model = lgb.Booster(model_str=model_file.read())
         if second_joint_model.num_feature() != len(second_joint_schema["feature_order"]):
             raise RuntimeError("REIN second-place model schema mismatch")
+        market_root = root / "market_models"
+        market_models = None
+        if market_root.is_dir():
+            market_models = {
+                role: {
+                    "market": lgb.Booster(model_file=str(market_root / f"{role}_market.txt")),
+                    "rein": lgb.Booster(model_file=str(market_root / f"{role}_rein.txt")),
+                }
+                for role in ("first", "second", "third")
+            }
         return cls(
             history=history,
             schema=schema,
             models=models,
             second_joint_schema=second_joint_schema,
             second_joint_model=second_joint_model,
+            market_models=market_models,
             version=f"{version}+{second_joint_schema['version']}",
         )
 
