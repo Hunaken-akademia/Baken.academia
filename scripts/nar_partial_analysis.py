@@ -13,25 +13,89 @@ def _pct(v: float) -> float:
     return round(float(v), 6)
 
 
+def _market_data_quality(frame: pd.DataFrame) -> dict[str, float | int]:
+    popularity = pd.to_numeric(frame.get("popularity"), errors="coerce")
+    win_odds = pd.to_numeric(frame.get("win_odds"), errors="coerce")
+    gate = pd.to_numeric(frame.get("gate"), errors="coerce")
+    horse_number = pd.to_numeric(frame.get("horse_number"), errors="coerce")
+
+    popularity_gate = popularity.notna() & gate.notna()
+    odds_horse = win_odds.notna() & horse_number.notna()
+    pop1_per_race = frame.assign(_popularity=popularity).groupby(
+        "race_id", observed=True
+    )["_popularity"].apply(lambda values: int(values.eq(1).sum()))
+
+    return {
+        "rows_with_popularity": int(popularity.notna().sum()),
+        "rows_with_win_odds": int(win_odds.notna().sum()),
+        "races_with_exactly_one_favorite": int(pop1_per_race.eq(1).sum()),
+        "popularity_equals_gate_rate": _pct(
+            popularity.loc[popularity_gate].eq(gate.loc[popularity_gate]).mean()
+        ) if popularity_gate.any() else 0.0,
+        "win_odds_equals_horse_number_rate": _pct(
+            win_odds.loc[odds_horse].eq(horse_number.loc[odds_horse]).mean()
+        ) if odds_horse.any() else 0.0,
+    }
+
+
+def _validate_market_columns(frame: pd.DataFrame) -> dict[str, float | int]:
+    quality = _market_data_quality(frame)
+    if (
+        quality["rows_with_popularity"] >= 100
+        and quality["popularity_equals_gate_rate"] >= 0.8
+    ):
+        raise ValueError(
+            "NAR popularity is almost identical to gate; reject likely CSS-column "
+            "misparse before publishing analysis"
+        )
+    if (
+        quality["rows_with_win_odds"] >= 100
+        and quality["win_odds_equals_horse_number_rate"] >= 0.8
+    ):
+        raise ValueError(
+            "NAR win_odds is almost identical to horse_number; reject likely "
+            "CSS-column misparse before publishing analysis"
+        )
+    return quality
+
+
 def _race_level_market(frame: pd.DataFrame) -> dict[str, float | int]:
     valid = frame.loc[frame["finish_position"].notna() & frame["popularity"].notna()].copy()
-    races = valid.groupby("race_id", observed=True)
-    total = valid["race_id"].nunique()
+    valid["finish_position"] = pd.to_numeric(valid["finish_position"], errors="coerce")
+    valid["popularity"] = pd.to_numeric(valid["popularity"], errors="coerce")
+    by_race = valid.groupby("race_id", observed=True)
+    eligible = by_race.apply(
+        lambda race: bool(
+            race["finish_position"].eq(1).any()
+            and race["popularity"].eq(1).sum() == 1
+        ),
+        include_groups=False,
+    )
+    race_ids = eligible.index[eligible]
+    valid = valid.loc[valid["race_id"].isin(race_ids)]
+    total = len(race_ids)
     if total == 0:
         return {"races": 0}
 
     top1 = valid.loc[valid["popularity"].eq(1)]
-    top1_by_race = top1.groupby("race_id", observed=True)
     top3 = valid.loc[valid["popularity"].between(1, 3)]
-    top3_by_race = top3.groupby("race_id", observed=True)
-
-    winner_in_top3 = top3.groupby("race_id", observed=True)["finish_position"].apply(lambda s: bool((s == 1).any()))
-    placed_count = top3.groupby("race_id", observed=True)["finish_position"].apply(lambda s: int(s.between(1, 3).sum()))
+    top1_win = top1.groupby("race_id", observed=True)["finish_position"].apply(
+        lambda values: bool(values.eq(1).any())
+    ).reindex(race_ids, fill_value=False)
+    top1_placed = top1.groupby("race_id", observed=True)["finish_position"].apply(
+        lambda values: bool(values.between(1, 3).any())
+    ).reindex(race_ids, fill_value=False)
+    winner_in_top3 = top3.groupby("race_id", observed=True)["finish_position"].apply(
+        lambda values: bool(values.eq(1).any())
+    ).reindex(race_ids, fill_value=False)
+    placed_count = top3.groupby("race_id", observed=True)["finish_position"].apply(
+        lambda values: int(values.between(1, 3).sum())
+    ).reindex(race_ids, fill_value=0)
 
     return {
         "races": int(total),
-        "pop1_win_rate": _pct(top1_by_race["finish_position"].apply(lambda s: bool((s == 1).any())).mean()),
-        "pop1_top3_rate": _pct(top1_by_race["finish_position"].apply(lambda s: bool(s.between(1, 3).any())).mean()),
+        "pop1_win_rate": _pct(top1_win.mean()),
+        "pop1_top3_rate": _pct(top1_placed.mean()),
         "top3_contains_winner_rate": _pct(winner_in_top3.mean()),
         "top3_two_or_more_placed_rate": _pct((placed_count >= 2).mean()),
         "top3_all_placed_rate": _pct((placed_count >= 3).mean()),
@@ -122,6 +186,9 @@ def build_report(input_dir: Path, output_dir: Path) -> dict[str, object]:
     df = pd.concat(frames, ignore_index=True)
     df["race_date"] = pd.to_datetime(df["race_date"], errors="coerce")
     df = df.sort_values(["race_date", "race_id", "horse_number"]).drop_duplicates(["race_id", "horse_id"])
+    for column in ("finish_position", "popularity", "win_odds", "gate", "horse_number"):
+        df[column] = pd.to_numeric(df[column], errors="coerce")
+    data_quality = _validate_market_columns(df)
     df["distance_bucket"] = (pd.to_numeric(df["distance_m"], errors="coerce") // 200 * 200).astype("Int64")
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -142,6 +209,7 @@ def build_report(input_dir: Path, output_dir: Path) -> dict[str, object]:
             "horses": int(df["horse_id"].nunique()),
             "racecourses": int(df["racecourse"].nunique()),
         },
+        "data_quality": data_quality,
         "market_baseline": _race_level_market(df),
         "by_popularity": _by_popularity(df),
         "by_racecourse": _market_by_group(df, ["racecourse"], min_races=50),
@@ -175,6 +243,8 @@ def build_report(input_dir: Path, output_dir: Path) -> dict[str, object]:
         f"- レース数: {c['races']:,}",
         f"- 出走行数: {c['runners']:,}",
         f"- 競馬場数: {c['racecourses']}",
+        f"- 人気列検証（人気＝枠の一致率）: {report['data_quality']['popularity_equals_gate_rate']:.2%}",
+        f"- オッズ列検証（単勝＝馬番の一致率）: {report['data_quality']['win_odds_equals_horse_number_rate']:.2%}",
         "",
         "## 人気順ベースライン",
         "",

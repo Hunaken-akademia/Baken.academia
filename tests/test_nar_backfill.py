@@ -25,6 +25,16 @@ class NarBackfillTest(unittest.TestCase):
         self.assertEqual(row["race_id"], "20190101-NAR-3-01")
         self.assertEqual(row["distance_m"], 1400)
         self.assertEqual(row["horse_weight_change"], 2)
+        self.assertEqual(row["gate"], 2)
+        self.assertEqual(row["horse_number"], 3)
+        self.assertEqual(row["affiliation"], "北海道")
+        self.assertEqual(row["sex"], "牡")
+        self.assertEqual(row["age"], 4)
+        self.assertEqual(row["weight_carried"], 56.0)
+        self.assertEqual(row["finish_time"], "1:25.0")
+        self.assertEqual(row["last_3f"], 38.1)
+        self.assertEqual(row["popularity"], 2)
+        self.assertEqual(row["win_odds"], 3.4)
 
     def test_all_odds_urls(self):
         url = "https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?k_raceDate=2019%2F01%2F01&k_raceNo=1&k_babaCode=3"

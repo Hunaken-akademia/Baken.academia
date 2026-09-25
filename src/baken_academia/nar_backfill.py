@@ -34,6 +34,18 @@ def _first(node, xpath):
     return values[0] if values else None
 
 
+def _has_class(class_name: str) -> str:
+    """Return an XPath predicate that matches one complete HTML class token."""
+    return (
+        "contains(concat(' ', normalize-space(@class), ' '), "
+        f"' {class_name} ')"
+    )
+
+
+def _cell(row, class_name: str):
+    return _first(row, f"./td[{_has_class(class_name)}]")
+
+
 def _int(value):
     matched = re.search(r"-?\d+", (value or "").replace(",", ""))
     return int(matched.group()) if matched else None
@@ -112,14 +124,17 @@ def parse_odds_cells(payload: bytes, race_id: str, bet_type: str, source_url: st
 
 def _payouts(doc):
     result, current = [], ""
-    for table in doc.xpath("//section[contains(@class,'newRefundTable')]//table"):
+    for table in doc.xpath(f"//section[{_has_class('newRefundTable')}]//table"):
         for row in table.xpath(".//tr"):
-            current = _text(_first(row, "./td[contains(@class,'title')]")) or current
-            combination = _text(_first(row, "./td[contains(@class,'a') or contains(@class,'d')]"))
-            money = _int(_text(_first(row, "./td[contains(@class,'refundMoney')]")))
+            current = _text(_cell(row, "title")) or current
+            combination = _text(_first(
+                row,
+                f"./td[{_has_class('a')} or {_has_class('d')}]",
+            ))
+            money = _int(_text(_cell(row, "refundMoney")))
             if current and combination and money is not None:
                 result.append({"bet_type": current, "combination": combination, "payout_yen": money,
-                               "popularity": _int(_text(_first(row, "./td[contains(@class,'c')]")))})
+                               "popularity": _int(_text(_cell(row, "c")))})
     return result
 
 
@@ -134,27 +149,27 @@ def parse_result_page(payload: bytes, source_url: str) -> list[dict[str, object]
     race_no = int(race_no)
     baba_code = _query(source_url, "k_babaCode")
     race_id = f"{race_date.replace('-', '')}-NAR-{baba_code}-{race_no:02d}"
-    title = _first(doc, "//section[contains(@class,'raceTitle')]")
-    conditions = _text(_first(title, ".//ul[contains(@class,'dataArea')]/li[1]"))
+    title = _first(doc, f"//section[{_has_class('raceTitle')}]")
+    conditions = _text(_first(title, f".//ul[{_has_class('dataArea')}]/li[1]"))
     distance_match = re.search(r"(\d+)\s*ｍ", conditions)
     direction_match = re.search(r"ｍ（([^）]+)）", conditions)
     weather_match = re.search(r"天候[：:]\s*([^\s]+)", conditions)
     going_match = re.search(r"馬場[：:]\s*([^\s]+)", conditions)
     payout_json = json.dumps(_payouts(doc), ensure_ascii=False)
     rows = []
-    table = _first(doc, "//section[contains(@class,'gradeTable')]/table")
+    table = _first(doc, f"//section[{_has_class('gradeTable')}]/table")
     if table is None:
         return rows
     for runner in table.xpath(".//tr[td]"):
-        horse = _first(runner, "./td[contains(@class,'horseName')]//a")
+        horse = _first(runner, f"./td[{_has_class('horseName')}]//a")
         if horse is None:
             continue
-        jockey = _first(runner, "./td[contains(@class,'jockeyName')]//a")
-        trainer = _first(runner, ".//a[contains(@class,'trainerName')]")
-        sex_age = re.search(r"(せん|牡|牝)\s*(\d+)", _text(_first(runner, "./td[contains(@class,'f')]")))
-        weight_text = _text(_first(runner, "./td[contains(@class,'horseWeight') ]"))
+        jockey = _first(runner, f"./td[{_has_class('jockeyName')}]//a")
+        trainer = _first(runner, f".//a[{_has_class('trainerName')}]")
+        sex_age = re.search(r"(せん|牡|牝)\s*(\d+)", _text(_cell(runner, "f")))
+        weight_text = _text(_cell(runner, "horseWeight"))
         weight = re.search(r"(\d+)\s*\(([+-]?\d+)\)", weight_text)
-        finish = _text(_first(runner, "./td[contains(@class,'a')]"))
+        finish = _text(_cell(runner, "a"))
         rows.append({
             "race_id": race_id, "race_date": race_date, "race_no": race_no,
             "racecourse": racecourse.replace(" ", ""), "baba_code": baba_code,
@@ -166,23 +181,23 @@ def parse_result_page(payload: bytes, source_url: str) -> list[dict[str, object]
             "going": going_match.group(1) if going_match else None,
             "race_conditions": conditions,
             "finish_position": _int(finish) if finish.isdigit() else None, "finish_status": finish,
-            "gate": _int(_text(_first(runner, "./td[contains(@class,'b')]"))),
-            "horse_number": _int(_text(_first(runner, "./td[contains(@class,'c')]"))),
+            "gate": _int(_text(_cell(runner, "b"))),
+            "horse_number": _int(_text(_cell(runner, "c"))),
             "horse_id": _query(horse.get("href"), "k_lineageLoginCode"), "horse_name": _text(horse),
-            "affiliation": _text(_first(runner, "./td[contains(@class,'e')]")) or None,
+            "affiliation": _text(_cell(runner, "e")) or None,
             "sex": sex_age.group(1) if sex_age else None, "age": int(sex_age.group(2)) if sex_age else None,
-            "weight_carried": _float(_text(_first(runner, "./td[contains(@class,'g')]"))),
+            "weight_carried": _float(_text(_cell(runner, "g"))),
             "jockey_id": _query(jockey.get("href") if jockey is not None else None, "k_riderLicenseNo"),
             "jockey_name": _text(jockey).split("（")[0].strip() if jockey is not None else None,
             "trainer_id": _query(trainer.get("href") if trainer is not None else None, "k_trainerLicenseNo"),
             "trainer_name": _text(trainer) or None,
             "horse_weight": int(weight.group(1)) if weight else _int(weight_text),
             "horse_weight_change": int(weight.group(2)) if weight else None,
-            "finish_time": _text(_first(runner, "./td[contains(@class,'k')]")) or None,
-            "margin": _text(_first(runner, "./td[contains(@class,'l')]")) or None,
-            "last_3f": _float(_text(_first(runner, "./td[contains(@class,'m')]"))),
-            "popularity": _int(_text(_first(runner, "./td[contains(@class,'o')]"))),
-            "win_odds": _float(_text(_first(runner, "./td[contains(@class,'p')]"))),
+            "finish_time": _text(_cell(runner, "k")) or None,
+            "margin": _text(_cell(runner, "l")) or None,
+            "last_3f": _float(_text(_cell(runner, "m"))),
+            "popularity": _int(_text(_cell(runner, "o"))),
+            "win_odds": _float(_text(_cell(runner, "p"))),
             "payouts": payout_json, "source": "NAR地方競馬情報サイト", "source_url": source_url,
         })
     return rows

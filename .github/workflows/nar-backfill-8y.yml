@@ -13,6 +13,7 @@ on:
       - tests/test_odds_resume.py
 
 permissions:
+  actions: write
   contents: read
   id-token: write
 
@@ -49,13 +50,13 @@ jobs:
       SUFFIX: ${{ matrix.suffix }}
       PERIOD: ${{ matrix.period }}
       SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
-      ARCHIVE_DATASET: "nar-results-all-bet-types-odds-and-payouts"
+      ARCHIVE_DATASET: "nar-results-all-bet-types-odds-and-payouts-v2"
     steps:
       - uses: actions/checkout@v4
       - id: archive
         name: Skip if verified archive already exists in Supabase
         run: |
-          export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v1/${YEAR}/${PERIOD}.tar.gz"
+          export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v2/${YEAR}/${PERIOD}.tar.gz"
           bash scripts/check_supabase_archive.sh
       - uses: actions/setup-python@v5
         if: steps.archive.outputs.exists != 'true'
@@ -88,5 +89,10 @@ jobs:
         if: steps.archive.outputs.exists != 'true'
         run: |
           export ARCHIVE_FILE="nar-${PERIOD}.tar.gz"
-          export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v1/${YEAR}/${PERIOD}.tar.gz"
+          export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v2/${YEAR}/${PERIOD}.tar.gz"
           bash scripts/upload_archive_to_supabase.sh
+      - name: Request rolling NAR analysis after a new chunk
+        if: steps.archive.outputs.exists != 'true' && success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run nar-partial-analysis.yml --ref main
