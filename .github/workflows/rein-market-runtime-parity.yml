@@ -49,3 +49,5 @@ jobs:
           name: rein-market-runtime-parity
           path: artifacts/runtime-parity
           retention-days: 30
+
+# rerun after runtime category normalization
