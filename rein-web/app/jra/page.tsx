@@ -42,6 +42,9 @@ type Horse = {
   pedigree?: string;
   jockey?: string;
   trainer?: string;
+  age?: number;
+  sex?: string;
+  weightCarried?: number;
   earlyPosition?: number | null;
   recentPositions?: string[];
   paceAdjustment?: number;
@@ -914,6 +917,7 @@ function AnalysisScreen({
           )}
         </TabsContent>
       </Tabs>
+      <DetailedComparison horses={data.horses} />
       <OverallAssessment data={data} insights={insights} onHorse={onHorse} />
     </>
   );
@@ -1140,6 +1144,107 @@ function OverallAssessment({ data, insights, onHorse }: { data: Analysis; insigh
   );
 }
 
+function DetailedComparison({ horses }: { horses: Horse[] }) {
+  const ranked = [...horses].sort((a, b) => b.score - a.score);
+  const roleRank = (
+    horse: Horse,
+    key: "firstSuitability" | "secondSuitability" | "thirdSuitability",
+  ) =>
+    1 + horses.filter((other) => (other[key] ?? 0) > (horse[key] ?? 0)).length;
+  return (
+    <section className="mt-6 overflow-hidden rounded-2xl border border-slate-700 bg-[#0c192a]">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-700 p-4 sm:p-5">
+        <div>
+          <p className="text-xs font-semibold tracking-widest text-cyan-300">FULL COMPARISON</p>
+          <h2 className="mt-1 text-xl font-bold">全頭詳細比較</h2>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            適性ptはレース内相対評価、確率は着順専用モデルの推定値です。
+          </p>
+        </div>
+        <Badge className="bg-white/10 text-slate-300">左右にスクロール</Badge>
+      </div>
+      <div className="overflow-x-auto" data-no-swipe>
+        <table className="min-w-[1180px] w-full border-collapse text-sm">
+          <thead className="bg-black/20 text-xs text-slate-400">
+            <tr>
+              <TableHead sticky>総合</TableHead>
+              <TableHead>馬</TableHead>
+              <TableHead>性齢</TableHead>
+              <TableHead>斤量</TableHead>
+              <TableHead>人気</TableHead>
+              <TableHead>単勝</TableHead>
+              <TableHead>1着適性</TableHead>
+              <TableHead>1着確率</TableHead>
+              <TableHead>2着適性</TableHead>
+              <TableHead>2着確率</TableHead>
+              <TableHead>3着適性</TableHead>
+              <TableHead>3着確率</TableHead>
+              <TableHead>コース</TableHead>
+              <TableHead>近走</TableHead>
+              <TableHead>展開補正</TableHead>
+              <TableHead>履歴補正</TableHead>
+              <TableHead>履歴母数</TableHead>
+            </tr>
+          </thead>
+          <tbody>
+            {ranked.map((horse, index) => {
+              const parameters = horseParameters(horse);
+              return (
+                <tr key={horse.number} className="border-t border-slate-800 hover:bg-white/[.025]">
+                  <TableCell sticky>
+                    <span className="font-black text-cyan-300">{index + 1}位</span>
+                    <span className="ml-1 text-xs text-slate-500">{horse.score}pt</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="mr-2 inline-grid size-7 place-items-center rounded-md bg-white font-bold text-slate-900">{horse.number}</span>
+                    <span className="font-semibold text-slate-100">{horse.name}</span>
+                  </TableCell>
+                  <TableCell>{horse.sex || "－"}{horse.age || "－"}</TableCell>
+                  <TableCell>{horse.weightCarried ? `${horse.weightCarried}kg` : "未取得"}</TableCell>
+                  <TableCell>{horse.popularity > 0 ? `${horse.popularity}人気` : "未発表"}</TableCell>
+                  <TableCell>{horse.odds === null ? "未発表" : `${horse.odds}倍`}</TableCell>
+                  <RoleCell value={horse.firstSuitability ?? 0} rank={roleRank(horse, "firstSuitability")} />
+                  <ProbabilityCell value={horse.firstProbability} />
+                  <RoleCell value={horse.secondSuitability ?? 0} rank={roleRank(horse, "secondSuitability")} />
+                  <ProbabilityCell value={horse.secondProbability} />
+                  <RoleCell value={horse.thirdSuitability ?? 0} rank={roleRank(horse, "thirdSuitability")} />
+                  <ProbabilityCell value={horse.thirdProbability} />
+                  <TableCell>{parameters[3].value}pt</TableCell>
+                  <TableCell>{parameters[4].value}pt</TableCell>
+                  <SignedCell value={horse.paceAdjustment} />
+                  <SignedCell value={horse.historyAdjustment} />
+                  <TableCell>{horse.historySamples ? `${horse.historySamples}走` : "0走"}</TableCell>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function TableHead({ children, sticky = false }: { children: React.ReactNode; sticky?: boolean }) {
+  return <th className={`whitespace-nowrap px-3 py-3 text-left font-semibold ${sticky ? "sticky left-0 z-20 bg-[#091522]" : ""}`}>{children}</th>;
+}
+
+function TableCell({ children, sticky = false }: { children: React.ReactNode; sticky?: boolean }) {
+  return <td className={`whitespace-nowrap px-3 py-3 text-slate-300 ${sticky ? "sticky left-0 z-10 bg-[#0c192a]" : ""}`}>{children}</td>;
+}
+
+function RoleCell({ value, rank }: { value: number; rank: number }) {
+  return <TableCell><span className="font-bold text-slate-100">{value}pt</span><span className="ml-1 text-[11px] text-slate-500">({rank}位)</span></TableCell>;
+}
+
+function ProbabilityCell({ value }: { value: number | undefined }) {
+  return <TableCell>{value === undefined ? "未取得" : `${(value * 100).toFixed(1)}%`}</TableCell>;
+}
+
+function SignedCell({ value }: { value: number | undefined }) {
+  const safe = value ?? 0;
+  return <TableCell><span className={safe > 0 ? "text-cyan-300" : safe < 0 ? "text-rose-300" : "text-slate-400"}>{safe > 0 ? "+" : ""}{safe}</span></TableCell>;
+}
+
 type HorseParameter = {
   label: string;
   value: number;
@@ -1347,6 +1452,11 @@ function ParameterRadar({ horse, horses }: { horse: Horse; horses: Horse[] }) {
 function HorseDetails({ horse, horses }: { horse: Horse; horses: Horse[] }) {
   const signed = (value: number | undefined) =>
     `${value && value > 0 ? "+" : ""}${value ?? 0}`;
+  const parameters = horseParameters(horse);
+  const overallRank =
+    1 + horses.filter((other) => other.score > horse.score).length;
+  const probability = (value: number | undefined) =>
+    value === undefined ? "未取得" : `${(value * 100).toFixed(1)}%`;
   return (
     <div>
       <div className="flex items-start justify-between gap-3">
@@ -1366,12 +1476,34 @@ function HorseDetails({ horse, horses }: { horse: Horse; horses: Horse[] }) {
         </p>
       </div>
       <ParameterRadar horse={horse} horses={horses} />
+      <section className="mt-4 rounded-xl border border-slate-800 bg-black/10 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-slate-200">詳細データ</p>
+            <p className="mt-1 text-xs text-slate-500">モデル出力と当日情報を分けて表示</p>
+          </div>
+          <Badge className="bg-white/10 text-slate-300">総合 {overallRank}位 / {horses.length}頭</Badge>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Metric label="1着推定確率" value={probability(horse.firstProbability)} />
+          <Metric label="2着推定確率" value={probability(horse.secondProbability)} />
+          <Metric label="3着推定確率" value={probability(horse.thirdProbability)} />
+          <Metric label="総合評価" value={`${horse.reinScore ?? horse.score}pt`} />
+          <Metric label="コース評価" value={`${parameters[3].value}pt`} />
+          <Metric label="近走状態" value={`${parameters[4].value}pt`} />
+          <Metric label="市場評価" value={horse.popularity > 0 ? `${horse.marketScore ?? "－"}pt` : "未発表"} />
+          <Metric label="履歴母数" value={`${horse.historySamples ?? 0}走`} />
+        </div>
+      </section>
       <div className="mt-4 grid grid-cols-3 gap-2">
         <Metric label="1着適性" value={`${horse.firstSuitability ?? 0}pt`} />
         <Metric label="2着適性" value={`${horse.secondSuitability ?? 0}pt`} />
         <Metric label="3着適性" value={`${horse.thirdSuitability ?? 0}pt`} />
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Metric label="性齢" value={`${horse.sex || "－"}${horse.age || "－"}`} />
+        <Metric label="負担重量" value={horse.weightCarried ? `${horse.weightCarried}kg` : "未取得"} />
+        <Metric label="枠番" value={horse.gate ? `${horse.gate}枠` : "未取得"} />
         <Metric
           label="脚質"
           value={
