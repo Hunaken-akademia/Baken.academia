@@ -650,6 +650,9 @@ async function analyze(request: NextRequest) {
           first_probability: number;
           second_probability: number;
           third_probability: number;
+          first_reasons?: Array<{ feature: string; contribution: number }>;
+          second_reasons?: Array<{ feature: string; contribution: number }>;
+          third_reasons?: Array<{ feature: string; contribution: number }>;
         }>;
         error?: string;
       };
@@ -719,6 +722,11 @@ async function analyze(request: NextRequest) {
         horse.thirdSuitability = Math.round(
           (100 * role.third_probability) / maxima.third,
         );
+        horse.roleReasons = {
+          first: role.first_reasons || [],
+          second: role.second_reasons || [],
+          third: role.third_reasons || [],
+        };
         const roleStrength =
           0.5 * role.first_probability +
           0.3 * role.second_probability +
