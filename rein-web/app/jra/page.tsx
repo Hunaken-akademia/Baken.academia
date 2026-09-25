@@ -7,9 +7,13 @@ import {
   ArrowLeft,
   ChevronRight,
   Clock3,
+  Database,
   Gauge,
+  Layers3,
   RefreshCw,
   Sparkles,
+  Target,
+  TrendingUp,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -601,6 +605,7 @@ function AnalysisScreen({
 }) {
   const top3 = data.review?.finishers.slice(0, 3) ?? [];
   const guide = courseGuide(data.race);
+  const insights = raceInsights(data);
   return (
     <>
       {data.model && (
@@ -784,6 +789,7 @@ function AnalysisScreen({
           </div>
         </div>
       </section>
+      <RaceIntelligence data={data} insights={insights} />
       <Tabs defaultValue="ranking" onSwipeBack={onBack}>
         <TabsList className="mb-4 grid h-auto min-h-11 w-full grid-cols-4 bg-[#0c192a]">
           <TabsTrigger value="ranking" className="px-1 text-xs sm:text-sm">
@@ -908,7 +914,229 @@ function AnalysisScreen({
           )}
         </TabsContent>
       </Tabs>
+      <OverallAssessment data={data} insights={insights} onHorse={onHorse} />
     </>
+  );
+}
+
+type RaceInsights = {
+  leaders: Horse[];
+  styles: Array<{ label: string; count: number }>;
+  roleLeaders: Array<{ label: string; horse: Horse; value: number }>;
+  courseLeaders: Horse[];
+  scoreGap: number;
+  confidence: string;
+  difficulty: string;
+  oddsCoverage: number;
+  weightCoverage: number;
+  core: Horse[];
+  rivals: Horse[];
+  sleepers: Horse[];
+};
+
+function raceInsights(data: Analysis): RaceInsights {
+  const horses = data.horses;
+  const sorted = [...horses].sort((a, b) => b.score - a.score);
+  const top = sorted[0];
+  const second = sorted[1];
+  const scoreGap = top && second ? Math.max(0, top.score - second.score) : 0;
+  const styleGroups = [
+    { label: "逃げ", match: (style: string) => style.includes("逃") },
+    { label: "先行", match: (style: string) => style.includes("先") || style.includes("好位") },
+    { label: "差し", match: (style: string) => style.includes("差") || style.includes("中団") },
+    { label: "追込", match: (style: string) => style.includes("追") || style.includes("後方") },
+  ];
+  const styles = styleGroups.map(({ label, match }) => ({
+    label,
+    count: horses.filter((horse) => match(horse.style)).length,
+  }));
+  const roleKeys = [
+    { label: "1着適性", key: "firstSuitability" as const },
+    { label: "2着適性", key: "secondSuitability" as const },
+    { label: "3着適性", key: "thirdSuitability" as const },
+  ];
+  const roleLeaders = roleKeys.flatMap(({ label, key }) => {
+    const horse = [...horses].sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0))[0];
+    return horse ? [{ label, horse, value: horse[key] ?? 0 }] : [];
+  });
+  const courseLeaders = [...horses]
+    .sort((a, b) => horseParameters(b)[3].value - horseParameters(a)[3].value)
+    .slice(0, 3);
+  const oddsCoverage = horses.length
+    ? Math.round((horses.filter((horse) => horse.odds !== null).length / horses.length) * 100)
+    : 0;
+  const weightCoverage = horses.length
+    ? Math.round((horses.filter((horse) => Boolean(horse.weight)).length / horses.length) * 100)
+    : 0;
+  const confidence = scoreGap >= 8 ? "上位明確" : scoreGap >= 4 ? "上位やや優勢" : "接戦";
+  const difficulty = scoreGap >= 8 && roleLeaders.filter((item) => item.horse.number === top?.number).length >= 2
+    ? "比較的読みやすい"
+    : scoreGap <= 2
+      ? "混戦"
+      : "標準";
+  const core = sorted.slice(0, 2);
+  const rivals = sorted.slice(2, 5);
+  const sleepers = sorted
+    .filter((horse) => horse.popularity >= 4 || horse.popularity <= 0)
+    .sort((a, b) => {
+      const aRole = Math.max(a.firstSuitability ?? 0, a.secondSuitability ?? 0, a.thirdSuitability ?? 0);
+      const bRole = Math.max(b.firstSuitability ?? 0, b.secondSuitability ?? 0, b.thirdSuitability ?? 0);
+      return bRole + horseParameters(b)[3].value - (aRole + horseParameters(a)[3].value);
+    })
+    .slice(0, 3);
+  return {
+    leaders: data.pace.leaders
+      .map((number) => horses.find((horse) => horse.number === number))
+      .filter((horse): horse is Horse => Boolean(horse)),
+    styles,
+    roleLeaders,
+    courseLeaders,
+    scoreGap,
+    confidence,
+    difficulty,
+    oddsCoverage,
+    weightCoverage,
+    core,
+    rivals,
+    sleepers,
+  };
+}
+
+function RaceIntelligence({ data, insights }: { data: Analysis; insights: RaceInsights }) {
+  return (
+    <section className="mb-5">
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold tracking-widest text-cyan-300">RACE INTELLIGENCE</p>
+          <h2 className="mt-1 text-xl font-bold">レース情報ボード</h2>
+        </div>
+        <Badge className="bg-white/10 text-slate-300">判断材料</Badge>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <InfoPanel icon={<Layers3 className="size-5 text-amber-300" />} title="展開構成">
+          <p className="font-bold text-white">{data.pace.label}</p>
+          <p className="mt-1 text-sm leading-5 text-slate-400">{data.pace.detail}</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {insights.styles.map((style) => (
+              <Badge key={style.label} variant="outline" className="border-slate-700 text-slate-300">
+                {style.label} {style.count}頭
+              </Badge>
+            ))}
+          </div>
+        </InfoPanel>
+        <InfoPanel icon={<TrendingUp className="size-5 text-cyan-300" />} title="前で運ぶ候補">
+          {insights.leaders.length ? insights.leaders.map((horse) => (
+            <HorseLine key={horse.number} horse={horse} suffix={horse.style} />
+          )) : <p className="text-sm text-slate-400">明確な先導役は未確定</p>}
+        </InfoPanel>
+        <InfoPanel icon={<Target className="size-5 text-emerald-300" />} title="着順適性トップ">
+          {insights.roleLeaders.map((item) => (
+            <HorseLine key={item.label} horse={item.horse} prefix={item.label} suffix={`${item.value}pt`} />
+          ))}
+        </InfoPanel>
+        <InfoPanel icon={<Database className="size-5 text-violet-300" />} title="当日データ">
+          <DataCoverage label="オッズ" value={insights.oddsCoverage} />
+          <DataCoverage label="馬体重" value={insights.weightCoverage} />
+          <p className="mt-3 text-xs leading-5 text-slate-500">
+            未発表項目は評価に混ぜず、取得後の再分析で更新します。
+          </p>
+        </InfoPanel>
+      </div>
+    </section>
+  );
+}
+
+function InfoPanel({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-slate-700 bg-[#0c192a] p-4">
+      <div className="mb-3 flex items-center gap-2">
+        {icon}
+        <h3 className="font-semibold text-slate-200">{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function HorseLine({ horse, prefix, suffix }: { horse: Horse; prefix?: string; suffix?: string }) {
+  return (
+    <div className="flex items-center gap-2 border-t border-slate-800 py-2 first:border-t-0 first:pt-0">
+      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-white text-sm font-bold text-slate-900">{horse.number}</span>
+      <div className="min-w-0 flex-1">
+        {prefix ? <p className="text-[11px] text-slate-500">{prefix}</p> : null}
+        <p className="truncate text-sm font-semibold text-slate-200">{horse.name}</p>
+      </div>
+      {suffix ? <span className="shrink-0 text-xs text-cyan-300">{suffix}</span> : null}
+    </div>
+  );
+}
+
+function DataCoverage({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="mb-3 last:mb-0">
+      <div className="mb-1 flex justify-between text-xs"><span className="text-slate-400">{label}</span><span className="text-slate-200">{value}%</span></div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-cyan-400" style={{ width: `${value}%` }} /></div>
+    </div>
+  );
+}
+
+function OverallAssessment({ data, insights, onHorse }: { data: Analysis; insights: RaceInsights; onHorse: (horse: Horse) => void }) {
+  const list = (horses: Horse[], color: string) => (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {horses.map((horse) => (
+        <button key={horse.number} onClick={() => onHorse(horse)} className={`rounded-lg border px-3 py-2 text-left transition hover:-translate-y-0.5 ${color}`}>
+          <span className="mr-2 font-black">{horse.number}</span>
+          <span className="text-sm font-semibold">{horse.name}</span>
+          <span className="ml-2 text-xs opacity-70">{horse.score}pt</span>
+        </button>
+      ))}
+    </div>
+  );
+  return (
+    <section className="mt-6 overflow-hidden rounded-2xl border border-cyan-400/30 bg-gradient-to-br from-[#11304a] via-[#0d2237] to-[#081522]">
+      <div className="border-b border-cyan-400/15 p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold tracking-[.18em] text-cyan-300">OVERALL ASSESSMENT</p>
+            <h2 className="mt-1 text-2xl font-black">総合評価</h2>
+          </div>
+          <div className="flex gap-2">
+            <Badge className="bg-cyan-300 text-[#07111f]">{insights.confidence}</Badge>
+            <Badge className="bg-white/10 text-white">{insights.difficulty}</Badge>
+          </div>
+        </div>
+        <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-300">
+          {data.pace.label}想定。総合1位と2位の差は{insights.scoreGap}ptです。
+          着順適性・コース相性・展開を別々に確認し、順位を固定せず候補を広く表示しています。
+        </p>
+      </div>
+      <div className="grid gap-px bg-cyan-400/10 md:grid-cols-3">
+        <div className="bg-[#0b1b2c] p-5">
+          <p className="text-sm font-bold text-cyan-300">軸候補</p>
+          <p className="mt-1 text-xs text-slate-500">総合評価上位</p>
+          {list(insights.core, "border-cyan-400/30 bg-cyan-400/10 text-cyan-100")}
+        </div>
+        <div className="bg-[#0b1b2c] p-5">
+          <p className="text-sm font-bold text-amber-300">相手候補</p>
+          <p className="mt-1 text-xs text-slate-500">上位争いに加えたい馬</p>
+          {list(insights.rivals, "border-amber-400/25 bg-amber-400/[.07] text-amber-100")}
+        </div>
+        <div className="bg-[#0b1b2c] p-5">
+          <p className="text-sm font-bold text-rose-300">注目候補</p>
+          <p className="mt-1 text-xs text-slate-500">着順適性・コース評価から拾う馬</p>
+          {list(insights.sleepers, "border-rose-400/25 bg-rose-400/[.07] text-rose-100")}
+        </div>
+      </div>
+      <div className="grid gap-3 border-t border-cyan-400/15 p-5 sm:grid-cols-3 sm:p-6">
+        {insights.courseLeaders.map((horse, index) => (
+          <button key={horse.number} onClick={() => onHorse(horse)} className="flex items-center gap-3 rounded-xl border border-slate-700 bg-black/15 p-3 text-left hover:border-cyan-400/40">
+            <span className="text-xs font-bold text-emerald-300">コース適性 {index + 1}位</span>
+            <span className="grid size-7 place-items-center rounded-md bg-white text-sm font-bold text-slate-900">{horse.number}</span>
+            <span className="min-w-0 truncate text-sm font-semibold">{horse.name}</span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
