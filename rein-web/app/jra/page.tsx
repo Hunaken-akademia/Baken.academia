@@ -115,6 +115,7 @@ type Venue = {
   races: Race[];
 };
 type Schedule = { dateLabel: string; updatedAt: string; venues: Venue[] };
+type ScheduleDay = "today" | "tomorrow";
 
 const groupStyle = {
   本線: "bg-sky-100 text-sky-800",
@@ -124,23 +125,24 @@ const groupStyle = {
 
 export default function Home() {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
+  const [scheduleDay, setScheduleDay] = useState<ScheduleDay>("today");
   const [venue, setVenue] = useState<Venue | null>(null);
   const [data, setData] = useState<Analysis | null>(null);
   const [activeHorse, setActiveHorse] = useState<Horse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const danger = useMemo(
-    () => data?.horses.find((h) => h.popularity <= 3 && h.score < 78),
+    () => data?.horses.find((h) => h.popularity > 0 && h.popularity <= 3 && h.score < 78),
     [data],
   );
 
-  async function loadSchedule(background = false) {
+  async function loadSchedule(day: ScheduleDay = scheduleDay, background = false) {
     if (!background) {
       setLoading(true);
       setError("");
     }
     try {
-      const response = await fetch("/api/races");
+      const response = await fetch(`/api/races?day=${day}`);
       const result = (await response.json()) as Schedule & { error?: string };
       if (!response.ok)
         throw new Error(result.error || "開催情報を取得できませんでした");
@@ -168,7 +170,7 @@ export default function Home() {
       setError("");
     }
     try {
-      const response = await fetch(`/api/analyze?raceId=${race.raceId}`);
+      const response = await fetch(`/api/analyze?raceId=${race.raceId}${scheduleDay === "tomorrow" ? "&preview=1" : ""}`);
       const result = (await response.json()) as Analysis & { error?: string };
       if (!response.ok) throw new Error(result.error || "分析できませんでした");
       setData(result);
@@ -182,12 +184,13 @@ export default function Home() {
   }
 
   useEffect(() => {
-    void loadSchedule();
+    void loadSchedule(scheduleDay);
     const refresh = () => {
-      if (document.visibilityState === "visible") void loadSchedule(true);
+      if (document.visibilityState === "visible") void loadSchedule(scheduleDay, true);
     };
     const timer = setInterval(refresh, 300_000);
     const clock = setInterval(() => {
+      if (scheduleDay !== "today") return;
       const update = (item: Venue) =>
         ({ ...item, ...raceProgress(item.races) }) as Venue;
       setSchedule((current) =>
@@ -201,7 +204,7 @@ export default function Home() {
       clearInterval(clock);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, []);
+  }, [scheduleDay]);
 
   useEffect(() => {
     const raceId = data?.race.raceId;
@@ -313,7 +316,7 @@ export default function Home() {
               size="icon"
               onClick={() => {
                 if (data) void analyze({ raceId: data.race.raceId });
-                else void loadSchedule();
+                else void loadSchedule(scheduleDay);
               }}
               disabled={loading}
               className="text-slate-400 hover:bg-white/10 hover:text-white"
@@ -343,12 +346,20 @@ export default function Home() {
         {!venue && !data && (
           <VenueScreen
             schedule={schedule}
+            day={scheduleDay}
             loading={loading}
             onSelect={setVenue}
+            onDay={(day) => {
+              if (day === scheduleDay) return;
+              setSchedule(null);
+              setVenue(null);
+              setData(null);
+              setScheduleDay(day);
+            }}
           />
         )}
         {venue && !data && (
-          <RaceScreen venue={venue} loading={loading} onAnalyze={analyze} />
+          <RaceScreen venue={venue} day={scheduleDay} loading={loading} onAnalyze={analyze} />
         )}
         {data && (
           <AnalysisScreen
@@ -370,20 +381,37 @@ export default function Home() {
 
 function VenueScreen({
   schedule,
+  day,
   loading,
   onSelect,
+  onDay,
 }: {
   schedule: Schedule | null;
+  day: ScheduleDay;
   loading: boolean;
   onSelect: (venue: Venue) => void;
+  onDay: (day: ScheduleDay) => void;
 }) {
   return (
     <>
       <section className="mb-5 rounded-2xl border border-slate-700 bg-gradient-to-br from-[#10233a] to-[#0b1727] p-5">
-        <p className="text-sm font-semibold text-cyan-300">TODAY&apos;S JRA</p>
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-black/20 p-1" data-no-swipe>
+          {(["today", "tomorrow"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onDay(value)}
+              aria-pressed={day === value}
+              className={`rounded-lg px-4 py-2 text-sm font-bold transition ${day === value ? "bg-cyan-300 text-[#07111f]" : "text-slate-400 hover:text-white"}`}
+            >
+              {value === "today" ? "今日" : "明日"}
+            </button>
+          ))}
+        </div>
+        <p className="text-sm font-semibold text-cyan-300">{day === "today" ? "TODAY'S JRA" : "TOMORROW'S JRA"}</p>
         <h1 className="mt-1 text-2xl font-black">開催場を選択</h1>
         <p className="mt-2 text-sm text-slate-400">
-          {schedule?.dateLabel || "本日の開催情報を取得中"}
+          {schedule?.dateLabel || `${day === "today" ? "本日" : "明日"}の開催情報を取得中`}
         </p>
       </section>
       {loading && !schedule ? (
@@ -428,7 +456,7 @@ function VenueScreen({
         </div>
       ) : (
         <div className="rounded-2xl border border-slate-700 bg-[#0c192a] p-8 text-center text-slate-400">
-          本日のJRA開催はありません
+          {day === "today" ? "本日" : "明日"}のJRA開催はありません
         </div>
       )}
     </>
@@ -437,10 +465,12 @@ function VenueScreen({
 
 function RaceScreen({
   venue,
+  day,
   loading,
   onAnalyze,
 }: {
   venue: Venue;
+  day: ScheduleDay;
   loading: boolean;
   onAnalyze: (race: Pick<Race, "raceId">) => void;
 }) {
@@ -451,7 +481,9 @@ function RaceScreen({
           <p className="text-sm font-semibold text-cyan-300">開催場</p>
           <h1 className="mt-1 text-3xl font-black">{venue.name}</h1>
           <p className="mt-2 text-sm text-slate-400">
-            発走前は予想、確定後は着順・予想印・買い目を照合できます
+            {day === "tomorrow"
+              ? "前日出走表による暫定予想です。人気・オッズ・馬体重・馬場は当日に更新します"
+              : "発走前は予想、確定後は着順・予想印・買い目を照合できます"}
           </p>
         </div>
         <Badge className="bg-white/10 text-white">
@@ -597,7 +629,7 @@ function AnalysisScreen({
                       {item.payout.toLocaleString("ja-JP")}円
                       {item.popularity ? (
                         <small className="ml-1 font-normal text-slate-500">
-                          {item.popularity}人気
+                          {item.popularity > 0 ? `${item.popularity}人気` : "人気未発表"}
                         </small>
                       ) : null}
                     </span>
@@ -731,7 +763,7 @@ function AnalysisScreen({
                       <span className="text-xs text-slate-500">pt</span>
                     </p>
                     <span className="hidden text-right text-sm text-slate-400 sm:block">
-                      {horse.popularity}人気
+                      {horse.popularity > 0 ? `${horse.popularity}人気` : "人気未発表"}
                     </span>
                     <ChevronRight
                       className={`size-4 text-slate-600 transition ${expanded ? "rotate-90 text-cyan-300" : ""}`}
@@ -1021,7 +1053,7 @@ function HorseDetails({ horse, horses }: { horse: Horse; horses: Horse[] }) {
             {horse.mark} {horse.number} {horse.name}
           </p>
           <p className="mt-1 text-xs text-slate-400">
-            {horse.gate}枠・{horse.popularity}人気・単勝{" "}
+            {horse.gate}枠・{horse.popularity > 0 ? `${horse.popularity}人気` : "人気未発表"}・単勝{" "}
             {horse.odds === null ? "未取得" : `${horse.odds}倍`}　
             {horse.jockey || "騎手取得中"}
           </p>
