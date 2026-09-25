@@ -55,6 +55,19 @@ jobs:
       - name: ROI and expected-value analysis
         if: matrix.lane == 'roi'
         run: python scripts/jra_roi_analysis.py
+      - name: Download saved real-odds REIN research models
+        if: matrix.lane == 'roi'
+        uses: actions/download-artifact@v4
+        with:
+          name: rein-saved-real-win-odds-training-20260925
+          path: .real-odds-model
+          github-token: ${{ github.token }}
+          run-id: "36135569462"
+      - name: Audit non-trifecta tickets with saved real-odds REIN scores
+        if: matrix.lane == 'roi'
+        env:
+          REIN_REAL_ODDS_TICKET_AUDIT: "1"
+        run: python scripts/jra_roi_analysis.py
       - name: Venue and candidate-feature analysis
         if: matrix.lane == 'venue'
         run: python scripts/jra_venue_feature_analysis.py
@@ -63,7 +76,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: jra-analysis-roi-ev
-          path: reports/jra-roi-ev-v1
+          path: |
+            reports/jra-roi-ev-v1
+            reports/rein-real-odds-ticket-audit
           retention-days: 30
       - name: Upload venue report
         if: matrix.lane == 'venue'
