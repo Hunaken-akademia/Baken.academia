@@ -22,7 +22,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { compactSelections } from "@/lib/tickets";
 import { raceProgress } from "@/lib/race-progress";
 
-type HistoryFactor = { label: string; samples: number; impact: number };
+type HistoryFactor = {
+  label: string;
+  samples: number;
+  impact: number;
+  wins?: number;
+  top3?: number;
+  winRate?: number;
+  top3Rate?: number;
+  averageFinish?: number;
+};
 type Horse = {
   number: number;
   gate?: number;
@@ -1146,11 +1155,6 @@ function OverallAssessment({ data, insights, onHorse }: { data: Analysis; insigh
 
 function DetailedComparison({ horses }: { horses: Horse[] }) {
   const ranked = [...horses].sort((a, b) => b.score - a.score);
-  const roleRank = (
-    horse: Horse,
-    key: "firstSuitability" | "secondSuitability" | "thirdSuitability",
-  ) =>
-    1 + horses.filter((other) => (other[key] ?? 0) > (horse[key] ?? 0)).length;
   return (
     <section className="mt-6 overflow-hidden rounded-2xl border border-slate-700 bg-[#0c192a]">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-700 p-4 sm:p-5">
@@ -1161,9 +1165,43 @@ function DetailedComparison({ horses }: { horses: Horse[] }) {
             適性ptはレース内相対評価、確率は着順専用モデルの推定値です。
           </p>
         </div>
-        <Badge className="bg-white/10 text-slate-300">左右にスクロール</Badge>
+        <Badge className="bg-white/10 text-slate-300">全{horses.length}頭</Badge>
       </div>
-      <div className="overflow-x-auto" data-no-swipe>
+      <div className="grid gap-2 p-3 md:hidden">
+        {ranked.map((horse, index) => {
+          const parameters = horseParameters(horse);
+          return (
+            <article key={horse.number} className="rounded-xl border border-slate-700 bg-black/10 p-3">
+              <div className="flex items-center gap-3">
+                <span className="w-8 text-center text-sm font-black text-cyan-300">{index + 1}位</span>
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white font-black text-slate-900">{horse.number}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold text-slate-100">{horse.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {horse.sex || "－"}{horse.age || "－"}・{horse.weightCarried ? `${horse.weightCarried}kg` : "斤量未取得"}・{horse.popularity > 0 ? `${horse.popularity}人気` : "人気未発表"}
+                  </p>
+                </div>
+                <p className="text-xl font-black text-cyan-300">{horse.score}<span className="text-[10px] text-slate-500">pt</span></p>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-1.5">
+                <CompactStat label={`1着・${roleRankOf(horses, horse, "firstSuitability")}位`} value={`${horse.firstSuitability ?? 0}pt`} sub={formatProbability(horse.firstProbability)} color="text-cyan-300" />
+                <CompactStat label={`2着・${roleRankOf(horses, horse, "secondSuitability")}位`} value={`${horse.secondSuitability ?? 0}pt`} sub={formatProbability(horse.secondProbability)} color="text-amber-300" />
+                <CompactStat label={`3着・${roleRankOf(horses, horse, "thirdSuitability")}位`} value={`${horse.thirdSuitability ?? 0}pt`} sub={formatProbability(horse.thirdProbability)} color="text-rose-300" />
+              </div>
+              <div className="mt-2 grid grid-cols-4 gap-1.5">
+                <CompactStat label="コース" value={`${parameters[3].value}`} />
+                <CompactStat label="近走" value={`${parameters[4].value}`} />
+                <CompactStat label="展開" value={signedNumber(horse.paceAdjustment)} />
+                <CompactStat label="履歴" value={signedNumber(horse.historyAdjustment)} sub={`${horse.historySamples ?? 0}走`} />
+              </div>
+              <p className="mt-3 rounded-lg bg-cyan-400/[.06] px-3 py-2 text-sm leading-5 text-slate-300">
+                <span className="mr-1 font-semibold text-cyan-300">一言：</span>{horseMemo(horse, horses)}
+              </p>
+            </article>
+          );
+        })}
+      </div>
+      <div className="hidden overflow-x-auto md:block" data-no-swipe>
         <table className="min-w-[1180px] w-full border-collapse text-sm">
           <thead className="bg-black/20 text-xs text-slate-400">
             <tr>
@@ -1203,11 +1241,11 @@ function DetailedComparison({ horses }: { horses: Horse[] }) {
                   <TableCell>{horse.weightCarried ? `${horse.weightCarried}kg` : "未取得"}</TableCell>
                   <TableCell>{horse.popularity > 0 ? `${horse.popularity}人気` : "未発表"}</TableCell>
                   <TableCell>{horse.odds === null ? "未発表" : `${horse.odds}倍`}</TableCell>
-                  <RoleCell value={horse.firstSuitability ?? 0} rank={roleRank(horse, "firstSuitability")} />
+                  <RoleCell value={horse.firstSuitability ?? 0} rank={roleRankOf(horses, horse, "firstSuitability")} />
                   <ProbabilityCell value={horse.firstProbability} />
-                  <RoleCell value={horse.secondSuitability ?? 0} rank={roleRank(horse, "secondSuitability")} />
+                  <RoleCell value={horse.secondSuitability ?? 0} rank={roleRankOf(horses, horse, "secondSuitability")} />
                   <ProbabilityCell value={horse.secondProbability} />
-                  <RoleCell value={horse.thirdSuitability ?? 0} rank={roleRank(horse, "thirdSuitability")} />
+                  <RoleCell value={horse.thirdSuitability ?? 0} rank={roleRankOf(horses, horse, "thirdSuitability")} />
                   <ProbabilityCell value={horse.thirdProbability} />
                   <TableCell>{parameters[3].value}pt</TableCell>
                   <TableCell>{parameters[4].value}pt</TableCell>
@@ -1221,6 +1259,52 @@ function DetailedComparison({ horses }: { horses: Horse[] }) {
         </table>
       </div>
     </section>
+  );
+}
+
+function roleRankOf(
+  horses: Horse[],
+  horse: Horse,
+  key: "firstSuitability" | "secondSuitability" | "thirdSuitability",
+) {
+  return 1 + horses.filter((other) => (other[key] ?? 0) > (horse[key] ?? 0)).length;
+}
+
+function formatProbability(value: number | undefined) {
+  return value === undefined ? "未取得" : `${(value * 100).toFixed(1)}%`;
+}
+
+function signedNumber(value: number | undefined) {
+  const safe = value ?? 0;
+  return `${safe > 0 ? "+" : ""}${safe}`;
+}
+
+function horseMemo(horse: Horse, horses: Horse[]) {
+  const rank = 1 + horses.filter((other) => other.score > horse.score).length;
+  const roles = [
+    { label: "1着", value: horse.firstSuitability ?? 0, rank: roleRankOf(horses, horse, "firstSuitability") },
+    { label: "2着", value: horse.secondSuitability ?? 0, rank: roleRankOf(horses, horse, "secondSuitability") },
+    { label: "3着", value: horse.thirdSuitability ?? 0, rank: roleRankOf(horses, horse, "thirdSuitability") },
+  ].sort((a, b) => a.rank - b.rank || b.value - a.value);
+  const best = roles[0];
+  const course = horseParameters(horse)[3].value;
+  const notes = [`総合${rank}位、${best.label}適性${best.rank}位`];
+  if ((horse.historySamples ?? 0) <= 2) notes.push("キャリアが浅く上積み余地あり");
+  else if ((horse.historyAdjustment ?? 0) >= 2) notes.push("履歴面が後押し");
+  else if ((horse.historyAdjustment ?? 0) <= -2) notes.push("履歴面は慎重に評価");
+  if (course >= 65) notes.push("今回条件との相性が高め");
+  if ((horse.paceAdjustment ?? 0) > 0) notes.push("展開の恩恵を受けそう");
+  if ((horse.paceAdjustment ?? 0) < 0) notes.push("展開対応がポイント");
+  return `${notes.slice(0, 3).join("。 ")}。`;
+}
+
+function CompactStat({ label, value, sub, color = "text-slate-100" }: { label: string; value: string; sub?: string; color?: string }) {
+  return (
+    <div className="rounded-lg border border-slate-800 bg-[#081522] px-2 py-2 text-center">
+      <p className="truncate text-[10px] text-slate-500">{label}</p>
+      <p className={`mt-0.5 text-sm font-black ${color}`}>{value}</p>
+      {sub ? <p className="text-[10px] text-slate-600">{sub}</p> : null}
+    </div>
   );
 }
 
@@ -1475,6 +1559,10 @@ function HorseDetails({ horse, horses }: { horse: Horse; horses: Horse[] }) {
           <span className="text-xs font-normal text-slate-500">pt</span>
         </p>
       </div>
+      <div className="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-400/[.06] p-3 text-sm leading-6 text-slate-200">
+        <span className="mr-2 font-bold text-cyan-300">REIN一言メモ</span>
+        {horseMemo(horse, horses)}
+      </div>
       <ParameterRadar horse={horse} horses={horses} />
       <section className="mt-4 rounded-xl border border-slate-800 bg-black/10 p-4">
         <div className="flex items-center justify-between gap-3">
@@ -1563,27 +1651,22 @@ function HorseDetails({ horse, horses }: { horse: Horse; horses: Horse[] }) {
           )}
         </div>
       </div>
-      {horse.historyFactors?.length ? (
-        <div className="mt-3 rounded-xl border border-slate-800 p-4">
-          <p className="mb-3 text-sm font-semibold">8年履歴の主な評価材料</p>
-          <div className="space-y-2">
-            {horse.historyFactors.map((item) => (
-              <div
-                key={item.label}
-                className="grid grid-cols-[1fr_auto_auto] items-center gap-3 text-xs"
-              >
-                <span className="text-slate-300">{item.label}</span>
-                <span className="text-slate-500">{item.samples}走</span>
-                <span
-                  className={
-                    item.impact >= 0 ? "text-cyan-300" : "text-rose-300"
-                  }
-                >
-                  {signed(item.impact)}
-                </span>
-              </div>
+      {horse.parameterFactors?.length || horse.historyFactors?.length ? (
+        <div className="mt-3 rounded-xl border border-slate-700 p-4">
+          <div className="mb-3">
+            <p className="text-sm font-semibold">8年履歴・項目別成績</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              通算・近走・芝ダ・距離・競馬場は馬自身、騎手・厩舎は該当人物の集計です。
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(horse.parameterFactors ?? horse.historyFactors ?? []).map((item) => (
+              <HistoryFactorCard key={item.label} item={item} />
             ))}
           </div>
+          <p className="mt-3 text-[11px] leading-5 text-slate-600">
+            1〜2走は参考値です。母数が少ない項目だけで評価を決めず、着順適性・騎手・厩舎・枠傾向と合わせて総合評価しています。
+          </p>
         </div>
       ) : null}
       {horse.trainer || horse.pedigree ? (
@@ -1593,6 +1676,35 @@ function HorseDetails({ horse, horses }: { horse: Horse; horses: Horse[] }) {
           血統：{horse.pedigree || "取得中"}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+function HistoryFactorCard({ item }: { item: HistoryFactor }) {
+  const reliability = item.samples >= 50
+    ? { label: "母数十分", style: "bg-emerald-400/10 text-emerald-300" }
+    : item.samples >= 10
+      ? { label: "参考可", style: "bg-amber-400/10 text-amber-300" }
+      : { label: "少数参考", style: "bg-slate-700 text-slate-300" };
+  const signed = `${item.impact > 0 ? "+" : ""}${item.impact}`;
+  return (
+    <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-semibold text-slate-200">{item.label}</p>
+        <Badge className={reliability.style}>{reliability.label}</Badge>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <div><p className="text-[10px] text-slate-500">母数</p><p className="mt-0.5 text-sm font-bold">{item.samples}走</p></div>
+        <div><p className="text-[10px] text-slate-500">勝利</p><p className="mt-0.5 text-sm font-bold">{item.wins ?? "－"}勝</p></div>
+        <div><p className="text-[10px] text-slate-500">3着内</p><p className="mt-0.5 text-sm font-bold">{item.top3 ?? "－"}回</p></div>
+        <div><p className="text-[10px] text-slate-500">勝率</p><p className="mt-0.5 text-sm font-bold text-cyan-300">{item.winRate ?? "－"}%</p></div>
+        <div><p className="text-[10px] text-slate-500">3着内率</p><p className="mt-0.5 text-sm font-bold text-cyan-300">{item.top3Rate ?? "－"}%</p></div>
+        <div><p className="text-[10px] text-slate-500">平均着順</p><p className="mt-0.5 text-sm font-bold">{item.averageFinish ?? "－"}着</p></div>
+      </div>
+      <div className="mt-3 flex items-center justify-between border-t border-slate-800 pt-2 text-xs">
+        <span className="text-slate-500">総合点への補正</span>
+        <span className={item.impact >= 0 ? "font-bold text-cyan-300" : "font-bold text-rose-300"}>{signed}</span>
+      </div>
     </div>
   );
 }
