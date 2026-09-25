@@ -298,6 +298,92 @@ class ReinRuntime:
             ]
         return frame
 
+    def _market_feature_frame(
+        self, full_frame: pd.DataFrame, race: dict[str, Any],
+        runners: list[dict[str, Any]], target: int, columns: list[str],
+    ) -> pd.DataFrame:
+        frame = full_frame.copy()
+        race_date = pd.Timestamp(race["race_date"])
+        history = self.history.loc[self.history["race_date"].lt(race_date)].copy()
+        finish = pd.to_numeric(history["finish_position"], errors="coerce")
+        history["_target"] = finish.eq(target).astype(float)
+        history["_wet_key"] = history["going"].isin(["重", "不良"])
+        history["_style_key"] = np.select(
+            [history["early_pct"].le(.25), history["early_pct"].le(.5), history["early_pct"].gt(.5)],
+            [1, 2, 3], default=0,
+        )
+        current_wet = (race.get("going") or "") in ("重", "不良")
+        distance_bucket = int(float(race["distance_m"]) // 200)
+        for index, runner in enumerate(runners):
+            horse_id = str(runner.get("horse_id", "0")).lstrip("0") or "0"
+            horse = history.loc[history["horse_id"].eq(horse_id)].sort_values(["race_date", "race_id"])
+            surprise = (
+                pd.to_numeric(horse["past_popularity"], errors="coerce")
+                - pd.to_numeric(horse["finish_position"], errors="coerce")
+            ) / pd.to_numeric(horse["historical_field_size"], errors="coerce")
+            for window in (3, 5, 10):
+                frame.loc[index, f"form_surprise_last{window}"] = _safe_mean(surprise.tail(window))
+                frame.loc[index, f"form_speed_last{window}"] = _safe_mean(horse["speed_relative"].tail(window))
+            frame.loc[index, "body_weight_vs_recent3"] = (
+                float(runner.get("horse_weight") or np.nan)
+                - _safe_mean(pd.to_numeric(horse.get("horse_weight"), errors="coerce").tail(3))
+            )
+            frame.loc[index, "body_load_change"] = (
+                float(runner.get("weight_carried") or np.nan)
+                - (float(horse.iloc[-1]["weight_carried"]) if len(horse) and pd.notna(horse.iloc[-1]["weight_carried"]) else math.nan)
+            )
+            style_key = 1 if frame.loc[index, "prior_early_pct"] <= .25 else 2 if frame.loc[index, "prior_early_pct"] <= .5 else 3 if pd.notna(frame.loc[index, "prior_early_pct"]) else 0
+            specs = [
+                (history.loc[history["horse_id"].eq(horse_id) & history["surface"].eq(race["surface"])], "fit_surface"),
+                (history.loc[history["horse_id"].eq(horse_id) & history["distance_bucket"].eq(distance_bucket)], "fit_distance"),
+                (history.loc[history["horse_id"].eq(horse_id) & history["racecourse"].eq(race["racecourse"])], "fit_course"),
+                (history.loc[history["horse_id"].eq(horse_id) & history["_wet_key"].eq(current_wet)], "fit_wet"),
+                (history.loc[history["racecourse"].eq(race["racecourse"]) & history["surface"].eq(race["surface"]) & pd.to_numeric(history["gate"], errors="coerce").eq(int(runner["gate"]))], "gate_course_bias"),
+                (history.loc[history["racecourse"].eq(race["racecourse"]) & history["surface"].eq(race["surface"]) & history["_style_key"].eq(style_key)], "pace_course_style"),
+            ]
+            for subset, prefix in specs:
+                n = float(len(subset))
+                frame.loc[index, prefix + "_starts"] = n
+                frame.loc[index, prefix + "_rate"] = float((subset["_target"].sum() + 6.4) / (n + 80))
+        frame["form_speed_trend"] = frame["form_speed_last3"] - frame["form_speed_last10"]
+        frame["form_surprise_trend"] = frame["form_surprise_last3"] - frame["form_surprise_last10"]
+        frame["body_change_abs"] = frame["horse_weight_change"].abs()
+        frame["body_change_pct"] = frame["horse_weight_change"] / frame["horse_weight"]
+        frame["body_load_ratio"] = frame["weight_carried"] / frame["horse_weight"]
+        frame["month_sin"] = math.sin(race_date.month * 2 * math.pi / 12)
+        frame["month_cos"] = math.cos(race_date.month * 2 * math.pi / 12)
+        frame["history_coverage"] = frame["horse_starts"].gt(0).mean()
+        frame["field_speed_std"] = frame["recent3_speed_relative"].std()
+        pop = pd.Series([float(r.get("popularity") or np.nan) for r in runners], index=frame.index)
+        field = float(len(runners))
+        frame["market_rank"] = pop
+        frame["market_logrank"] = np.log(pop.clip(lower=1))
+        frame["market_inv_rank"] = 1 / pop.clip(lower=1)
+        frame["market_share"] = frame["market_inv_rank"] / frame["market_inv_rank"].sum()
+        frame["market_rank_fraction"] = pop / field
+        frame["market_field_size"] = field
+        favorite_index = pop.idxmin()
+        for column in ("recent3_speed_relative", "recent3_closing3f_z", "horse_top3_rate", "prior_early_pct"):
+            frame["matchup_" + column] = frame[column] - frame.loc[favorite_index, column]
+        odds = pd.Series([float(r.get("win_odds") or np.nan) for r in runners], index=frame.index)
+        if not np.isfinite(odds).all() or (odds < 1).any():
+            raise ValueError("Validated win odds are required for market-difference ranking")
+        share = (1 / odds) / (1 / odds).sum()
+        frame["odds_log_win"] = np.log(odds)
+        frame["odds_win_share"] = share
+        frame["odds_favorite_share"] = share.max()
+        frame["odds_entropy"] = float((-share * np.log(share)).sum())
+        frame["odds_concentration"] = float((share ** 2).sum())
+        frame["odds_relative_to_favorite"] = np.log(share / share.max())
+        frame["odds_log_rank"] = np.log(odds.rank(method="min"))
+        for column in CATEGORICAL:
+            if column in frame:
+                frame[column] = frame[column].fillna("__missing__").astype("category")
+        missing = [column for column in columns if column not in frame]
+        if missing:
+            raise RuntimeError("Market model features are unavailable: " + ",".join(missing[:5]))
+        return frame[columns]
+
     def score(self, race: dict[str, Any], runners: list[dict[str, Any]]) -> dict[str, Any]:
         full_frame = self._feature_frame_full(race, runners)
         frame = self._legacy_feature_frame(full_frame, runners)
