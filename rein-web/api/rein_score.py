@@ -74,7 +74,7 @@ def get_runtime(token: str) -> Any:
     with _runtime_lock:
         if _runtime is not None:
             return _runtime
-        from rein_core import ReinRuntime
+        from rein_augmented_runtime import ReinRuntime
 
         registry, bundle = _request_bundle(token)
         version = registry["model"]["version"]
