@@ -1533,6 +1533,70 @@ function ParameterRadar({ horse, horses }: { horse: Horse; horses: Horse[] }) {
   );
 }
 
+function marketRoleComparison(horse: Horse, horses: Horse[], key: "firstSuitability" | "secondSuitability" | "thirdSuitability") {
+  const reinRank = roleRankOf(horses, horse, key);
+  const marketRank = horse.popularity > 0 ? horse.popularity : null;
+  const gap = marketRank ? marketRank - reinRank : 0;
+  const label = !marketRank ? "市場未発表" : gap >= 3 ? "★ 注目" : gap >= 1 ? "↑ 市場以上" : gap <= -2 ? "↓ 慎重評価" : "≒ 評価一致";
+  const tone = gap >= 3 ? "text-amber-300" : gap >= 1 ? "text-emerald-300" : gap <= -2 ? "text-rose-300" : "text-slate-300";
+  return { reinRank, marketRank, gap, label, tone };
+}
+
+function reinEvidence(horse: Horse) {
+  const factors = [...(horse.parameterFactors ?? []), ...(horse.historyFactors ?? [])]
+    .filter((item) => item.samples > 0)
+    .sort((a, b) => (b.impact ?? 0) - (a.impact ?? 0))
+    .slice(0, 3);
+  if (factors.length) return factors.map((item) => ({ label: item.label, samples: item.samples }));
+  const fallback = [
+    { label: "近走", value: horseParameters(horse)[4].value },
+    { label: "コース", value: horseParameters(horse)[3].value },
+    { label: "展開", value: horse.paceAdjustment ?? 0 },
+  ].sort((a, b) => b.value - a.value);
+  return fallback.slice(0, 3).map((item) => ({ label: item.label, samples: 0 }));
+}
+
+function MarketReinPanel({ horse, horses }: { horse: Horse; horses: Horse[] }) {
+  const roles = [
+    { label: "1着", key: "firstSuitability" as const },
+    { label: "2着", key: "secondSuitability" as const },
+    { label: "3着", key: "thirdSuitability" as const },
+  ];
+  const evidence = reinEvidence(horse);
+  const samples = horse.historySamples ?? Math.max(0, ...evidence.map((item) => item.samples));
+  const reliability = samples >= 50 ? "高" : samples >= 20 ? "中" : samples > 0 ? "参考" : "算出中";
+  return (
+    <section className="mt-4 rounded-xl border border-violet-400/25 bg-violet-400/[.06] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold tracking-widest text-violet-300">REIN × 市場評価</p>
+          <p className="mt-1 text-sm text-slate-400">人気順位と着順専用モデルの評価差を比較</p>
+        </div>
+        <Badge className="bg-white/10 text-slate-300">信頼度 {reliability}</Badge>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        {roles.map(({ label, key }) => {
+          const item = marketRoleComparison(horse, horses, key);
+          return (
+            <div key={label} className="rounded-lg border border-slate-700 bg-black/15 p-3">
+              <p className="font-bold text-slate-100">{label}適性 {item.reinRank}位</p>
+              <p className="mt-1 text-xs text-slate-400">市場 {item.marketRank ? item.marketRank + "位" : "未発表"} → REIN {item.reinRank}位</p>
+              <p className={"mt-2 text-sm font-bold " + item.tone}>{item.label}</p>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 rounded-lg bg-black/15 px-3 py-2">
+        <p className="text-xs font-semibold text-slate-300">今回の参考材料</p>
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+          {evidence.map((item) => <span key={item.label}>{item.label}{item.samples ? `（${item.samples}走）` : ""}</span>)}
+        </div>
+        <p className="mt-2 text-[11px] leading-5 text-slate-500">評価差は判断材料です。「★ 注目」「慎重評価」だけで買い・消しを確定しません。</p>
+      </div>
+    </section>
+  );
+}
+
 function HorseDetails({ horse, horses }: { horse: Horse; horses: Horse[] }) {
   const signed = (value: number | undefined) =>
     `${value && value > 0 ? "+" : ""}${value ?? 0}`;
@@ -1563,6 +1627,7 @@ function HorseDetails({ horse, horses }: { horse: Horse; horses: Horse[] }) {
         <span className="mr-2 font-bold text-cyan-300">REIN一言メモ</span>
         {horseMemo(horse, horses)}
       </div>
+      <MarketReinPanel horse={horse} horses={horses} />
       <ParameterRadar horse={horse} horses={horses} />
       <section className="mt-4 rounded-xl border border-slate-800 bg-black/10 p-4">
         <div className="flex items-center justify-between gap-3">
