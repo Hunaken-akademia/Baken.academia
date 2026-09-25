@@ -609,6 +609,7 @@ async function analyze(request: NextRequest) {
         ].slice(0, 5);
     });
     let roleModel = { version: "履歴補正フォールバック", feature_count: 0 };
+    let marketDifferenceOrder: number[] | null = null;
     try {
       const oidcToken = await getVercelOidcToken();
       if (!oidcToken) throw new Error("Vercel OIDC token is unavailable");
@@ -752,6 +753,24 @@ async function analyze(request: NextRequest) {
         );
         horse.score = horse.reinScore;
       });
+      if (scored.market_difference_ready) {
+        const ranked = scored.runners
+          .map((runner) => {
+            const market = 0.5 * (runner.market_first_probability ?? NaN)
+              + 0.3 * (runner.market_second_probability ?? NaN)
+              + 0.2 * (runner.market_third_probability ?? NaN);
+            const rein = 0.5 * (runner.rein_market_first_probability ?? NaN)
+              + 0.3 * (runner.rein_market_second_probability ?? NaN)
+              + 0.2 * (runner.rein_market_third_probability ?? NaN);
+            const edge = 0.5 * Math.log((runner.rein_market_first_probability ?? NaN) / (runner.market_first_probability ?? NaN))
+              + 0.3 * Math.log((runner.rein_market_second_probability ?? NaN) / (runner.market_second_probability ?? NaN))
+              + 0.2 * Math.log((runner.rein_market_third_probability ?? NaN) / (runner.market_third_probability ?? NaN));
+            return { number: runner.horse_number, score: market * Math.exp(0.75 * edge), rein };
+          })
+          .filter((item) => Number.isFinite(item.score))
+          .sort((a, b) => b.score - a.score || a.number - b.number);
+        if (ranked.length === raw.length) marketDifferenceOrder = ranked.map((item) => item.number);
+      }
     } catch (modelError) {
       console.error("REIN role model fallback", modelError);
       const fallback = raw.map((horse) => Math.max(horse.reinScore, 1));
@@ -771,6 +790,17 @@ async function analyze(request: NextRequest) {
     raw.sort(
       (a, b) => b.reinScore - a.reinScore || a.popularity - b.popularity,
     );
+    if (marketDifferenceOrder?.length === raw.length) {
+      const legacyOrder = [...raw];
+      const byHorseNumber = new Map(raw.map((horse) => [horse.number, horse]));
+      const topFour = marketDifferenceOrder.slice(0, 4)
+        .map((number) => byHorseNumber.get(number))
+        .filter((horse): horse is (typeof raw)[number] => Boolean(horse));
+      if (topFour.length === 4) {
+        const selected = new Set(topFour.map((horse) => horse.number));
+        raw.splice(0, raw.length, ...topFour, ...legacyOrder.filter((horse) => !selected.has(horse.number)));
+      }
+    }
     raw.forEach((horse, index) => {
       horse.mark = mark(index);
       horse.verdict =
