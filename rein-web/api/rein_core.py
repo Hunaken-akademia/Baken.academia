@@ -408,8 +408,13 @@ class ReinRuntime:
             "third": (self.models["third"].predict(third_frame, pred_contrib=True), list(third_frame.columns)),
         }
         second_contribution = self.second_joint_model.predict(second_frame, pred_contrib=True)
+        second_width = len(second_frame.columns) + 1
+        second_class = int(self.second_joint_schema["second_class_index"])
         if second_contribution.ndim == 3:
-            second_contribution = second_contribution[:, int(self.second_joint_schema["second_class_index"]), :]
+            second_contribution = second_contribution[:, second_class, :]
+        elif second_contribution.ndim == 2 and second_contribution.shape[1] > second_width:
+            start = second_class * second_width
+            second_contribution = second_contribution[:, start:start + second_width]
         contribution_frames["second"] = (second_contribution, list(second_frame.columns))
         def local_reasons(role, index):
             values, columns = contribution_frames[role]
