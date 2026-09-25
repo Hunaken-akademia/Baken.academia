@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getCache } from "@vercel/functions";
 import { responseCache } from "@/lib/response-cache";
 import { raceProgress } from "@/lib/race-progress";
@@ -19,6 +19,26 @@ const decode = (value: string) => value.replace(/<[^>]+>/g, " ")
   .replace(/&nbsp;|&#160;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 
 type VenueSeed = { name: string; eventId: string; nextRace: number; nextStart: string };
+
+type ScheduleDay = "today" | "tomorrow";
+
+function jstDate(day: ScheduleDay) {
+  const now = new Date(Date.now() + 9 * 3600_000 + (day === "tomorrow" ? 24 * 3600_000 : 0));
+  return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1, date: now.getUTCDate() };
+}
+
+export function monthlyVenueSeeds(html: string, targetDate: number): VenueSeed[] {
+  const venues = new Set(["札幌", "函館", "福島", "新潟", "東京", "中山", "中京", "京都", "阪神", "小倉"]);
+  return [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)].flatMap((row) => {
+    const text = decode(row[1]);
+    if (!new RegExp(`(?:^|\\s)${targetDate}日[（(]`).test(text)) return [];
+    return [...row[1].matchAll(/href=["']\/keiba\/race\/list\/(\d{8})["'][^>]*>([\s\S]*?)<\/a>/gi)].flatMap((match) => {
+      const label = decode(match[2]);
+      const name = [...venues].find((venue) => label.includes(venue));
+      return name ? [{ name, eventId: match[1], nextRace: 1, nextStart: "--:--" }] : [];
+    });
+  });
+}
 
 function venueSeeds(html: string): VenueSeed[] {
   const section = html.match(/<section[^>]*id="raceflash"[\s\S]*?<\/section>/i)?.[0] || "";
@@ -51,9 +71,11 @@ function races(html: string, nextRace: number) {
   });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const day: ScheduleDay = request.nextUrl.searchParams.get("day") === "tomorrow" ? "tomorrow" : "today";
+  const cacheKey = day;
   try {
-    const shared = await sharedSchedule.get("today");
+    const shared = await sharedSchedule.get(cacheKey);
     if (typeof shared === "string") {
       return new NextResponse(shared, {
         status: 200,
@@ -69,18 +91,18 @@ export async function GET() {
   }
 
   // Expected failures are cached too, so an upstream outage does not fan out with audience size.
-  const failure = await readFailure("schedule");
+  const failure = await readFailure(`schedule:${day}`);
   if (failure) {
     return new NextResponse(failure.body, {
       status: failure.status,
       headers: { ...failureCacheHeaders, "content-type": "application/json; charset=utf-8", "x-rein-failure-cache": "1" },
     });
   }
-  const response = await cachedSchedule("schedule", loadSchedule);
+  const response = await cachedSchedule(`schedule:${day}`, () => loadSchedule(day));
   if (response.ok) {
     try {
-      await sharedSchedule.set("today", await response.clone().text(), {
-        ttl: 120,
+      await sharedSchedule.set(cacheKey, await response.clone().text(), {
+        ttl: day === "tomorrow" ? 900 : 120,
         tags: ["rein-live", "rein-schedule"],
         name: "REIN schedule",
       });
@@ -88,22 +110,32 @@ export async function GET() {
       console.error("REIN schedule cache write failed", error instanceof Error ? error.message : "unknown");
     }
   } else {
-    await writeFailure("schedule", { status: response.status, body: await response.clone().text() }, ["rein-live"]);
+    await writeFailure(`schedule:${day}`, { status: response.status, body: await response.clone().text() }, ["rein-live"]);
   }
   return response;
 }
 
-async function loadSchedule() {
+async function loadSchedule(day: ScheduleDay) {
   try {
-    const home = await fetchSource(`${BASE}/`, "開催情報");
-    const seeds = venueSeeds(home);
-    if (!seeds.length) return NextResponse.json({ dateLabel: "本日の開催", venues: [] }, { headers: publicCache });
+    const target = jstDate(day);
+    const source = day === "today"
+      ? await fetchSource(`${BASE}/`, "開催情報")
+      : await fetchSource(`${BASE}/schedule/monthly?month=${target.month}&year=${target.year}`, "翌日の開催情報");
+    const seeds = day === "today" ? venueSeeds(source) : monthlyVenueSeeds(source, target.date);
+    const emptyLabel = day === "today" ? "本日の開催" : `${target.year}年${target.month}月${target.date}日の開催`;
+    if (!seeds.length) return NextResponse.json({ dateLabel: emptyLabel, updatedAt: new Date().toISOString(), venues: [] }, { headers: publicCache });
     const venues = await Promise.all(seeds.map(async (seed) => {
       const html = await fetchSource(`${BASE}/race/list/${seed.eventId}`, `${seed.name}のレース一覧`);
       const parsed = races(html, 0);
+      if (day === "tomorrow") {
+        const first = parsed[0];
+        return { ...seed, nextRace: first?.number ?? 1, nextStart: first?.start ?? "--:--", races: parsed.map((race) => ({ ...race, status: "発売前" })) };
+      }
       return { ...seed, ...raceProgress(parsed) };
     }));
-    const dateLabel = decode(home.match(/<section[^>]*id="raceflash"[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>/i)?.[1] || "本日の開催");
+    const dateLabel = day === "today"
+      ? decode(source.match(/<section[^>]*id="raceflash"[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>/i)?.[1] || "本日の開催")
+      : `${target.year}年${target.month}月${target.date}日の開催（暫定）`;
     return NextResponse.json({ dateLabel, updatedAt: new Date().toISOString(), venues }, { headers: publicCache });
   } catch (error) {
     return NextResponse.json(
