@@ -926,6 +926,7 @@ function AnalysisScreen({
           )}
         </TabsContent>
       </Tabs>
+      <MarketReinComparison horses={data.horses} />
       <DetailedComparison horses={data.horses} />
       <OverallAssessment data={data} insights={insights} onHorse={onHorse} />
     </>
@@ -1148,6 +1149,42 @@ function OverallAssessment({ data, insights, onHorse }: { data: Analysis; insigh
             <span className="min-w-0 truncate text-sm font-semibold">{horse.name}</span>
           </button>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function MarketReinComparison({ horses }: { horses: Horse[] }) {
+  const ranked = [...horses].sort((a, b) => b.score - a.score);
+  return (
+    <section className="mt-6 overflow-hidden rounded-2xl border border-violet-400/25 bg-[#0c192a]">
+      <div className="border-b border-slate-700 p-4 sm:p-5">
+        <p className="text-xs font-semibold tracking-widest text-violet-300">MARKET × REIN</p>
+        <h2 className="mt-1 text-xl font-bold">市場と着順適性の比較</h2>
+        <p className="mt-1 text-xs leading-5 text-slate-500">人気のコピーではなく、着順ごとにREINがどこを上げ下げしたかを一覧化。</p>
+      </div>
+      <div className="grid gap-2 p-3 md:hidden">
+        {ranked.map((horse) => (
+          <div key={horse.number} className="rounded-xl border border-slate-700 bg-black/10 p-3">
+            <div className="flex items-center gap-2">
+              <span className="grid size-8 place-items-center rounded-md bg-white font-bold text-slate-900">{horse.number}</span>
+              <span className="min-w-0 flex-1 truncate font-semibold">{horse.name}</span>
+              <span className="text-xs text-slate-400">{horse.popularity > 0 ? horse.popularity + "人気" : "人気未発表"}</span>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
+              {(["firstSuitability","secondSuitability","thirdSuitability"] as const).map((key, i) => {
+                const item=marketRoleComparison(horse,horses,key);
+                return <div key={key} className="rounded-lg bg-white/[.04] p-2 text-center"><p className="text-[11px] text-slate-500">{i+1}着</p><p className="text-sm font-bold">REIN {item.reinRank}位</p><p className={"mt-1 text-[11px] font-semibold "+item.tone}>{item.label}</p></div>
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead className="bg-black/20 text-xs text-slate-400"><tr><TableHead>馬</TableHead><TableHead>市場</TableHead><TableHead>1着</TableHead><TableHead>2着</TableHead><TableHead>3着</TableHead></tr></thead>
+          <tbody>{ranked.map((horse)=><tr key={horse.number} className="border-t border-slate-800"><td className="p-3 font-semibold">{horse.number} {horse.name}</td><td className="p-3">{horse.popularity>0?horse.popularity+"位":"未発表"}</td>{(["firstSuitability","secondSuitability","thirdSuitability"] as const).map(key=>{const item=marketRoleComparison(horse,horses,key);return <td key={key} className="p-3"><span className="font-bold">REIN {item.reinRank}位</span><span className={"ml-2 text-xs font-semibold "+item.tone}>{item.label}</span></td>})}</tr>)}</tbody>
+        </table>
       </div>
     </section>
   );
