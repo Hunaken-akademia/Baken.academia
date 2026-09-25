@@ -1,10 +1,10 @@
 {
-  "requested_at": "2026-09-24T20:20:00+09:00",
+  "requested_at": "2026-09-25T21:42:00+09:00",
   "source": "supabase-durable-jra-history-and-final-odds",
   "lanes": [
     "roi",
     "venue"
   ],
-  "reason": "Supabase import completed successfully",
+  "reason": "audit non-trifecta hit rate and ROI for saved real-odds REIN models",
   "import_run_id": 35986103089
 }
