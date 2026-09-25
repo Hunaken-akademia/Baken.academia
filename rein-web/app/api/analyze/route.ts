@@ -533,11 +533,21 @@ async function analyze(request: NextRequest) {
             label: component.label,
             samples: component.samples,
             impact: Math.round(component.signal * 1000) / 10,
+            wins: component.wins,
+            top3: component.top3,
+            winRate: component.winRate,
+            top3Rate: component.top3Rate,
+            averageFinish: component.averageFinish,
           })),
         parameterFactors: historical.components.map((component) => ({
           label: component.label,
           samples: component.samples,
           impact: Math.round(component.signal * 1000) / 10,
+          wins: component.wins,
+          top3: component.top3,
+          winRate: component.winRate,
+          top3Rate: component.top3Rate,
+          averageFinish: component.averageFinish,
         })),
       };
     });
