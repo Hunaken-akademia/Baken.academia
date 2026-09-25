@@ -65,7 +65,14 @@ def _market_by_group(frame: pd.DataFrame, keys: list[str], min_races: int = 30) 
             continue
         metrics = _race_level_market(g)
         values = idx if isinstance(idx, tuple) else (idx,)
-        row = {k: (None if pd.isna(v) else v) for k, v in zip(keys, values)}
+        row = {}
+        for k, v in zip(keys, values):
+            if pd.isna(v):
+                row[k] = None
+            elif hasattr(v, "item"):
+                row[k] = v.item()
+            else:
+                row[k] = v
         row.update(metrics)
         out.append(row)
     return out
@@ -148,7 +155,15 @@ def build_report(input_dir: Path, output_dir: Path) -> dict[str, object]:
         ],
     }
 
-    (output_dir / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_dir / "report.json").write_text(
+        json.dumps(
+            report,
+            ensure_ascii=False,
+            indent=2,
+            default=lambda o: o.item() if hasattr(o, "item") else str(o),
+        ),
+        encoding="utf-8",
+    )
 
     c = report["coverage"]
     m = report["market_baseline"]
