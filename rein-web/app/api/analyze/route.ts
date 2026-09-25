@@ -181,7 +181,7 @@ function paceAdjustment(style: string, pace: string) {
 }
 
 function mark(index: number) {
-  return ["◎", "○", "▲", "☆", "△", "注"][index] || (index < 8 ? "・" : "消");
+  return ["◎", "○", "▲", "☆", "△", "注"][index] || "・";
 }
 
 function raceClass(text: string) {
@@ -748,7 +748,7 @@ async function analyze(request: NextRequest) {
               ? "穴"
               : index < 7
                 ? "連下"
-                : "見送り";
+                : "候補";
     });
     const raceName = decode(
       card.match(
