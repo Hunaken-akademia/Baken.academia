@@ -195,6 +195,7 @@ function raceClass(text: string) {
 
 export async function GET(request: NextRequest) {
   const raceId = request.nextUrl.searchParams.get("raceId") || "";
+  const preview = request.nextUrl.searchParams.get("preview") === "1";
   if (!/^\d{10,12}$/.test(raceId))
     return NextResponse.json(
       { error: "レースIDは10〜12桁で入力してください" },
@@ -207,7 +208,7 @@ export async function GET(request: NextRequest) {
 
   if (!forceRefresh) {
     try {
-      const snapshot = await sharedCache.get(`snapshot-market-v2:${raceId}`);
+      const snapshot = await sharedCache.get(`${preview ? "snapshot-preview-v1" : "snapshot-market-v2"}:${raceId}`);
       if (typeof snapshot === "string") {
         return new NextResponse(snapshot, {
           status: 200,
@@ -226,7 +227,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const failure = await readFailure(`analyze:${raceId}`);
+    const failure = await readFailure(`analyze:${preview ? "preview:" : ""}${raceId}`);
     if (failure) {
       return new NextResponse(failure.body, {
         status: failure.status,
@@ -242,15 +243,17 @@ export async function GET(request: NextRequest) {
 
   const response = forceRefresh
     ? await analyze(request)
-    : await cachedAnalysis(raceId, () => analyze(request));
+    : await cachedAnalysis(`${raceId}:${preview ? "preview" : "market"}`, () => analyze(request));
   if (response.ok && response.headers.get("x-rein-fallback") === "0") {
     try {
       await sharedCache.set(
-        `snapshot-market-v2:${raceId}`,
+        `${preview ? "snapshot-preview-v1" : "snapshot-market-v2"}:${raceId}`,
         await response.clone().text(),
         {
           ttl:
-            response.headers.get("x-rein-final") === "1"
+            preview
+              ? 6 * 60 * 60
+              : response.headers.get("x-rein-final") === "1"
               ? 24 * 60 * 60
               : 5 * 60,
           tags: [`rein-race-${raceId}`, "rein-live"],
@@ -265,7 +268,7 @@ export async function GET(request: NextRequest) {
     }
   } else if (!response.ok) {
     await writeFailure(
-      `analyze:${raceId}`,
+      `analyze:${preview ? "preview:" : ""}${raceId}`,
       { status: response.status, body: await response.clone().text() },
       [`rein-race-${raceId}`, "rein-live"],
     );
@@ -286,6 +289,7 @@ function isCronRequest(request: NextRequest) {
 
 async function analyze(request: NextRequest) {
   const raceId = request.nextUrl.searchParams.get("raceId") || "";
+  const preview = request.nextUrl.searchParams.get("preview") === "1";
   if (!/^\d{10,12}$/.test(raceId))
     return NextResponse.json(
       { error: "レースIDは10〜12桁で入力してください" },
@@ -315,9 +319,7 @@ async function analyze(request: NextRequest) {
       loadHistory(),
     ]);
     const cardRows = tableRows(card).filter(
-      (row) =>
-        /^\d+$/.test(row.cells[1] || "") &&
-        /\d+\([+-]?\d+\)/.test(row.cells[6] || ""),
+      (row) => /^\d+$/.test(row.cells[1] || "") && /(牡|牝|セ)\s*\d+/.test(row.cells.slice(2, 5).join(" ")),
     );
     const oddsRows = tableRows(odds, 5).filter(
       (row) =>
@@ -410,12 +412,13 @@ async function analyze(request: NextRequest) {
       const weight = fixedWeight?.weight || publishedWeight;
       const change = fixedWeight ? fixedWeight.change : publishedChange;
       const popOdds = parseMarket(cells[7] || "");
-      const popularity =
+      const publishedPopularity =
         parsePopularity(cells[7] || "") ?? finalPopularity.get(number);
+      const popularity = publishedPopularity ?? 0;
       const odd = oddsMap.get(number) ?? popOdds?.odds ?? null;
       if (
-        !popularity ||
-        popularity > cardRows.length ||
+        (!preview && !publishedPopularity) ||
+        (publishedPopularity !== undefined && publishedPopularity > cardRows.length) ||
         (odd !== null && (!Number.isFinite(odd) || odd < 1))
       ) {
         throw new Error(
@@ -474,11 +477,9 @@ async function analyze(request: NextRequest) {
         positives.push("位置取り");
       }
       const marketScore = Math.round(
-        clamp(
-          96 - (popularity - 1) * (50 / Math.max(cardRows.length - 1, 1)),
-          42,
-          96,
-        ),
+        publishedPopularity
+          ? clamp(96 - (publishedPopularity - 1) * (50 / Math.max(cardRows.length - 1, 1)), 42, 96)
+          : 70,
       );
       const reinScore = Math.round(
         clamp(72 + historical.adjustment + liveAdjustment, 45, 95),
@@ -783,6 +784,9 @@ async function analyze(request: NextRequest) {
     return NextResponse.json(
       {
         warnings: [
+          preview
+            ? "前日暫定予想です。人気・オッズ・馬体重・馬場状態は当日に自動更新されます"
+            : "",
           !odds
             ? "単勝オッズ表を取得できず、出馬表の掲載値を使用しています"
             : "",
@@ -803,8 +807,10 @@ async function analyze(request: NextRequest) {
           ...history.meta,
           version: roleModel.version,
           featureCount: roleModel.feature_count,
-          strategy: "全券種=人気70%+着順別REIN 30%",
-          snapshotPolicy: resultRows.length
+          strategy: preview ? "前日暫定=着順別REIN（市場情報は未反映）" : "全券種=人気70%+着順別REIN 30%",
+          snapshotPolicy: preview
+            ? "前日出走表による暫定予想"
+            : resultRows.length
             ? "最終オッズから復習用予想を再構成"
             : "発走前の最新情報で分析",
         },
