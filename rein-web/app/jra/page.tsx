@@ -67,6 +67,11 @@ type Horse = {
   thirdSuitability?: number;
   historyFactors?: HistoryFactor[];
   parameterFactors?: HistoryFactor[];
+  roleReasons?: {
+    first?: Array<{ feature: string; contribution: number }>;
+    second?: Array<{ feature: string; contribution: number }>;
+    third?: Array<{ feature: string; contribution: number }>;
+  };
 };
 type TicketTier = {
   group: "本線" | "対抗" | "穴";
@@ -1579,6 +1584,26 @@ function marketRoleComparison(horse: Horse, horses: Horse[], key: "firstSuitabil
   return { reinRank, marketRank, gap, label, tone };
 }
 
+const featureLabels: Record<string, string> = {
+  recent3_speed_relative: "近3走の走破内容", recent3_closing3f_z: "近3走の末脚",
+  recent3_closing3f_relative: "近3走の末脚", recent3_finish_pct: "近3走の着順",
+  prior_early_pct: "先行力", relative_early: "今回メンバー内の先行力",
+  relative_late: "今回メンバー内の末脚", closing_pressure_fit: "展開との相性",
+  horse_distance_top3_rate: "距離適性", horse_course_top3_rate: "コース適性",
+  horse_surface_top3_rate: "芝・ダート適性", horse_wet_prior_top3_rate: "馬場適性",
+  horse_top3_rate: "通算安定度", days_since_last_start: "レース間隔",
+  horse_weight_change: "馬体重変化", weight_carried: "斤量",
+};
+function readableFeature(feature: string) {
+  return featureLabels[feature] || feature.replaceAll("_", " ");
+}
+function roleEvidence(horse: Horse, role: "first" | "second" | "third") {
+  return (horse.roleReasons?.[role] ?? []).slice(0, 4).map((item) => ({
+    label: readableFeature(item.feature),
+    positive: item.contribution >= 0,
+  }));
+}
+
 function reinEvidence(horse: Horse) {
   const factors = [...(horse.parameterFactors ?? []), ...(horse.historyFactors ?? [])]
     .filter((item) => item.samples > 0)
@@ -1623,8 +1648,17 @@ function MarketReinPanel({ horse, horses }: { horse: Horse; horses: Horse[] }) {
           );
         })}
       </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        {(["first","second","third"] as const).map((role, index) => {
+          const items = roleEvidence(horse, role);
+          return <div key={role} className="rounded-lg bg-black/15 px-3 py-2">
+            <p className="text-xs font-semibold text-slate-300">{index + 1}着評価の主な要因</p>
+            {items.length ? items.map((item, i) => <p key={i} className={"mt-1 text-xs " + (item.positive ? "text-emerald-300" : "text-rose-300")}>{item.positive ? "↑" : "↓"} {item.label}</p>) : <p className="mt-1 text-xs text-slate-500">モデル要因を算出中</p>}
+          </div>
+        })}
+      </div>
       <div className="mt-3 rounded-lg bg-black/15 px-3 py-2">
-        <p className="text-xs font-semibold text-slate-300">今回の参考材料</p>
+        <p className="text-xs font-semibold text-slate-300">履歴の参考材料</p>
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
           {evidence.map((item) => <span key={item.label}>{item.label}{item.samples ? `（${item.samples}走）` : ""}</span>)}
         </div>
