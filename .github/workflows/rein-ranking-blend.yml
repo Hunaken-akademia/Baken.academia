@@ -8,11 +8,17 @@ on:
 permissions:
   contents: read
   actions: read
+  id-token: write
 
 jobs:
   evaluate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-rein-model"
+      ARCHIVE_OBJECT_PATH: "jra/2019-01-01_2026-09-18/jra-backfill-result.tar.gz"
+      ARCHIVE_OUTPUT: ".dataset/jra-backfill-result.tar.gz"
+      OIDC_AUDIENCE: "rein-supabase-model-v1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,13 +27,10 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python -m unittest tests.test_ranking_quality tests.test_ranking_blend -v
-      - name: Download licensed JRA history
-        uses: actions/download-artifact@v4
-        with:
-          name: jra-backfill-2019-2026
-          path: .dataset
-          github-token: ${{ github.token }}
-          run-id: "35414533165"
+      - name: Download durable licensed JRA history from Supabase
+        run: |
+          mkdir -p .dataset
+          bash scripts/download_supabase_archive.sh
       - run: tar --no-same-owner -xzf .dataset/jra-backfill-result.tar.gz
       - name: Download held-out REIN predictions
         uses: actions/download-artifact@v4
