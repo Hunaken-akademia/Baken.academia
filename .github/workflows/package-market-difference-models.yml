@@ -89,6 +89,8 @@ jobs:
           compile(source, str(p), 'exec')
           p.write_text(source)
           PY
+      - name: Stage and test exact Top4 legacy-tail rollout
+        run: python scripts/finalize_market_top4.py
       - name: Download saved validation odds
         env:
           GH_TOKEN: ${{ github.token }}
@@ -113,12 +115,18 @@ jobs:
           assert report['max_abs_error'] < 1e-10, report
           print('Parity gate passed; production model publication is permitted')
           PY
+      - name: Diagnose remaining feature differences without changing production
+        if: failure()
+        run: |
+          if test -f artifacts/runtime-parity/parity.csv; then
+            python scripts/diagnose_market_features.py --output artifacts/runtime-parity --odds .odds
+          fi
       - name: Commit only verified model and market-only code changes
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add rein-web/api/models/market_difference rein-web/api/rein_core.py
+          git add rein-web/api/models/market_difference rein-web/api/rein_core.py rein-web/app/api/analyze/route.ts
           if git diff --cached --quiet; then
             echo 'Verified model files already present; no commit needed.'
             exit 0
@@ -153,5 +161,7 @@ jobs:
           path: |
             artifacts/runtime-parity/report.json
             artifacts/runtime-parity/parity.csv
+            artifacts/runtime-parity/feature-differences.csv
+            artifacts/runtime-parity/feature-reference-checks.json
           if-no-files-found: warn
           retention-days: 14
