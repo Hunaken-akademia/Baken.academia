@@ -20,6 +20,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 BROKER_URL = "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/vercel-rein-model"
 _runtime: Any = None
 _runtime_lock = threading.Lock()
+# Fluid compute sends concurrent requests to one instance. Each score() builds several
+# full-history frames, so parallel scoring exhausted the 2 GB instance (OOM kills in
+# production logs). Scoring one race at a time keeps peak memory at a single request.
+_inference_lock = threading.Lock()
 ISSUER = "https://oidc.vercel.com/hunaken-akademia"
 AUDIENCE = "https://vercel.com/hunaken-akademia"
 _jwks = jwt.PyJWKClient(f"{ISSUER}/.well-known/jwks", lifespan=300, timeout=5)
@@ -102,7 +106,9 @@ class handler(BaseHTTPRequestHandler):
             runners = payload.get("runners", [])
             if not 4 <= len(runners) <= 18:
                 raise ValueError("Runner count must be between 4 and 18")
-            result = get_runtime(token).score(payload["race"], runners)
+            runtime = get_runtime(token)
+            with _inference_lock:
+                result = runtime.score(payload["race"], runners)
             body = json.dumps(result, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
         except (jwt.InvalidTokenError, jwt.PyJWKClientError):
