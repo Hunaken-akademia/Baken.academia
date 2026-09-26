@@ -130,7 +130,7 @@ class ReinRuntime:
             second_joint_model = lgb.Booster(model_str=model_file.read())
         if second_joint_model.num_feature() != len(second_joint_schema["feature_order"]):
             raise RuntimeError("REIN second-place model schema mismatch")
-        market_root = root / "market_models"
+        market_root = packaged / "market_difference"
         market_models = None
         if market_root.is_dir():
             market_models = {
