@@ -140,7 +140,7 @@ jobs:
               echo 'Concurrent content conflict; leaving production unchanged.' >&2
               exit 1
             fi
-            if ! git diff --quiet "$validated_commit" HEAD -- rein-web scripts/verify_rein_market_runtime.py; then
+            if ! git diff --quiet "$validated_commit" HEAD -- rein-web scripts/verify_rein_market_runtime.py scripts/finalize_market_top4.py scripts/stage_market_precision.py; then
               echo 'Runtime changed concurrently after validation; refusing unverified publication.' >&2
               exit 1
             fi
@@ -157,7 +157,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: market-package-parity-${{ github.run_id }}
+          name: market-package-parity-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             artifacts/runtime-parity/report.json
             artifacts/runtime-parity/parity.csv
