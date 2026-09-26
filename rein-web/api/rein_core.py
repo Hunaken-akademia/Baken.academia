@@ -403,6 +403,24 @@ class ReinRuntime:
             second_output[:, int(self.second_joint_schema["second_class_index"])], 1e-12, None
         )
         normalized = {role: values / values.sum() for role, values in role_values.items()}
+        market_difference = None
+        if self.market_models:
+            market_values = {}
+            rein_values = {}
+            for role, target in (("first", 1), ("second", 2), ("third", 3)):
+                market_model = self.market_models[role]["market"]
+                rein_model = self.market_models[role]["rein"]
+                market_frame = self._market_feature_frame(full_frame, race, runners, target, market_model.feature_name())
+                rein_frame = self._market_feature_frame(full_frame, race, runners, target, rein_model.feature_name())
+                market_values[role] = np.clip(market_model.predict(market_frame), 1e-12, None)
+                rein_values[role] = np.clip(rein_model.predict(rein_frame), 1e-12, None)
+            for role in ("first", "second", "third"):
+                market_values[role] /= market_values[role].sum()
+                rein_values[role] /= rein_values[role].sum()
+            weights = {"first": .5, "second": .3, "third": .2}
+            market_composite = sum(weights[r] * market_values[r] for r in weights)
+            edge = sum(weights[r] * np.log(rein_values[r] / market_values[r]) for r in weights)
+            market_difference = market_composite * np.exp(.75 * edge)
         contribution_frames = {
             "first": (self.models["first"].predict(frame, pred_contrib=True), list(frame.columns)),
             "third": (self.models["third"].predict(third_frame, pred_contrib=True), list(third_frame.columns)),
@@ -431,5 +449,6 @@ class ReinRuntime:
                 "first_reasons": local_reasons("first", index),
                 "second_reasons": local_reasons("second", index),
                 "third_reasons": local_reasons("third", index),
+                "market_difference_score": float(market_difference[index]) if market_difference is not None else None,
             })
         return {"version": self.version, "feature_count": len(frame.columns), "runners": output}
