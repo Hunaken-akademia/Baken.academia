@@ -52,6 +52,14 @@ def patch(source: str) -> str:
     if '"x-rein-market-difference"' not in source:
         assert source.count(marker) == 1, 'Unexpected response headers'
         source = source.replace(marker, marker + '\n          "x-rein-market-difference": marketTop4Applied ? "1" : "0",\n          "x-rein-role-cache-version": ROLE_CACHE_VERSION,')
+    for old_key, new_key in (("snapshot-preview-v1", "snapshot-preview-market-top4-v1"),
+                             ("snapshot-market-v2", "snapshot-market-top4-v1")):
+        old_literal, new_literal = json.dumps(old_key), json.dumps(new_key)
+        if old_literal in source:
+            assert source.count(old_literal) == 2, 'Unexpected snapshot cache references'
+            source = source.replace(old_literal, new_literal)
+        else:
+            assert source.count(new_literal) == 2, 'Unexpected snapshot cache version'
     return source
 
 
