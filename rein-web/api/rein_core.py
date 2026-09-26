@@ -338,7 +338,7 @@ class ReinRuntime:
                 (history.loc[history["horse_id"].eq(horse_id) & history["distance_bucket"].eq(distance_bucket)], "fit_distance"),
                 (history.loc[history["horse_id"].eq(horse_id) & history["racecourse"].eq(race["racecourse"])], "fit_course"),
                 (history.loc[history["horse_id"].eq(horse_id) & history["_wet_key"].eq(current_wet)], "fit_wet"),
-                (history.loc[history["racecourse"].eq(race["racecourse"]) & history["surface"].eq(race["surface"]) & pd.to_numeric(history["gate"], errors="coerce").eq(int(runner["gate"]))], "gate_course_bias"),
+                (history.loc[history["racecourse"].eq(race["racecourse"]) & history["surface"].eq(race["surface"]) & history["distance_bucket"].eq(distance_bucket) & pd.to_numeric(history["gate"], errors="coerce").eq(int(runner["gate"]))], "gate_course_bias"),
                 (history.loc[history["racecourse"].eq(race["racecourse"]) & history["surface"].eq(race["surface"]) & history["_style_key"].eq(style_key)], "pace_course_style"),
             ]
             for subset, prefix in specs:
