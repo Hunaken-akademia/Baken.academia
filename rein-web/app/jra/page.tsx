@@ -89,6 +89,13 @@ type RacePayout = {
   payout: number;
   popularity: number | null;
 };
+type RaceConfidence = {
+  label: "慎重" | "標準" | "高め" | "かなり高い";
+  top3Share: number;
+  sharePercent: number;
+  detail: string;
+  note: string;
+};
 type Analysis = {
   warnings?: string[];
   race: {
@@ -111,6 +118,7 @@ type Analysis = {
     tickets: "ready" | "held";
     held: string[];
   };
+  confidence?: RaceConfidence | null;
   picks?: Picks;
   scratched?: Array<{ number: number; name: string }>;
   model?: {
@@ -684,6 +692,47 @@ function roleReady(data: Analysis) {
   return data.evaluation?.roleModel !== "unavailable";
 }
 
+function RaceConfidenceCard({ confidence }: { confidence?: RaceConfidence | null }) {
+  const tone = confidence?.label === "かなり高い"
+    ? "border-violet-400/35 bg-violet-400/[.07] text-violet-200"
+    : confidence?.label === "高め"
+      ? "border-emerald-400/35 bg-emerald-400/[.07] text-emerald-200"
+      : confidence?.label === "標準"
+        ? "border-cyan-400/30 bg-cyan-400/[.06] text-cyan-200"
+        : "border-amber-400/30 bg-amber-400/[.06] text-amber-200";
+  return (
+    <Card className={`text-white ${tone}`}>
+      <CardContent className="flex gap-3 p-4">
+        <Target className="mt-0.5 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-400">上位3頭信頼度</p>
+            {confidence ? (
+              <Badge className="bg-white/10 text-current">{confidence.label}</Badge>
+            ) : null}
+          </div>
+          {confidence ? (
+            <>
+              <p className="mt-1 font-bold">
+                指数占有率 {confidence.sharePercent.toFixed(1)}%
+              </p>
+              <p className="mt-1 text-sm text-slate-300">{confidence.detail}</p>
+              <p className="mt-2 text-[11px] leading-5 text-slate-500">{confidence.note}</p>
+            </>
+          ) : (
+            <>
+              <p className="mt-1 font-bold text-slate-300">算出待ち</p>
+              <p className="mt-1 text-sm text-slate-500">
+                人気・オッズと市場差評価がそろうと表示します。
+              </p>
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // data.horses is already in overall-ranking order (market Top4 + legacy tail).
 function overallRankOf(data: Analysis, horse: Horse) {
   return overallReady(data)
@@ -859,6 +908,7 @@ function AnalysisScreen({
           </CardContent>
         </Card>
         <div className="grid gap-4">
+          <RaceConfidenceCard confidence={data.confidence} />
           <Card className="border-slate-700 bg-[#0c192a] text-white">
             <CardContent className="flex gap-3 p-4">
               <Gauge className="text-amber-300" />

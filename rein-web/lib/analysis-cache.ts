@@ -3,8 +3,8 @@
 // its freshness window is still shown (with its data timestamps) while a refresh runs
 // in the background, so a viewer never waits for inference when one exists.
 
-export const SNAPSHOT_KEY = "snapshot-market-top4-v2";
-export const PREVIEW_SNAPSHOT_KEY = "snapshot-preview-market-top4-v2";
+export const SNAPSHOT_KEY = "snapshot-market-top4-confidence-v3";
+export const PREVIEW_SNAPSHOT_KEY = "snapshot-preview-market-top4-confidence-v3";
 
 const MINUTE = 60_000;
 // The cron runs every 10 minutes; races within an hour of the start are refreshed on

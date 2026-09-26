@@ -18,6 +18,7 @@ import {
   parseSexAge,
 } from "@/lib/race-card";
 import { selectPicks } from "@/lib/marks";
+import { buildRaceConfidence, type RaceConfidence } from "@/lib/race-confidence";
 import {
   isSnapshotFresh,
   metaFromBody,
@@ -40,7 +41,7 @@ const publicCacheHeaders = {
 };
 const ROLE_CACHE_VERSION = "2026-09-26-market-top4-v1";
 // Last complete prediction generated before the start time, kept for post-start review.
-const PRESTART_KEY = "prestart-v1";
+const PRESTART_KEY = "prestart-confidence-v2";
 
 type SourceBody = { body: string; fetchedAt: string | null };
 
@@ -680,6 +681,7 @@ async function analyze(request: NextRequest) {
     let roleModelReady = false;
     let marketDifferenceReady = false;
     let marketDifferenceOrder: number[] | null = null;
+    let raceConfidence: RaceConfidence | null = null;
     try {
       const oidcToken = await getVercelOidcToken();
       if (!oidcToken) throw new Error("Vercel OIDC token is unavailable");
@@ -851,7 +853,10 @@ async function analyze(request: NextRequest) {
           })
           .filter((item) => Number.isFinite(item.score))
           .sort((a, b) => b.score - a.score || a.number - b.number);
-        if (ranked.length === raw.length) marketDifferenceOrder = ranked.map((item) => item.number);
+        if (ranked.length === raw.length) {
+          marketDifferenceOrder = ranked.map((item) => item.number);
+          raceConfidence = buildRaceConfidence(ranked.map((item) => item.score));
+        }
       }
     } catch (modelError) {
       // No substitute scores: the history-only fallback used to fill 1着/2着/3着 with
@@ -1016,6 +1021,7 @@ async function analyze(request: NextRequest) {
         tickets: ticketsReady ? "ready" : "held",
         held,
       },
+      confidence: overallReady && !preview ? raceConfidence : null,
       picks,
       scratched: scratchedRows.map((row) => ({
         number: +row.cells[1],
