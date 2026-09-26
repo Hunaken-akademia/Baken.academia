@@ -458,7 +458,12 @@ class ReinRuntime:
                 "third_reasons": local_reasons("third", index),
                 "market_difference_score": float(market_difference[index]) if market_difference is not None else None,
             })
-        return {"version": self.version, "feature_count": len(frame.columns), "runners": output}
+        result = {"version": self.version, "feature_count": len(frame.columns), "runners": output}
+        if market_difference is not None:
+            # Handed to the augmented runtime so the six market models are not evaluated a
+            # second time with identical inputs; it is removed before the JSON response.
+            result["_market_role_scores"] = {"market": market_values, "rein": rein_values}
+        return result
 
 
 # MARKET_HISTORY_PRECISION_V1: match the frozen research accumulation order.
