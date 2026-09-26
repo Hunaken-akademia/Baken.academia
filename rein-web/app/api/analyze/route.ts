@@ -23,7 +23,7 @@ const sharedCache = getCache({ namespace: "rein-analysis-v1" });
 const publicCacheHeaders = {
   "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=30",
 };
-const ROLE_CACHE_VERSION = "2026-09-23-v1";
+const ROLE_CACHE_VERSION = "2026-09-26-market-top4-v1";
 
 async function fetchCachedSource(
   url: string,
@@ -792,35 +792,28 @@ async function analyze(request: NextRequest) {
     raw.sort(
       (a, b) => b.reinScore - a.reinScore || a.popularity - b.popularity,
     );
+    // MARKET_TOP4_LEGACY_TAIL_V1: splice once from the untouched legacy order.
     const legacyOrder = [...raw];
-    const marketDifferenceTop4 = raw
-      .filter((horse) => Number.isFinite((horse as any).marketDifferenceScore))
-      .sort(
-        (a, b) =>
-          ((b as any).marketDifferenceScore ?? -Infinity) -
-            ((a as any).marketDifferenceScore ?? -Infinity) ||
-          a.popularity - b.popularity ||
-          a.number - b.number,
-      )
-      .slice(0, 4);
-    if (marketDifferenceTop4.length === 4) {
-      const promoted = new Set(marketDifferenceTop4.map((horse) => horse.number));
-      raw.splice(
-        0,
-        raw.length,
-        ...marketDifferenceTop4,
-        ...legacyOrder.filter((horse) => !promoted.has(horse.number)),
-      );
-    }
-    if (marketDifferenceOrder?.length === raw.length) {
-      const legacyOrder = [...raw];
-      const byHorseNumber = new Map(raw.map((horse) => [horse.number, horse]));
-      const topFour = marketDifferenceOrder.slice(0, 4)
-        .map((number) => byHorseNumber.get(number))
-        .filter((horse): horse is (typeof raw)[number] => Boolean(horse));
+    let marketTop4Applied = false;
+    if (marketDifferenceOrder && marketDifferenceOrder.length === legacyOrder.length) {
+      const byHorseNumber = new Map(legacyOrder.map((horse) => [horse.number, horse]));
+      const completeOrder = new Set(marketDifferenceOrder).size === legacyOrder.length
+        && marketDifferenceOrder.every((number) => byHorseNumber.has(number));
+      const topFour = completeOrder ? marketDifferenceOrder.slice(0, 4).flatMap((number) => {
+        const horse = byHorseNumber.get(number);
+        return horse ? [horse] : [];
+      }) : [];
       if (topFour.length === 4) {
         const selected = new Set(topFour.map((horse) => horse.number));
-        raw.splice(0, raw.length, ...topFour, ...legacyOrder.filter((horse) => !selected.has(horse.number)));
+        raw.splice(0, raw.length, ...topFour,
+          ...legacyOrder.filter((horse) => !selected.has(horse.number)));
+        marketTop4Applied = true;
+        console.info("REIN market-difference Top4 applied", JSON.stringify({
+          modelVersion: roleModel.version,
+          cacheVersion: ROLE_CACHE_VERSION,
+          top4: topFour.map((horse) => horse.number),
+          tailCount: raw.length - 4,
+        }));
       }
     }
     raw.forEach((horse, index) => {
@@ -915,6 +908,8 @@ async function analyze(request: NextRequest) {
         headers: {
           ...publicCacheHeaders,
           "x-rein-fallback": roleModel.feature_count ? "0" : "1",
+          "x-rein-market-difference": marketTop4Applied ? "1" : "0",
+          "x-rein-role-cache-version": ROLE_CACHE_VERSION,
           "x-rein-final": resultRows.length ? "1" : "0",
         },
       },
