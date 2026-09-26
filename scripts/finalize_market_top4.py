@@ -101,6 +101,8 @@ console.log(`Top4/tail regression checks passed: ${checks}`);
 
 
 def main() -> None:
+    from stage_market_precision import stage_precision
+    stage_precision()
     path = Path('rein-web/app/api/analyze/route.ts')
     original = path.read_text()
     updated = patch(original)
