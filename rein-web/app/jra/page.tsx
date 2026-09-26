@@ -174,6 +174,9 @@ export default function Home() {
   const [error, setError] = useState("");
   // The race whose detail failed to load, so the error banner can offer a retry.
   const [failedRace, setFailedRace] = useState<string | null>(null);
+  // Set while an older snapshot is shown and the server refreshes it in the background.
+  const [refreshing, setRefreshing] = useState(false);
+  const staleRetry = useRef<ReturnType<typeof setTimeout> | null>(null);
   const danger = useMemo(
     () => data?.horses.find((h) => h.popularity > 0 && h.popularity <= 3 && h.score < 78),
     [data],
@@ -217,6 +220,13 @@ export default function Home() {
       const response = await fetch(`/api/analyze?raceId=${race.raceId}${scheduleDay === "tomorrow" ? "&preview=1" : ""}`);
       const result = (await response.json().catch(() => ({}))) as Analysis & { error?: string };
       if (!response.ok || !result.race) throw new Error(result.error || "レース情報を取得できませんでした");
+      const stale = response.headers.get("x-rein-stale") === "1";
+      if (staleRetry.current) clearTimeout(staleRetry.current);
+      staleRetry.current = null;
+      setRefreshing(stale);
+      // Pick up the refreshed snapshot once; the CDN keeps responses for 15s.
+      if (stale && !background)
+        staleRetry.current = setTimeout(() => void analyze(race, true), 25_000);
       setData(result);
       setActiveHorse((current) =>
         background && current ? result.horses.find((horse) => horse.number === current.number) ?? null : null,
@@ -266,6 +276,9 @@ export default function Home() {
   }, [data?.race.raceId, data?.review?.isFinished]);
 
   const back = () => {
+    if (staleRetry.current) clearTimeout(staleRetry.current);
+    staleRetry.current = null;
+    setRefreshing(false);
     setError("");
     setFailedRace(null);
     if (data) {
@@ -396,6 +409,14 @@ export default function Home() {
               </Button>
             )}
           </div>
+        )}
+        {data && refreshing && (
+          <p className="mb-3 flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3 text-sm text-cyan-100">
+            <RefreshCw className="size-4 shrink-0 animate-spin" />
+            <span className="min-w-0 break-words">
+              {data.race.updated}の情報を表示中です。最新の情報を計算しており、まもなく自動で切り替わります。
+            </span>
+          </p>
         )}
         {data?.warnings?.map((warning) => (
           <p

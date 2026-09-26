@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVercelOidcToken } from "@vercel/oidc";
-import { getCache } from "@vercel/functions";
+import { getCache, waitUntil } from "@vercel/functions";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { loadHistory, scoreHistory } from "@/lib/history";
 import { buildTickets } from "@/lib/tickets";
@@ -18,6 +18,14 @@ import {
   parseSexAge,
 } from "@/lib/race-card";
 import { selectPicks } from "@/lib/marks";
+import {
+  isSnapshotFresh,
+  metaFromBody,
+  refreshLockKey,
+  snapshotKey,
+  snapshotMetaKey,
+  snapshotTtlSeconds,
+} from "@/lib/analysis-cache";
 import { fetchSource } from "@/lib/source-fetch";
 import {
   failureCacheHeaders,
@@ -31,9 +39,6 @@ const publicCacheHeaders = {
   "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=30",
 };
 const ROLE_CACHE_VERSION = "2026-09-26-market-top4-v1";
-// v2 snapshots carry picks/evaluation/data timestamps; v1 bodies must not be replayed.
-const SNAPSHOT_KEY = "snapshot-market-top4-v2";
-const PREVIEW_SNAPSHOT_KEY = "snapshot-preview-market-top4-v2";
 // Last complete prediction generated before the start time, kept for post-start review.
 const PRESTART_KEY = "prestart-v1";
 
@@ -234,8 +239,13 @@ export async function GET(request: NextRequest) {
 
   if (!forceRefresh) {
     try {
-      const snapshot = await sharedCache.get(`${preview ? PREVIEW_SNAPSHOT_KEY : SNAPSHOT_KEY}:${raceId}`);
+      const snapshot = await sharedCache.get(snapshotKey(raceId, preview));
       if (typeof snapshot === "string") {
+        const meta = metaFromBody(JSON.parse(snapshot), preview);
+        const fresh = meta ? isSnapshotFresh(meta, Date.now()) : false;
+        // Past its freshness window the snapshot is still shown at once (its data
+        // timestamps are on screen) while a single background refresh replaces it.
+        if (!fresh) waitUntil(refreshInBackground(request, raceId, preview));
         return new NextResponse(snapshot, {
           status: 200,
           headers: {
@@ -243,6 +253,7 @@ export async function GET(request: NextRequest) {
             "content-type": "application/json; charset=utf-8",
             "x-rein-fallback": "0",
             "x-rein-snapshot": "1",
+            "x-rein-stale": fresh ? "0" : "1",
           },
         });
       }
@@ -270,22 +281,29 @@ export async function GET(request: NextRequest) {
   const response = forceRefresh
     ? await analyze(request)
     : await cachedAnalysis(`${raceId}:${preview ? "preview" : "market"}`, () => analyze(request));
+  await storeAnalysis(response, raceId, preview);
+  response.headers.set("x-rein-snapshot", "0");
+  return response;
+}
+
+async function storeAnalysis(response: Response, raceId: string, preview: boolean) {
   if (response.ok && response.headers.get("x-rein-fallback") === "0") {
     try {
-      await sharedCache.set(
-        `${preview ? PREVIEW_SNAPSHOT_KEY : SNAPSHOT_KEY}:${raceId}`,
-        await response.clone().text(),
-        {
-          ttl:
-            preview
-              ? 6 * 60 * 60
-              : response.headers.get("x-rein-final") === "1"
-              ? 24 * 60 * 60
-              : 5 * 60,
-          tags: [`rein-race-${raceId}`, "rein-live"],
-          name: "REIN race analysis",
-        },
-      );
+      const text = await response.clone().text();
+      const meta = metaFromBody(JSON.parse(text), preview);
+      if (!meta) return;
+      const ttl = snapshotTtlSeconds(meta);
+      await sharedCache.set(snapshotKey(raceId, preview), text, {
+        ttl,
+        tags: [`rein-race-${raceId}`, "rein-live"],
+        name: "REIN race analysis",
+      });
+      // Small record the cron reads to decide what to precompute.
+      await sharedCache.set(snapshotMetaKey(raceId, preview), meta, {
+        ttl,
+        tags: [`rein-race-${raceId}`, "rein-live"],
+        name: "REIN race analysis metadata",
+      });
     } catch (error) {
       console.error(
         "REIN snapshot write failed",
@@ -299,8 +317,31 @@ export async function GET(request: NextRequest) {
       [`rein-race-${raceId}`, "rein-live"],
     );
   }
-  response.headers.set("x-rein-snapshot", "0");
-  return response;
+}
+
+async function refreshInBackground(request: NextRequest, raceId: string, preview: boolean) {
+  const lock = refreshLockKey(raceId, preview);
+  try {
+    if (await sharedCache.get(lock)) return;
+    await sharedCache.set(lock, "1", { ttl: 150, name: "REIN snapshot refresh lock" });
+  } catch {
+    // Without the shared lock the in-process dedupe below still applies.
+  }
+  try {
+    const response = await cachedAnalysis(
+      `${raceId}:${preview ? "preview" : "market"}`,
+      () => analyze(request),
+    );
+    await storeAnalysis(response, raceId, preview);
+  } catch (error) {
+    console.error("REIN background refresh failed", error instanceof Error ? error.message : "unknown");
+  } finally {
+    try {
+      await sharedCache.delete(lock);
+    } catch {
+      // The lock expires on its own.
+    }
+  }
 }
 
 function isCronRequest(request: NextRequest) {
@@ -947,6 +988,7 @@ async function analyze(request: NextRequest) {
         course,
         condition: going,
         start,
+        startsAt: Number.isFinite(startAt) ? startAt : null,
         updated: oddsTime ? `人気・オッズ ${oddsTime}取得` : cardTime ? `出馬表 ${cardTime}取得` : "取得時刻不明",
         dataTimes: {
           card: cardSource.fetchedAt,
