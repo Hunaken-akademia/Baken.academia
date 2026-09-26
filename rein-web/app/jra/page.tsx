@@ -2081,8 +2081,8 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
   }
   const candidates = picks.longshotCandidates ?? (picks.longshot ? [picks.longshot] : []);
   const roleRanks = {
-    second: new Map(roleOrder(data.horses, "second").map((horse, index) => [horse.number, index + 1])),
-    third: new Map(roleOrder(data.horses, "third").map((horse, index) => [horse.number, index + 1])),
+    second: new Map<number, number>(roleOrder(data.horses, "second").map((horse, index): [number, number] => [horse.number, index + 1])),
+    third: new Map<number, number>(roleOrder(data.horses, "third").map((horse, index): [number, number] => [horse.number, index + 1])),
   };
   const slots: Array<{ title: string; pick: MarkPick | null; empty?: string }> = [
     { title: "本命", pick: picks.main },
