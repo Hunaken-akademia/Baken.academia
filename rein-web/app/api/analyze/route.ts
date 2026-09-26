@@ -668,6 +668,7 @@ async function analyze(request: NextRequest) {
           first_reasons?: Array<{ feature: string; contribution: number }>;
           second_reasons?: Array<{ feature: string; contribution: number }>;
           third_reasons?: Array<{ feature: string; contribution: number }>;
+          market_difference_score?: number | null;
         }>;
         error?: string;
       };
@@ -742,6 +743,7 @@ async function analyze(request: NextRequest) {
           second: role.second_reasons || [],
           third: role.third_reasons || [],
         };
+        (horse as any).marketDifferenceScore = role.market_difference_score ?? null;
         const roleStrength =
           0.5 * role.first_probability +
           0.3 * role.second_probability +
@@ -790,6 +792,26 @@ async function analyze(request: NextRequest) {
     raw.sort(
       (a, b) => b.reinScore - a.reinScore || a.popularity - b.popularity,
     );
+    const legacyOrder = [...raw];
+    const marketDifferenceTop4 = raw
+      .filter((horse) => Number.isFinite((horse as any).marketDifferenceScore))
+      .sort(
+        (a, b) =>
+          ((b as any).marketDifferenceScore ?? -Infinity) -
+            ((a as any).marketDifferenceScore ?? -Infinity) ||
+          a.popularity - b.popularity ||
+          a.number - b.number,
+      )
+      .slice(0, 4);
+    if (marketDifferenceTop4.length === 4) {
+      const promoted = new Set(marketDifferenceTop4.map((horse) => horse.number));
+      raw.splice(
+        0,
+        raw.length,
+        ...marketDifferenceTop4,
+        ...legacyOrder.filter((horse) => !promoted.has(horse.number)),
+      );
+    }
     if (marketDifferenceOrder?.length === raw.length) {
       const legacyOrder = [...raw];
       const byHorseNumber = new Map(raw.map((horse) => [horse.number, horse]));
