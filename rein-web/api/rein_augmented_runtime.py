@@ -1,12 +1,12 @@
 from __future__ import annotations
 import numpy as np
-from rein_core import ReinRuntime as BaseRuntime
+from rein_core import ReinRuntime as BaseRuntime, market_inputs_valid
 from rein_market_score import score_market_difference
 
 class ReinRuntime(BaseRuntime):
     def score(self, race, runners):
         base = super().score(race, runners)
-        if self.market_models is None:
+        if self.market_models is None or not market_inputs_valid(runners):
             base["market_difference_ready"] = False
             return base
         full = self._feature_frame_full(race, runners)

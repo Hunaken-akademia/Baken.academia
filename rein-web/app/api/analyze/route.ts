@@ -11,6 +11,13 @@ import {
   parseResultOdds,
 } from "@/lib/market-data";
 import { parsePayouts } from "@/lib/payouts";
+import {
+  horseName,
+  isRunnerRow,
+  isScratched,
+  parseSexAge,
+} from "@/lib/race-card";
+import { selectPicks } from "@/lib/marks";
 import { fetchSource } from "@/lib/source-fetch";
 import {
   failureCacheHeaders,
@@ -24,17 +31,30 @@ const publicCacheHeaders = {
   "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=30",
 };
 const ROLE_CACHE_VERSION = "2026-09-26-market-top4-v1";
+// v2 snapshots carry picks/evaluation/data timestamps; v1 bodies must not be replayed.
+const SNAPSHOT_KEY = "snapshot-market-top4-v2";
+const PREVIEW_SNAPSHOT_KEY = "snapshot-preview-market-top4-v2";
+// Last complete prediction generated before the start time, kept for post-start review.
+const PRESTART_KEY = "prestart-v1";
+
+type SourceBody = { body: string; fetchedAt: string | null };
 
 async function fetchCachedSource(
   url: string,
   label: string,
   optional: boolean,
   ttlSeconds: number,
-) {
-  const key = "source:" + createHash("sha256").update(url).digest("hex");
+): Promise<SourceBody> {
+  // v2 stores the actual fetch time so the screen can show when the data was taken,
+  // not when the page happened to be reloaded.
+  const key = "source-v2:" + createHash("sha256").update(url).digest("hex");
   try {
     const cached = await sharedCache.get(key);
-    if (typeof cached === "string") return cached;
+    if (typeof cached === "string") {
+      const parsed = JSON.parse(cached) as Partial<SourceBody>;
+      if (typeof parsed.body === "string")
+        return { body: parsed.body, fetchedAt: parsed.fetchedAt ?? null };
+    }
   } catch (error) {
     console.error(
       "REIN source cache read failed",
@@ -44,8 +64,9 @@ async function fetchCachedSource(
   }
 
   const body = await fetchSource(url, label, optional);
+  const fetchedAt = body ? new Date().toISOString() : null;
   try {
-    await sharedCache.set(key, body, {
+    await sharedCache.set(key, JSON.stringify({ body, fetchedAt }), {
       ttl: ttlSeconds,
       tags: ["rein-source"],
       name: `REIN source: ${label}`,
@@ -57,7 +78,7 @@ async function fetchCachedSource(
       error instanceof Error ? error.message : "unknown",
     );
   }
-  return body;
+  return { body, fetchedAt };
 }
 
 // A card that is not published yet is an expected, deterministic state, not an upstream
@@ -180,9 +201,14 @@ function paceAdjustment(style: string, pace: string) {
   );
 }
 
-function mark(index: number) {
-  return ["◎", "○", "▲", "☆", "△", "注"][index] || "・";
-}
+const jstTime = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleTimeString("ja-JP", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Tokyo",
+      })
+    : null;
 
 function raceClass(text: string) {
   if (/新馬/.test(text)) return "新馬";
@@ -208,7 +234,7 @@ export async function GET(request: NextRequest) {
 
   if (!forceRefresh) {
     try {
-      const snapshot = await sharedCache.get(`${preview ? "snapshot-preview-market-top4-v1" : "snapshot-market-top4-v1"}:${raceId}`);
+      const snapshot = await sharedCache.get(`${preview ? PREVIEW_SNAPSHOT_KEY : SNAPSHOT_KEY}:${raceId}`);
       if (typeof snapshot === "string") {
         return new NextResponse(snapshot, {
           status: 200,
@@ -247,7 +273,7 @@ export async function GET(request: NextRequest) {
   if (response.ok && response.headers.get("x-rein-fallback") === "0") {
     try {
       await sharedCache.set(
-        `${preview ? "snapshot-preview-market-top4-v1" : "snapshot-market-top4-v1"}:${raceId}`,
+        `${preview ? PREVIEW_SNAPSHOT_KEY : SNAPSHOT_KEY}:${raceId}`,
         await response.clone().text(),
         {
           ttl:
@@ -297,7 +323,7 @@ async function analyze(request: NextRequest) {
     );
   const base = "https://sports.yahoo.co.jp/keiba/race";
   try {
-    const [card, detail, odds, result, history] = await Promise.all([
+    const [cardSource, detailSource, oddsSource, resultSource, history] = await Promise.all([
       // Card can still change through scratches/jockey changes, so keep it fresh.
       fetchCachedSource(`${base}/denma/${raceId}`, "出馬表", false, 5 * 60),
       // Past-performance detail is effectively static once the card is published.
@@ -318,9 +344,15 @@ async function analyze(request: NextRequest) {
       fetchCachedSource(`${base}/result/${raceId}`, "確定結果", true, 5 * 60),
       loadHistory(),
     ]);
-    const cardRows = tableRows(card).filter(
-      (row) => /^\d+$/.test(row.cells[1] || "") && /(牡|牝|セ)\s*\d+/.test(row.cells.slice(2, 5).join(" ")),
-    );
+    const card = cardSource.body;
+    const detail = detailSource.body;
+    const odds = oddsSource.body;
+    const result = resultSource.body;
+    // Geldings are written 「せん」 on Yahoo. The old 「セ」-only filter silently dropped
+    // them, and the popularity sanity check then rejected the whole race.
+    const allCardRows = tableRows(card).filter(isRunnerRow);
+    const scratchedRows = allCardRows.filter(isScratched);
+    const cardRows = allCardRows.filter((row) => !isScratched(row));
     const oddsRows = tableRows(odds, 5).filter(
       (row) =>
         /^\d+$/.test(row.cells[1] || "") &&
@@ -332,7 +364,7 @@ async function analyze(request: NextRequest) {
         /^\d+$/.test(row.cells[2] || "") &&
         parseResultOdds(row.cells[7] || "") !== null,
     );
-    if (!cardRows.length)
+    if (!allCardRows.length)
       throw new RaceNotReadyError(
         "出馬表の形式を読み取れませんでした。発走前の中央競馬レースを指定してください",
       );
@@ -385,21 +417,14 @@ async function analyze(request: NextRequest) {
       );
     }
 
+    const marketIssues = new Set<number>();
     const raw = cardRows.map((row) => {
       const cells = row.cells;
       const number = +cells[1];
       const gate = +cells[0] || Math.ceil(number / 2);
       const horseCell = cells[2];
-      const name = (horseCell.match(/^([^ ]+)/)?.[1] || horseCell).replace(
-        /牝\d|牡\d|セ\d/,
-        "",
-      );
-      const sexAge =
-        horseCell.match(/(牡|牝|セ)\s*(\d+)/) ||
-        cells
-          .slice(2, 5)
-          .join(" ")
-          .match(/(牡|牝|セ)\s*(\d+)/);
+      const name = horseName(horseCell);
+      const sexAge = parseSexAge(cells);
       const carriedText = cells.slice(2, 6).join(" ");
       const weightCarried = +(
         carriedText.match(
@@ -416,15 +441,15 @@ async function analyze(request: NextRequest) {
         parsePopularity(cells[7] || "") ?? finalPopularity.get(number);
       const popularity = publishedPopularity ?? 0;
       const odd = oddsMap.get(number) ?? popOdds?.odds ?? null;
+      // A missing or inconsistent market value only holds the market-dependent parts
+      // (overall ranking, tickets, 穴候補). It never blocks the race card itself and is
+      // never replaced by a placeholder value.
       if (
         (!preview && !publishedPopularity) ||
         (publishedPopularity !== undefined && publishedPopularity > cardRows.length) ||
         (odd !== null && (!Number.isFinite(odd) || odd < 1))
-      ) {
-        throw new Error(
-          "人気・オッズを正常に取得できないため、評価と買い目の生成を保留しています。時間をおいて更新してください",
-        );
-      }
+      )
+        marketIssues.add(number);
       const horseId = cleanId(row.html.match(/directory\/horse\/(\d+)/)?.[1]);
       const jockeyId = cleanId(row.html.match(/directory\/jockey\/(\d+)/)?.[1]);
       const trainerId = cleanId(
@@ -517,8 +542,8 @@ async function analyze(request: NextRequest) {
         horseId,
         jockeyId,
         trainerId,
-        age: +(sexAge?.[2] || 0),
-        sex: sexAge?.[1] || "",
+        age: sexAge.age,
+        sex: sexAge.sex,
         weightCarried,
         firstProbability: 0,
         secondProbability: 0,
@@ -526,6 +551,8 @@ async function analyze(request: NextRequest) {
         firstSuitability: 0,
         secondSuitability: 0,
         thirdSuitability: 0,
+        marketFirstProbability: null as number | null,
+        reinMarketFirstProbability: null as number | null,
         historyFactors: [...historical.components]
           .sort((a, b) => Math.abs(b.signal) - Math.abs(a.signal))
           .slice(0, 5)
@@ -608,7 +635,9 @@ async function analyze(request: NextRequest) {
           ...new Set([...horse.cautions, `展開不利 ${horse.paceAdjustment}`]),
         ].slice(0, 5);
     });
-    let roleModel = { version: "履歴補正フォールバック", feature_count: 0 };
+    let roleModel = { version: "", feature_count: 0 };
+    let roleModelReady = false;
+    let marketDifferenceReady = false;
     let marketDifferenceOrder: number[] | null = null;
     try {
       const oidcToken = await getVercelOidcToken();
@@ -677,7 +706,9 @@ async function analyze(request: NextRequest) {
         const modelResponse = await fetch(
           `https://${deploymentHost}/api/rein_score`,
           {
-            signal: AbortSignal.timeout(90_000),
+            // Cold starts (bundle download + history load) exceeded 90s in production
+            // logs; stay inside this function's 180s budget.
+            signal: AbortSignal.timeout(140_000),
             method: "POST",
             cache: "no-store",
             headers: {
@@ -744,6 +775,12 @@ async function analyze(request: NextRequest) {
           third: role.third_reasons || [],
         };
         (horse as any).marketDifferenceScore = role.market_difference_score ?? null;
+        horse.marketFirstProbability = scored.market_difference_ready
+          ? role.market_first_probability ?? null
+          : null;
+        horse.reinMarketFirstProbability = scored.market_difference_ready
+          ? role.rein_market_first_probability ?? null
+          : null;
         const roleStrength =
           0.5 * role.first_probability +
           0.3 * role.second_probability +
@@ -755,6 +792,8 @@ async function analyze(request: NextRequest) {
         );
         horse.score = horse.reinScore;
       });
+      roleModelReady = raw.every((horse) => byNumber.has(horse.number));
+      marketDifferenceReady = Boolean(scored.market_difference_ready);
       if (scored.market_difference_ready) {
         const ranked = scored.runners
           .map((runner) => {
@@ -774,20 +813,13 @@ async function analyze(request: NextRequest) {
         if (ranked.length === raw.length) marketDifferenceOrder = ranked.map((item) => item.number);
       }
     } catch (modelError) {
-      console.error("REIN role model fallback", modelError);
-      const fallback = raw.map((horse) => Math.max(horse.reinScore, 1));
-      const total = fallback.reduce((sum, value) => sum + value, 0);
-      raw.forEach((horse, index) => {
-        const probability = fallback[index] / total;
-        horse.firstProbability =
-          horse.secondProbability =
-          horse.thirdProbability =
-            probability;
-        horse.firstSuitability =
-          horse.secondSuitability =
-          horse.thirdSuitability =
-            Math.round((100 * horse.reinScore) / Math.max(...fallback));
-      });
+      // No substitute scores: the history-only fallback used to fill 1着/2着/3着 with
+      // one shared number, which looked like model output. Hold the evaluation instead.
+      console.error(
+        "REIN role model unavailable",
+        modelError instanceof Error ? modelError.message : "unknown",
+      );
+      roleModelReady = false;
     }
     raw.sort(
       (a, b) => b.reinScore - a.reinScore || a.popularity - b.popularity,
@@ -816,19 +848,40 @@ async function analyze(request: NextRequest) {
         }));
       }
     }
-    raw.forEach((horse, index) => {
-      horse.mark = mark(index);
-      horse.verdict =
-        index === 0
-          ? "軸"
-          : index < 3
-            ? "相手"
-            : index === 3
-              ? "穴"
-              : index < 7
-                ? "連下"
-                : "候補";
+    const popularityComplete = !preview && marketIssues.size === 0 && raw.length > 0;
+    // Overall ranking = validated market-difference Top4 + legacy tail. Without the
+    // Top4 (missing odds, no market model output) it is held rather than silently
+    // replaced by the legacy-only order. The preview keeps its labelled provisional order.
+    const overallReady = roleModelReady && (preview || (popularityComplete && marketTop4Applied));
+    // Tickets keep their own rule (popularity 70% + role models 30%) and need both inputs.
+    const ticketsReady = roleModelReady && (preview || popularityComplete);
+    const picks = selectPicks(raw, {
+      roleModelReady,
+      marketReady: popularityComplete && marketDifferenceReady,
     });
+    const pickByNumber = new Map(
+      [picks.main, picks.rival, picks.longshot].flatMap((pick) =>
+        pick ? [[pick.number, pick] as const] : [],
+      ),
+    );
+    raw.forEach((horse, index) => {
+      const pick = pickByNumber.get(horse.number);
+      horse.mark = pick ? { 本命: "◎", 対抗: "○", 穴候補: "☆" }[pick.role] : "・";
+      horse.verdict = pick
+        ? pick.role
+        : overallReady
+          ? `総合${index + 1}位`
+          : "";
+    });
+    const held: string[] = [];
+    if (!roleModelReady)
+      held.push("着順別モデルの結果を取得できないため、着順適性・総合順位・印・買い目を保留しています");
+    else if (!preview && !popularityComplete)
+      held.push(
+        `人気・オッズを正常に取得できない馬がいるため（${[...marketIssues].sort((a, b) => a - b).join("・")}番）、総合順位・買い目・穴候補を保留しています`,
+      );
+    else if (!preview && !marketTop4Applied)
+      held.push("市場差式の評価がそろわないため、総合順位を保留しています");
     const raceName = decode(
       card.match(
         /<h2[^>]*class="[^"]*hr-predictRaceInfo__title[^"]*"[^>]*>([\s\S]*?)<\/h2>/i,
@@ -860,60 +913,147 @@ async function analyze(request: NextRequest) {
       odds: parseResultOdds(row.cells[7])!,
     }));
     const payouts = parsePayouts(result);
-    return NextResponse.json(
-      {
-        warnings: [
-          preview
-            ? "前日暫定予想です。人気・オッズ・馬体重・馬場状態は当日に自動更新されます"
-            : "",
-          !odds
-            ? "単勝オッズ表を取得できず、出馬表の掲載値を使用しています"
-            : "",
-          !result ? "確定結果を取得できていません" : "",
-          resultRows.length && !payouts.length
-            ? "払戻情報を取得できていません"
-            : "",
-        ].filter(Boolean),
-        race: {
-          title,
-          course,
-          condition: going,
-          start,
-          updated: `${new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo" })}更新`,
-          raceId,
+    const startAt = /^\d{1,2}:\d{2}$/.test(start)
+      ? Date.parse(`${raceDate}T${start.padStart(5, "0")}:00+09:00`)
+      : NaN;
+    const generatedAt = new Date().toISOString();
+    const phase: "preview" | "prestart" | "poststart" | "final" = preview
+      ? "preview"
+      : resultRows.length
+        ? "final"
+        : Number.isFinite(startAt) && Date.now() >= startAt
+          ? "poststart"
+          : "prestart";
+    const runnerKey = raw.map((horse) => horse.number).sort((a, b) => a - b).join("-");
+    const complete = overallReady && ticketsReady && picks.status === "ready";
+    const oddsTime = jstTime(oddsSource.fetchedAt || cardSource.fetchedAt);
+    const cardTime = jstTime(cardSource.fetchedAt);
+    const review = { isFinished: resultRows.length > 0, finishers, payouts };
+    const warnings = [
+      preview
+        ? "前日暫定予想です。人気・オッズ・馬体重・馬場状態は当日に自動更新されます"
+        : "",
+      !odds ? "単勝オッズ表を取得できず、出馬表の掲載値を使用しています" : "",
+      !result ? "確定結果を取得できていません" : "",
+      resultRows.length && !payouts.length ? "払戻情報を取得できていません" : "",
+      scratchedRows.length
+        ? `出走取消・除外：${scratchedRows.map((row) => `${row.cells[1]}番`).join("・")}（評価対象から外しています）`
+        : "",
+    ].filter(Boolean);
+    const body = {
+      warnings,
+      race: {
+        title,
+        course,
+        condition: going,
+        start,
+        updated: oddsTime ? `人気・オッズ ${oddsTime}取得` : cardTime ? `出馬表 ${cardTime}取得` : "取得時刻不明",
+        dataTimes: {
+          card: cardSource.fetchedAt,
+          odds: oddsSource.fetchedAt,
+          result: resultSource.fetchedAt,
         },
-        model: {
-          ...history.meta,
-          version: roleModel.version,
-          featureCount: roleModel.feature_count,
-          strategy: preview ? "前日暫定=着順別REIN（市場情報は未反映）" : "全券種=人気70%+着順別REIN 30%",
-          snapshotPolicy: preview
+        raceId,
+      },
+      prediction: {
+        phase,
+        source: "live" as "live" | "prestart" | "rebuilt",
+        generatedAt,
+        label:
+          phase === "preview"
             ? "前日出走表による暫定予想"
-            : resultRows.length
-            ? "最終オッズから復習用予想を再構成"
-            : "発走前の最新情報で分析",
-        },
-        pace: {
-          label: pace,
-          detail: paceDetail,
-          leaders,
-          escapeCount,
-          frontCount: frontRunners.length,
-        },
-        horses: raw,
-        tickets: buildTickets(raw),
-        review: { isFinished: resultRows.length > 0, finishers, payouts },
+            : phase === "prestart"
+              ? `発走前の予想（人気・オッズ ${oddsTime ?? "取得時刻不明"}取得）`
+              : phase === "final"
+                ? "発走前の予想が保存されていないため、確定オッズで再計算した参考表示です（発走前の予想ではありません）"
+                : "発走前の予想が保存されていないため、発走後に取得した情報で再計算した参考表示です（発走前の予想ではありません）",
       },
-      {
-        headers: {
-          ...publicCacheHeaders,
-          "x-rein-fallback": roleModel.feature_count ? "0" : "1",
-          "x-rein-market-difference": marketTop4Applied ? "1" : "0",
-          "x-rein-role-cache-version": ROLE_CACHE_VERSION,
-          "x-rein-final": resultRows.length ? "1" : "0",
-        },
+      evaluation: {
+        roleModel: roleModelReady ? "ready" : "unavailable",
+        overall: overallReady ? "ready" : "held",
+        tickets: ticketsReady ? "ready" : "held",
+        held,
       },
-    );
+      picks,
+      scratched: scratchedRows.map((row) => ({
+        number: +row.cells[1],
+        name: horseName(row.cells[2] || ""),
+      })),
+      model: {
+        ...history.meta,
+        version: roleModel.version,
+        featureCount: roleModel.feature_count,
+        overallPolicy: preview
+          ? "総合順位：前日暫定（市場情報は未反映）"
+          : "総合順位：上位4頭＝市場差式、5位以下＝従来順",
+        strategy: preview
+          ? "買い目：着順別REIN（市場情報は未反映）"
+          : "買い目：全券種＝人気70%＋着順別REIN30%",
+        markPolicy: "本命・対抗＝1着適性1位・2位／穴候補＝1着適性3〜6位で4番人気以下かつ1着評価が市場を上回る馬",
+      },
+      pace: {
+        label: pace,
+        detail: paceDetail,
+        leaders,
+        escapeCount,
+        frontCount: frontRunners.length,
+      },
+      horses: raw,
+      tickets: ticketsReady ? buildTickets(raw) : [],
+      review,
+      runnerKey,
+    };
+    let responseBody: typeof body = body;
+    if (phase === "prestart" && complete) {
+      try {
+        await sharedCache.set(`${PRESTART_KEY}:${raceId}`, JSON.stringify(body), {
+          ttl: 72 * 60 * 60,
+          tags: [`rein-race-${raceId}`, "rein-prestart"],
+          name: "REIN pre-start prediction",
+        });
+      } catch (error) {
+        console.error("REIN pre-start snapshot write failed", error instanceof Error ? error.message : "unknown");
+      }
+    } else if (phase === "poststart" || phase === "final") {
+      try {
+        const saved = await sharedCache.get(`${PRESTART_KEY}:${raceId}`);
+        const prestart = typeof saved === "string" ? (JSON.parse(saved) as typeof body) : null;
+        if (prestart && prestart.runnerKey === runnerKey) {
+          // Show the stored pre-start prediction next to the current result; the
+          // result and final odds never rewrite it.
+          responseBody = {
+            ...prestart,
+            warnings: [...new Set([...prestart.warnings.filter((item) => !item.startsWith("確定結果")), ...warnings])],
+            prediction: {
+              ...prestart.prediction,
+              phase,
+              source: "prestart",
+              label: `発走前に保存した予想を表示（人気・オッズ ${jstTime(prestart.race.dataTimes.odds || prestart.race.dataTimes.card) ?? "取得時刻不明"}取得）`,
+            },
+            review,
+          };
+        } else {
+          body.prediction.source = "rebuilt";
+          if (prestart)
+            body.warnings.push("発走前の予想と出走馬構成が一致しないため、保存済みの予想は表示していません");
+        }
+      } catch (error) {
+        console.error("REIN pre-start snapshot read failed", error instanceof Error ? error.message : "unknown");
+        body.prediction.source = "rebuilt";
+      }
+    }
+    const usedPrestart = responseBody !== body;
+    return NextResponse.json(responseBody, {
+      headers: {
+        ...publicCacheHeaders,
+        // Incomplete evaluations are not cached, so a retry can recover them.
+        "x-rein-fallback": usedPrestart || complete ? "0" : "1",
+        "x-rein-market-difference": marketTop4Applied ? "1" : "0",
+        "x-rein-role-cache-version": ROLE_CACHE_VERSION,
+        "x-rein-final": resultRows.length ? "1" : "0",
+        "x-rein-phase": phase,
+      },
+    });
   } catch (error) {
     return NextResponse.json(
       {

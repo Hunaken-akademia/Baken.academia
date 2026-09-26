@@ -411,7 +411,7 @@ class ReinRuntime:
         )
         normalized = {role: values / values.sum() for role, values in role_values.items()}
         market_difference = None
-        if self.market_models:
+        if self.market_models and market_inputs_valid(runners):
             market_values = {}
             rein_values = {}
             for role, target in (("first", 1), ("second", 2), ("third", 3)):
@@ -462,6 +462,23 @@ class ReinRuntime:
 
 
 # MARKET_HISTORY_PRECISION_V1: match the frozen research accumulation order.
+def market_inputs_valid(runners):
+    """Market-difference models need a published popularity and win odds for every runner.
+
+    Missing values are never filled in; the caller skips only the market-difference
+    ranking and keeps the odds-independent first/second/third role models.
+    """
+    for runner in runners:
+        try:
+            popularity = float(runner.get("popularity") or np.nan)
+            odds = float(runner.get("win_odds") or np.nan)
+        except (TypeError, ValueError):
+            return False
+        if not (np.isfinite(popularity) and popularity >= 1 and np.isfinite(odds) and odds >= 1):
+            return False
+    return True
+
+
 def _market_precision_cache(runtime):
     cached = getattr(runtime, "_market_precision_cache_v1", None)
     if cached is not None:
