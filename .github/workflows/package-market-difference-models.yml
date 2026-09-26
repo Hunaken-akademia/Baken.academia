@@ -1,37 +1,157 @@
 name: Package market-difference models
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths: [.github/workflows/package-market-difference-models.yml]
 permissions:
   contents: write
   actions: read
+concurrency:
+  group: package-market-difference-models-main
+  cancel-in-progress: false
 jobs:
   package:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Install parity dependencies
+        run: python -m pip install numpy==2.4.6 pandas==2.3.3 pyarrow==19.0.1 lightgbm==4.7.0 scipy==1.17.1 pyjwt==2.14.0 cryptography==50.0.1
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: rein-saved-real-win-odds-training-20260925
           path: .models
           github-token: ${{ github.token }}
-          run-id: "36135569462"
-      - name: Package exact research models used by validated market-difference ranking
+          run-id: '36135569462'
+      - name: Download unchanged production base for parity
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: rein-role-v4-189820badb8b7689b1da27435d2e2ba28c967fc3
+          path: .base
+          github-token: ${{ github.token }}
+          run-id: '36069608921'
+      - name: Package exact research models without activating production
         run: |
           set -euo pipefail
           mkdir -p rein-web/api/models/market_difference
           for role in first second third; do
+            test -s ".models/$role/real_odds_market.txt"
+            test -s ".models/$role/real_odds_without_people.txt"
             cp ".models/$role/real_odds_market.txt" "rein-web/api/models/market_difference/${role}_market.txt"
             cp ".models/$role/real_odds_without_people.txt" "rein-web/api/models/market_difference/${role}_rein.txt"
           done
           sha256sum rein-web/api/models/market_difference/*.txt > rein-web/api/models/market_difference/SHA256SUMS
-      - name: Commit exact model files
+          sha256sum -c rein-web/api/models/market_difference/SHA256SUMS
+      - name: Stage market-only input fixes for parity validation
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add rein-web/api/models/market_difference
-          git diff --cached --quiet && exit 0
-          git commit -m "Package validated market-difference inference models"
-          git push
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('rein-web/api/rein_core.py')
+          source = p.read_text()
+          old = '''        frame = full_frame.copy()
+                  race_date = pd.Timestamp(race["race_date"])'''
+          new = '''        frame = full_frame.copy()
+                  # Market-only extension must add missing categories before recategorizing.
+                  for column in CATEGORICAL:
+                      if column in frame:
+                          frame[column] = frame[column].astype(object)
+                  race_date = pd.Timestamp(race["race_date"])'''
+          if old in source:
+              assert source.count(old) == 1
+              source = source.replace(old, new)
+          else:
+              assert new in source, 'Unexpected market feature implementation; refusing to patch'
+          old_style = '''        history["_style_key"] = np.select(
+                      [history["early_pct"].le(.25), history["early_pct"].le(.5), history["early_pct"].gt(.5)],
+                      [1, 2, 3], default=0,
+                  )'''
+          new_style = '''        # Each historical entry uses the style known BEFORE that race.
+                  historical_prior_early = history.groupby("horse_id", sort=False, observed=True)["early_pct"].shift(1)
+                  history["_style_key"] = np.select(
+                      [historical_prior_early.le(.25), historical_prior_early.le(.5), historical_prior_early.gt(.5)],
+                      [1, 2, 3], default=0,
+                  )'''
+          if old_style in source:
+              assert source.count(old_style) == 1
+              source = source.replace(old_style, new_style)
+          else:
+              assert new_style in source, 'Unexpected historical style implementation; refusing to patch'
+          compile(source, str(p), 'exec')
+          p.write_text(source)
+          PY
+      - name: Download saved validation odds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .odds
+          gh release download jra-final-odds-2019-2025-02-v1 --repo "$GITHUB_REPOSITORY" --pattern 'jra-final-odds-*.tar.gz' --dir .odds
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: jra-final-odds-*
+          path: .odds
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          run-id: '35419708495'
+      - name: Require research/runtime parity before any production commit
+        run: |
+          python scripts/verify_rein_market_runtime.py --bundle .base/rein-role-v4-189820badb8b7689b1da27435d2e2ba28c967fc3.bundle.tar.gz --research .models --odds .odds --output artifacts/runtime-parity
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('artifacts/runtime-parity/report.json').read_text())
+          assert report['passed'] is True and report['sample_races'] >= 4 and report['checks'] > 0, report
+          assert report['max_abs_error'] < 1e-10, report
+          print('Parity gate passed; production model publication is permitted')
+          PY
+      - name: Commit only verified model and market-only code changes
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add rein-web/api/models/market_difference rein-web/api/rein_core.py
+          if git diff --cached --quiet; then
+            echo 'Verified model files already present; no commit needed.'
+            exit 0
+          fi
+          git commit -m 'Package parity-verified market models and correct market-only history inputs'
+          validated_commit=$(git rev-parse HEAD)
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if ! git rebase origin/main; then
+              git rebase --abort
+              echo 'Concurrent content conflict; leaving production unchanged.' >&2
+              exit 1
+            fi
+            if ! git diff --quiet "$validated_commit" HEAD -- rein-web scripts/verify_rein_market_runtime.py; then
+              echo 'Runtime changed concurrently after validation; refusing unverified publication.' >&2
+              exit 1
+            fi
+            sha256sum -c rein-web/api/models/market_difference/SHA256SUMS
+            if git push origin HEAD:main; then
+              echo "Published commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep "$((attempt * 2))"
+          done
+          echo 'Push remained blocked after three safe attempts; no force push performed.' >&2
+          exit 1
+      - name: Preserve parity report on success or failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: market-package-parity-${{ github.run_id }}
+          path: |
+            artifacts/runtime-parity/report.json
+            artifacts/runtime-parity/parity.csv
+          if-no-files-found: warn
+          retention-days: 14
