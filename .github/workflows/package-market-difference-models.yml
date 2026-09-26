@@ -1,0 +1,37 @@
+name: Package market-difference models
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/package-market-difference-models.yml]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: rein-saved-real-win-odds-training-20260925
+          path: .models
+          github-token: ${{ github.token }}
+          run-id: "36135569462"
+      - name: Package exact research models used by validated market-difference ranking
+        run: |
+          set -euo pipefail
+          mkdir -p rein-web/api/models/market_difference
+          for role in first second third; do
+            cp ".models/$role/real_odds_market.txt" "rein-web/api/models/market_difference/${role}_market.txt"
+            cp ".models/$role/real_odds_without_people.txt" "rein-web/api/models/market_difference/${role}_rein.txt"
+          done
+          sha256sum rein-web/api/models/market_difference/*.txt > rein-web/api/models/market_difference/SHA256SUMS
+      - name: Commit exact model files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add rein-web/api/models/market_difference
+          git diff --cached --quiet && exit 0
+          git commit -m "Package validated market-difference inference models"
+          git push
