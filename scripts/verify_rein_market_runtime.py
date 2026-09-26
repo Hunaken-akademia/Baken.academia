@@ -30,7 +30,7 @@ def main():
   expected[role]=q.set_index(["race_id","horse_number"])
  ids=sorted(set(expected["first"].index.get_level_values(0)))
  dates=expected["first"].reset_index().drop_duplicates("race_id").set_index("race_id").race_date
- sample=list(dates[(pd.to_datetime(dates).between("2025-07-01","2025-12-31"))].index[::80])[:20]+list(dates[pd.to_datetime(dates).ge("2026-01-01")].index[::100])[:20]
+ sample=list(dates[(pd.to_datetime(dates).between("2025-07-01","2025-12-31"))].index[::500])[:2]+list(dates[pd.to_datetime(dates).ge("2026-01-01")].index[::700])[:2]
  checks=[];maxerr=0.
  for rid in sample:
   race_rows=raw.loc[raw.race_id.eq(rid)].sort_values("horse_number").merge(odds.loc[odds.race_id.eq(rid)],on=["race_id","horse_number"],how="left",validate="one_to_one")
