@@ -29,6 +29,13 @@ jobs:
       count: ${{ steps.periods.outputs.count }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Validate the collector once before starting the matrix
+        run: python -m unittest discover -s tests -v
       - id: periods
         run: python scripts/plan_nar_resume.py
 
@@ -36,7 +43,9 @@ jobs:
     needs: plan
     if: needs.plan.outputs.count != '0'
     runs-on: ubuntu-latest
-    timeout-minutes: 355
+    # GitHub-hosted jobs have a 360-minute ceiling.  Keep the whole allowance;
+    # the collector itself is paced at the licensed three-second minimum below.
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -65,8 +74,6 @@ jobs:
           cache: pip
       - if: steps.archive.outputs.exists != 'true'
         run: pip install -r requirements.txt
-      - if: steps.archive.outputs.exists != 'true'
-        run: python -m unittest discover -s tests -v
       - name: Backfill NAR results, all final odds and payouts
         if: steps.archive.outputs.exists != 'true'
         run: >-
@@ -74,7 +81,7 @@ jobs:
           --year "$YEAR" --month "$MONTH"
           --start-day "$START_DAY" --end-day "$END_DAY"
           --output "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.parquet"
-          --min-delay 3 --max-delay 4
+          --min-delay 3 --max-delay 3
           --permission-confirmed --continue-on-error
       - name: Package verified NAR archive
         if: steps.archive.outputs.exists != 'true'
