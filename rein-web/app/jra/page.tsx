@@ -1457,20 +1457,58 @@ function horseMemo(horse: Horse, data: Analysis) {
   const rank = overallRankOf(data, horse);
   if (!roleReady(data)) return "着順別モデルの結果を取得後に表示します。";
   const roles = [
-    { label: "1着", value: horse.firstSuitability ?? 0, rank: roleRankOf(horses, horse, "firstSuitability") },
-    { label: "2着", value: horse.secondSuitability ?? 0, rank: roleRankOf(horses, horse, "secondSuitability") },
-    { label: "3着", value: horse.thirdSuitability ?? 0, rank: roleRankOf(horses, horse, "thirdSuitability") },
+    { label: "1着", value: horse.firstSuitability ?? 0, probability: horse.firstProbability, rank: roleRankOf(horses, horse, "firstSuitability") },
+    { label: "2着", value: horse.secondSuitability ?? 0, probability: horse.secondProbability, rank: roleRankOf(horses, horse, "secondSuitability") },
+    { label: "3着", value: horse.thirdSuitability ?? 0, probability: horse.thirdProbability, rank: roleRankOf(horses, horse, "thirdSuitability") },
   ].sort((a, b) => a.rank - b.rank || b.value - a.value);
   const best = roles[0];
-  const course = horseParameters(horse)[3].value;
-  const notes = [rank ? `総合${rank}位、${best.label}適性${best.rank}位` : `${best.label}適性${best.rank}位`];
-  if ((horse.historySamples ?? 0) <= 2) notes.push("キャリアが浅く上積み余地あり");
-  else if ((horse.historyAdjustment ?? 0) >= 2) notes.push("履歴面が後押し");
-  else if ((horse.historyAdjustment ?? 0) <= -2) notes.push("履歴面は慎重に評価");
-  if (course >= 65) notes.push("今回条件との相性が高め");
-  if ((horse.paceAdjustment ?? 0) > 0) notes.push("展開の恩恵を受けそう");
-  if ((horse.paceAdjustment ?? 0) < 0) notes.push("展開対応がポイント");
-  return `${notes.slice(0, 3).join("。 ")}。`;
+  const weakest = [...roles].sort((a, b) => b.rank - a.rank || a.value - b.value)[0];
+  const parameters = horseParameters(horse);
+  const course = parameters[3].value;
+  const recent = parameters[4].value;
+  const pace = horse.paceAdjustment ?? 0;
+  const samples = horse.historySamples ?? 0;
+  const popularity = horse.popularity > 0 ? horse.popularity : null;
+  const probability = best.probability === undefined
+    ? ""
+    : `・推定${(best.probability * 100).toFixed(1)}%`;
+
+  const sentences: string[] = [];
+  const overall = rank ? `総合${rank}位。` : "";
+  const marketGap = popularity ? popularity - best.rank : 0;
+  const marketView = !popularity
+    ? ""
+    : marketGap >= 3
+      ? `${popularity}番人気を${marketGap}段階上回る評価`
+      : marketGap <= -3
+        ? `${popularity}番人気に対して${Math.abs(marketGap)}段階低い評価`
+        : `${popularity}番人気と大きな差はない評価`;
+  sentences.push(
+    `${overall}${best.label}適性${best.rank}位（${best.value}pt${probability}）が3つの着順適性で最上位${marketView ? `、${marketView}` : ""}。`,
+  );
+
+  const strengths: string[] = [];
+  if (course >= 75) strengths.push(`コース${course}pt`);
+  if (recent >= 70) strengths.push(`近走${recent}pt`);
+  if (pace > 0) strengths.push(`展開補正+${pace}`);
+  if (strengths.length) {
+    sentences.push(`${strengths.join("・")}が強み。`);
+  } else {
+    sentences.push(`コース${course}pt・近走${recent}pt。`);
+  }
+
+  const cautions: string[] = [];
+  if (weakest.rank - best.rank >= 5) {
+    cautions.push(`${weakest.label}適性は${weakest.rank}位`);
+  }
+  if (pace <= -2) cautions.push("先行争いの負荷に注意");
+  if (samples > 0 && samples < 10) cautions.push(`履歴${samples}走の少数評価`);
+  if (cautions.length) {
+    sentences.push(`${cautions.join("、")}。`);
+  } else if (samples > 0) {
+    sentences.push(`履歴${samples}走を含め、着順ごとの適性差まで確認したい。`);
+  }
+  return sentences.join("");
 }
 
 function CompactStat({ label, value, sub, color = "text-slate-100" }: { label: string; value: string; sub?: string; color?: string }) {
