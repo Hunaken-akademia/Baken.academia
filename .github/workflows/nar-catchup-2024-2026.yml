@@ -1,0 +1,129 @@
+name: NAR catch-up 2024-2026
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/nar-catchup-2024-2026.yml
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+  id-token: write
+
+concurrency:
+  group: nar-catchup-2024-2026-v1
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.periods.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Validate the collector once before starting catch-up
+        run: python -m unittest discover -s tests -v
+      - id: periods
+        name: Plan 2024-2026 half-month periods
+        shell: bash
+        run: |
+          python - <<'PY'
+          import calendar
+          import json
+          import os
+
+          periods = []
+          for year in range(2024, 2027):
+              last_month = 9 if year == 2026 else 12
+              for month in range(1, last_month + 1):
+                  last_day = calendar.monthrange(year, month)[1]
+                  for start_day, end_day, suffix in ((1, 15, "a"), (16, last_day, "b")):
+                      periods.append({
+                          "year": year,
+                          "month": month,
+                          "month_padded": f"{month:02d}",
+                          "start_day": start_day,
+                          "end_day": end_day,
+                          "suffix": suffix,
+                          "period": (
+                              f"{year:04d}{month:02d}{start_day:02d}-"
+                              f"{year:04d}{month:02d}{end_day:02d}"
+                          ),
+                      })
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(
+                  "matrix="
+                  + json.dumps({"include": periods}, separators=(",", ":"))
+                  + "\n"
+              )
+          print(f"Catch-up planned {len(periods)} periods")
+          PY
+
+  backfill:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      YEAR: ${{ matrix.year }}
+      MONTH: ${{ matrix.month }}
+      MONTH_PADDED: ${{ matrix.month_padded }}
+      START_DAY: ${{ matrix.start_day }}
+      END_DAY: ${{ matrix.end_day }}
+      SUFFIX: ${{ matrix.suffix }}
+      PERIOD: ${{ matrix.period }}
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+      ARCHIVE_DATASET: "nar-results-all-bet-types-odds-and-payouts-v2"
+    steps:
+      - uses: actions/checkout@v4
+      - id: archive
+        name: Skip if verified archive already exists in Supabase
+        run: |
+          export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v2/${YEAR}/${PERIOD}.tar.gz"
+          bash scripts/check_supabase_archive.sh
+      - uses: actions/setup-python@v5
+        if: steps.archive.outputs.exists != 'true'
+        with:
+          python-version: "3.11"
+          cache: pip
+      - if: steps.archive.outputs.exists != 'true'
+        run: pip install -r requirements.txt
+      - name: Backfill NAR results, all final odds and payouts
+        if: steps.archive.outputs.exists != 'true'
+        run: >-
+          python -m baken_academia.nar_backfill
+          --year "${YEAR}" --month "${MONTH}"
+          --start-day "${START_DAY}" --end-day "${END_DAY}"
+          --output "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.parquet"
+          --min-delay 3 --max-delay 3
+          --permission-confirmed --continue-on-error
+      - name: Package verified NAR archive
+        if: steps.archive.outputs.exists != 'true'
+        run: |
+          tar -czf "nar-${PERIOD}.tar.gz" \
+            data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}*.parquet \
+            "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.audit.json" \
+            "data/raw/nar/events/${YEAR}/${MONTH_PADDED}" \
+            "data/raw/nar/odds-pages/${YEAR}/${MONTH_PADDED}"
+          test -s "nar-${PERIOD}.tar.gz"
+      - name: Archive verified chunk directly to Supabase
+        if: steps.archive.outputs.exists != 'true'
+        run: |
+          export ARCHIVE_FILE="nar-${PERIOD}.tar.gz"
+          export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v2/${YEAR}/${PERIOD}.tar.gz"
+          bash scripts/upload_archive_to_supabase.sh
+      - name: Request rolling NAR analysis after a new chunk
+        if: steps.archive.outputs.exists != 'true' && success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run nar-partial-analysis.yml --ref main
