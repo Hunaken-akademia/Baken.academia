@@ -58,7 +58,12 @@ export function selectPicks(
   horses: MarkHorse[],
   options: { roleModelReady: boolean; marketReady: boolean },
 ): Picks {
-  const empty = { main: null, rival: null, longshot: null, longshotCandidates: [] } as const;
+  const empty: Pick<Picks, "main" | "rival" | "longshot" | "longshotCandidates"> = {
+    main: null,
+    rival: null,
+    longshot: null,
+    longshotCandidates: [],
+  };
   if (!options.roleModelReady) {
     return {
       status: "unavailable",
