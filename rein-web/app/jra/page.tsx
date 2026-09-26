@@ -961,6 +961,7 @@ function AnalysisScreen({
         </div>
       </section>
       <RaceIntelligence data={data} insights={insights} />
+      <ConditionReferenceRankings data={data} />
       <Tabs defaultValue="ranking" onSwipeBack={onBack}>
         <TabsList className="mb-4 grid h-auto min-h-11 w-full grid-cols-4 bg-[#0c192a]">
           <TabsTrigger value="ranking" className="px-1 text-xs sm:text-sm">
@@ -1238,6 +1239,131 @@ function RaceIntelligence({ data, insights }: { data: Analysis; insights: RaceIn
         </InfoPanel>
       </div>
     </section>
+  );
+}
+
+type ReferenceEntry = {
+  horse: Horse;
+  value: number;
+  samples?: number;
+  winRate?: number;
+  top3Rate?: number;
+};
+
+function ConditionReferenceRankings({ data }: { data: Analysis }) {
+  const horses = data.horses;
+  const categories: Array<{
+    title: string;
+    condition: string;
+    factor?: string;
+    note: string;
+  }> = [
+    { title: "競馬場適性", condition: data.race.title.split(" ")[0], factor: "競馬場適性", note: "馬ごとの同競馬場履歴" },
+    { title: "芝・ダート適性", condition: data.race.course.match(/^(芝|ダート|障害)/)?.[1] || "今回条件", factor: "芝ダ適性", note: "馬ごとの芝・ダート別履歴" },
+    { title: "距離適性", condition: data.race.course.match(/\d{3,4}m/)?.[0] || "今回距離", factor: "距離適性", note: "近い距離帯の馬自身の履歴" },
+    { title: "騎手傾向", condition: "騎手の過去履歴", factor: "騎手傾向", note: "今回の条件に限定しない騎手集計" },
+  ];
+  const historicalRows = categories.map((category) => ({
+    ...category,
+    entries: horses.flatMap((horse) => {
+      const item = horse.parameterFactors?.find((factor) => factor.label === category.factor);
+      return item ? [{ horse, value: item.impact, samples: item.samples, winRate: item.winRate, top3Rate: item.top3Rate }] : [];
+    }).sort((a, b) => b.value - a.value || a.horse.number - b.horse.number).slice(0, 5),
+  }));
+  const paceEntries: ReferenceEntry[] = [...horses]
+    .sort((a, b) => (b.paceAdjustment ?? 0) - (a.paceAdjustment ?? 0) || (a.earlyPosition ?? 99) - (b.earlyPosition ?? 99) || a.number - b.number)
+    .slice(0, 5)
+    .map((horse) => ({ horse, value: horse.paceAdjustment ?? 0 }));
+  return (
+    <section className="mb-5 rounded-2xl border border-violet-400/20 bg-[#0c192a] p-4 text-white sm:p-5">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold tracking-widest text-violet-300">予想順位とは別表示</p>
+          <h2 className="mt-1 text-xl font-bold">条件別参考ランキング</h2>
+        </div>
+        <Badge className="bg-violet-300/10 text-violet-200">参考情報</Badge>
+      </div>
+      <p className="mb-4 text-xs leading-5 text-slate-400">
+        {data.race.title} ・ {data.race.course} ・ 馬場 {data.race.condition}。項目別の履歴評価と今回の展開補正を個別に表示します。総合順位・着順適性・買い目には反映しません。
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {historicalRows.map((category) => (
+          <ReferenceRankingCard
+            key={category.title}
+            title={category.title}
+            condition={category.condition}
+            note={category.note}
+            entries={category.entries}
+            historical
+          />
+        ))}
+        <ReferenceRankingCard
+          title="脚質・展開"
+          condition="今回の想定ペース"
+          note="REINの展開補正順。履歴成績のランキングではありません"
+          entries={paceEntries}
+        />
+      </div>
+      <p className="mt-3 text-[11px] leading-5 text-slate-500">
+        履歴順位は各項目の補正値順です。母数が少ない馬は参考度が下がります。道悪別成績、枠順・頭数別成績、クラス別成績は個別順位に必要な根拠値を画面へ出せないため、ここでは表示していません。
+      </p>
+    </section>
+  );
+}
+
+function ReferenceRankingCard({
+  title,
+  condition,
+  note,
+  entries,
+  historical = false,
+}: {
+  title: string;
+  condition: string;
+  note: string;
+  entries: ReferenceEntry[];
+  historical?: boolean;
+}) {
+  return (
+    <div className="min-w-0 rounded-xl border border-slate-700/80 bg-black/10 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="font-semibold text-slate-100">{title}</h3>
+          <p className="mt-0.5 truncate text-[11px] text-slate-500">{condition}</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-white/[.06] px-2 py-1 text-[10px] text-slate-400">{historical ? "履歴評価" : "今回の補正"}</span>
+      </div>
+      <p className="mt-2 min-h-8 text-[11px] leading-4 text-slate-500">{note}</p>
+      {entries.length ? (
+        <ol className="mt-2 divide-y divide-slate-800">
+          {entries.map(({ horse, value, samples, winRate, top3Rate }, index) => (
+            <li key={horse.number} className="flex items-center gap-2 py-2">
+              <span className={`w-6 shrink-0 text-center text-sm font-black ${index === 0 ? "text-amber-300" : "text-slate-500"}`}>{index + 1}</span>
+              <span className="grid size-7 shrink-0 place-items-center rounded-md bg-white text-xs font-bold text-slate-900">{horse.number}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">{horse.name}</p>
+                <p className="truncate text-[10px] text-slate-500">{horse.jockey || "騎手未取得"} ・ {horse.popularity > 0 ? `${horse.popularity}人気` : "人気未発表"}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                {historical ? (
+                  <>
+                    <p className={`text-xs font-bold ${(value ?? 0) >= 0 ? "text-cyan-300" : "text-rose-300"}`}>{value > 0 ? "+" : ""}{value.toFixed(1)}</p>
+                    <p className="text-[10px] text-slate-500">{samples ?? 0}走 ・ 3着内{top3Rate ?? 0}%</p>
+                  </>
+                ) : (
+                  <>
+                    <p className={`text-xs font-bold ${value > 0 ? "text-cyan-300" : value < 0 ? "text-rose-300" : "text-slate-400"}`}>{value > 0 ? "+" : ""}{value}pt</p>
+                    <p className="text-[10px] text-slate-500">{horse.style}</p>
+                  </>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="mt-2 rounded-lg bg-white/[.03] px-3 py-4 text-center text-xs text-slate-500">今回の出走馬に表示できる履歴データがありません</p>
+      )}
+    </div>
   );
 }
 
