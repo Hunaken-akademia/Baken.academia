@@ -1,0 +1,46 @@
+name: REIN market runtime fast parity
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/rein-market-runtime-parity-fast.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with: {python-version: "3.11"}
+      - run: python -m pip install numpy==2.4.6 pandas==2.3.3 pyarrow==19.0.1 lightgbm==4.7.0 scipy==1.17.1 pyjwt==2.14.0 cryptography==50.0.1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: rein-role-v4-f09ba60f2141dda639c667423b1a07eec73eb0dc
+          path: .augmented
+          github-token: ${{ github.token }}
+          run-id: "36202792464"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: rein-saved-real-win-odds-training-20260925
+          path: .research
+          github-token: ${{ github.token }}
+          run-id: "36135569462"
+      - name: Download saved odds
+        env: {GH_TOKEN: ${{ github.token }}}
+        run: |
+          mkdir -p .odds
+          gh release download jra-final-odds-2019-2025-02-v1 --repo "$GITHUB_REPOSITORY" --pattern 'jra-final-odds-*.tar.gz' --dir .odds
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: jra-final-odds-*
+          path: .odds
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          run-id: "35419708495"
+      - run: python scripts/verify_rein_market_runtime.py --bundle .augmented/rein-role-v4-f09ba60f2141dda639c667423b1a07eec73eb0dc.bundle.tar.gz --research .research --odds .odds --output artifacts/runtime-parity
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with: {name: rein-market-runtime-fast-parity, path: artifacts/runtime-parity, retention-days: 30}
