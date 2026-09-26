@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
 
   if (!forceRefresh) {
     try {
-      const snapshot = await sharedCache.get(`${preview ? "snapshot-preview-v1" : "snapshot-market-v2"}:${raceId}`);
+      const snapshot = await sharedCache.get(`${preview ? "snapshot-preview-market-top4-v1" : "snapshot-market-top4-v1"}:${raceId}`);
       if (typeof snapshot === "string") {
         return new NextResponse(snapshot, {
           status: 200,
@@ -247,7 +247,7 @@ export async function GET(request: NextRequest) {
   if (response.ok && response.headers.get("x-rein-fallback") === "0") {
     try {
       await sharedCache.set(
-        `${preview ? "snapshot-preview-v1" : "snapshot-market-v2"}:${raceId}`,
+        `${preview ? "snapshot-preview-market-top4-v1" : "snapshot-market-top4-v1"}:${raceId}`,
         await response.clone().text(),
         {
           ttl:
