@@ -2079,6 +2079,11 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
       </p>
     );
   }
+  const candidates = picks.longshotCandidates ?? (picks.longshot ? [picks.longshot] : []);
+  const roleRanks = {
+    second: new Map(roleOrder(data.horses, "second").map((horse, index) => [horse.number, index + 1])),
+    third: new Map(roleOrder(data.horses, "third").map((horse, index) => [horse.number, index + 1])),
+  };
   const slots: Array<{ title: string; pick: MarkPick | null; empty?: string }> = [
     { title: "本命", pick: picks.main },
     { title: "対抗", pick: picks.rival },
@@ -2136,6 +2141,68 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
         本命・対抗は1着適性ランキングの1位・2位。穴候補は1着適性3〜6位のうち、4番人気以下で1着評価が市場評価を上回る馬です。
         {picks.longshotReason ? `（${picks.longshotReason}）` : ""}
       </p>
+      <section className="mt-4 rounded-2xl border border-rose-400/25 bg-rose-400/[.04] p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="font-bold text-rose-200">穴候補一覧・評価</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-400">
+              買い目とは別に、人気よりREIN評価が高い馬を確認できます。
+            </p>
+          </div>
+          <Badge className="bg-rose-400/10 text-rose-200">
+            {candidates.length ? `${candidates.length}頭` : "候補なし"}
+          </Badge>
+        </div>
+        {candidates.length ? (
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {candidates.map((pick, index) => {
+              const horse = byNumber(pick);
+              if (!horse) return null;
+              const secondRank = roleRanks.second.get(horse.number);
+              const thirdRank = roleRanks.third.get(horse.number);
+              return (
+                <button
+                  key={horse.number}
+                  onClick={() => onHorse(horse)}
+                  className="rounded-xl border border-rose-400/20 bg-black/15 p-3 text-left transition hover:border-rose-300/50 hover:bg-white/[.03]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white font-bold text-slate-900">
+                        {horse.number}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-slate-100">{horse.name}</span>
+                        <span className="mt-0.5 block text-xs text-slate-400">
+                          {horse.popularity}番人気・単勝{horse.odds === null ? "未取得" : `${horse.odds}倍`}
+                        </span>
+                      </span>
+                    </div>
+                    <Badge className={index === 0 ? "shrink-0 bg-rose-400/15 text-rose-200" : "shrink-0 bg-white/10 text-slate-300"}>
+                      {index === 0 ? "穴候補筆頭" : "穴候補"}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Metric label="1着適性" value={`${pick.firstRank}位・推定${formatProbability(horse.firstProbability)}`} />
+                    <Metric label="市場モデルとの差" value={typeof pick.marketGap === "number" ? `+${(pick.marketGap * 100).toFixed(1)}ポイント` : "算出中"} />
+                    <Metric label="2着適性順位" value={secondRank ? `${secondRank}位` : "算出中"} />
+                    <Metric label="3着適性順位" value={thirdRank ? `${thirdRank}位` : "算出中"} />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-3 rounded-lg border border-dashed border-slate-700 px-3 py-3 text-sm text-slate-400">
+            {picks.longshotStatus === "unavailable"
+              ? picks.longshotReason ?? "人気・市場評価を取得できないため、穴候補を保留しています。"
+              : picks.longshotReason ?? "今回の条件に合う穴候補はいません。"}
+          </p>
+        )}
+        <p className="mt-3 text-[11px] leading-5 text-slate-500">
+          選定条件：4番人気以下、1着適性3〜6位、REIN市場モデル評価が市場評価を上回る馬。候補一覧は評価確認用で、買い目や総合順位は変更しません。
+        </p>
+      </section>
     </>
   );
 }
