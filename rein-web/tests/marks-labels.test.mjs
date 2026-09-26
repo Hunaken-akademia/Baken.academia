@@ -82,7 +82,9 @@ test('穴候補 is the best-ranked 3〜6th horse that is 4th favourite or lower 
   const picks = selectPicks(horses, { roleModelReady: true, marketReady: true });
   assert.deepEqual([picks.main.number, picks.rival.number, picks.longshot.number], [1, 2, 5]);
   assert.equal(picks.longshot.firstRank, 5);
+  assert.deepEqual(picks.longshotCandidates.map((item) => item.number), [5, 6]);
   assert.ok(Math.abs(picks.longshot.marketRatio - 1.5) < 1e-9);
+  assert.ok(Math.abs(picks.longshot.marketGap - .02) < 1e-9);
   assert.equal(new Set([picks.main.number, picks.rival.number, picks.longshot.number]).size, 3);
 });
 
@@ -90,6 +92,7 @@ test('no qualifying horse gives 該当なし; missing market data never forces a
   const horses = [horse(1, .4, 5, .1, .4), horse(2, .3, 6, .1, .3), horse(3, .2, 1, .5, .6), horse(4, .1, 2, .3, .1)];
   const none = selectPicks(horses, { roleModelReady: true, marketReady: true });
   assert.equal(none.longshot, null);
+  assert.deepEqual(none.longshotCandidates, []);
   assert.equal(none.longshotStatus, 'none');
   const missing = [...horses, horse(5, .05, 9, null, null)];
   assert.equal(selectPicks(missing, { roleModelReady: true, marketReady: true }).longshotStatus, 'none');

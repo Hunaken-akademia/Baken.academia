@@ -40,6 +40,7 @@ export type MarkPick = {
   firstRank: number;
   // Only for 穴候補: REIN first-place probability / market-model first-place probability.
   marketRatio?: number;
+  marketGap?: number;
 };
 
 export type Picks = {
@@ -48,6 +49,7 @@ export type Picks = {
   main: MarkPick | null;
   rival: MarkPick | null;
   longshot: MarkPick | null;
+  longshotCandidates: MarkPick[];
   longshotStatus: "selected" | "none" | "unavailable";
   longshotReason?: string;
 };
@@ -56,7 +58,12 @@ export function selectPicks(
   horses: MarkHorse[],
   options: { roleModelReady: boolean; marketReady: boolean },
 ): Picks {
-  const empty = { main: null, rival: null, longshot: null } as const;
+  const empty: Pick<Picks, "main" | "rival" | "longshot" | "longshotCandidates"> = {
+    main: null,
+    rival: null,
+    longshot: null,
+    longshotCandidates: [],
+  };
   if (!options.roleModelReady) {
     return {
       status: "unavailable",
@@ -78,12 +85,13 @@ export function selectPicks(
   const rival: MarkPick = { number: order[1].number, role: "対抗", firstRank: 2 };
   if (!options.marketReady) {
     return {
-      status: "ready", main, rival, longshot: null,
+      status: "ready", main, rival, longshot: null, longshotCandidates: [],
       longshotStatus: "unavailable",
       longshotReason: "人気・市場評価がそろっていないため、穴候補は選定しません",
     };
   }
   const [from, to] = LONGSHOT_ROLE_RANKS;
+  const longshotCandidates: MarkPick[] = [];
   for (let rank = from; rank <= Math.min(to, order.length); rank++) {
     const horse = order[rank - 1];
     const market = horse.marketFirstProbability;
@@ -91,14 +99,23 @@ export function selectPicks(
     if (!(horse.popularity >= LONGSHOT_MIN_POPULARITY)) continue;
     if (!(typeof market === "number" && typeof rein === "number" && market > 0 && rein > 0)) continue;
     if (!(rein > market)) continue;
+    longshotCandidates.push({
+      number: horse.number,
+      role: "穴候補",
+      firstRank: rank,
+      marketRatio: rein / market,
+      marketGap: rein - market,
+    });
+  }
+  const longshot = longshotCandidates[0] ?? null;
+  if (longshot) {
     return {
-      status: "ready", main, rival,
-      longshot: { number: horse.number, role: "穴候補", firstRank: rank, marketRatio: rein / market },
+      status: "ready", main, rival, longshot, longshotCandidates,
       longshotStatus: "selected",
     };
   }
   return {
-    status: "ready", main, rival, longshot: null,
+    status: "ready", main, rival, longshot: null, longshotCandidates: [],
     longshotStatus: "none",
     longshotReason: "1着適性3〜6位に、4番人気以下かつ1着評価が市場を上回る馬がいません",
   };
