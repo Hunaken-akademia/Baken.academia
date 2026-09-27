@@ -1,0 +1,80 @@
+[
+  {
+    "race_id": "20250105-中京-01",
+    "feature_mismatches": [],
+    "max_normalized_probability_difference": {
+      "first": 0.0010165349033295357,
+      "third": 0.0001395450332753352,
+      "second": 0.00010536533795749148
+    }
+  },
+  {
+    "race_id": "20260104-中山-01",
+    "feature_mismatches": [
+      [
+        "jockey_id",
+        "category"
+      ],
+      [
+        "jockey_starts",
+        7795.0
+      ],
+      [
+        "jockey_win_rate",
+        0.05148752399232247
+      ],
+      [
+        "jockey_top3_rate",
+        0.09406589891234804
+      ],
+      [
+        "jockey_avg_finish",
+        0.0
+      ]
+    ],
+    "max_normalized_probability_difference": {
+      "first": 0.0036226476337867936,
+      "third": 0.0012348234471777353,
+      "second": 0.006540964107145317
+    }
+  },
+  {
+    "race_id": "20250209-京都-10",
+    "feature_mismatches": [],
+    "max_normalized_probability_difference": {
+      "first": 1.6653345369377348e-16,
+      "third": 0.0003794982456305357,
+      "second": 8.153200337090993e-17
+    }
+  },
+  {
+    "race_id": "20260201-東京-08",
+    "feature_mismatches": [
+      [
+        "jockey_id",
+        "category"
+      ],
+      [
+        "jockey_starts",
+        7887.0
+      ],
+      [
+        "jockey_win_rate",
+        0.051280510939673715
+      ],
+      [
+        "jockey_top3_rate",
+        0.09338876944479577
+      ],
+      [
+        "jockey_avg_finish",
+        0.0
+      ]
+    ],
+    "max_normalized_probability_difference": {
+      "first": 0.001648546498587325,
+      "third": 0.001390724759576037,
+      "second": 0.007825059863228456
+    }
+  }
+]
