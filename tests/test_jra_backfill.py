@@ -19,6 +19,11 @@ class JraBackfillTest(unittest.TestCase):
         self.assertEqual(parse_event_cnames(page), ["pw01srl10062026040420260913/75"])
         self.assertEqual(parse_all_results_cname(page), "pw01ses10062026040420260913/7E")
 
+    def test_today_and_history_navigation_are_both_recognized(self):
+        page = b"<a onclick=\"doAction('/JRADB/accessS.html','pw01srl00062026040920260927/D1')\">today</a><a onclick=\"doAction('/JRADB/accessS.html','pw01ses01062026040920260927/E2')\">results</a>"
+        self.assertEqual(parse_event_cnames(page), ['pw01srl00062026040920260927/D1'])
+        self.assertEqual(parse_all_results_cname(page), 'pw01ses01062026040920260927/E2')
+
     def test_parses_runner_and_race_fields(self) -> None:
         page = '''<!doctype html><html><body>
         <div class="race_result_unit" id="race_result_2R">
@@ -39,6 +44,8 @@ class JraBackfillTest(unittest.TestCase):
         self.assertEqual(rows[0]["horse_weight_change"], 2)
         self.assertEqual(rows[0]["race_last_3f"], 36.0)
         self.assertTrue(rows[0]["blinkers"])
+        same_day_rows = parse_results_page(page.replace(b"pw01dud10", b"pw01dud00"), "same-day")
+        self.assertEqual(same_day_rows[0]["horse_id"], "2021109096")
 
 
 if __name__ == "__main__":

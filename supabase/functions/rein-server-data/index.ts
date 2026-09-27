@@ -43,7 +43,13 @@ Deno.serve(async req => {
    const path = b.path;
    if (typeof path !== "string" || !/^daily\/(?:jra|nar)\/20\d{2}\/20\d{2}-\d{2}-\d{2}\.(?:tar\.gz|manifest\.json)$/.test(path)) return json({error:"Invalid archive path"},400);
    const storage = admin.storage.from("baken-archive");
-   if(action === "exists") { const {data,error}=await storage.exists(path); if(error) throw error; return json({exists:data}); }
+   if(action === "exists") {
+    // HEAD/exists reports missing objects as errors on this Storage deployment.
+    // Listing the exact basename distinguishes absence from an actual service error.
+    const split=path.lastIndexOf("/"), name=path.slice(split+1);
+    const objects=checked(await storage.list(path.slice(0,split),{search:name,limit:1}));
+    return json({exists:objects.some((object:any)=>object.name===name)});
+   }
    if(action === "sign-upload") { const value=checked(await storage.createSignedUploadUrl(path,{upsert:true})); return json({signed_url:value.signedUrl}); }
    if(action === "sign-download") { const value=checked(await storage.createSignedUrl(path,600)); return json({signed_url:value.signedUrl}); }
    return json({error:"Forbidden action"},403);
