@@ -27,6 +27,17 @@ async function identity(req: Request): Promise<"production" | "preview" | "githu
   return payload.environment as "production" | "preview";
 }
 function checked<T>(result: { data: T; error: any }) { if (result.error) throw new Error(result.error.message); return result.data; }
+function validNarAnalysis(report: any) {
+ const coverage=report?.coverage, baseline=report?.market_baseline;
+ return report?.status === "partial_rolling_analysis"
+  && Number.isInteger(coverage?.chunks) && coverage.chunks > 0
+  && dateValid(coverage?.date_from) && dateValid(coverage?.date_to)
+  && Number.isInteger(coverage?.races) && coverage.races >= 0
+  && Number.isInteger(coverage?.runners) && coverage.runners >= 0
+  && Number.isInteger(coverage?.racecourses) && coverage.racecourses >= 0
+  && typeof baseline?.pop1_win_rate === "number"
+  && typeof baseline?.pop1_top3_rate === "number";
+}
 const raceIdValid = (id: unknown) => typeof id === "string" && /^\d{10,12}$/.test(id);
 const dateValid = (date: unknown) => typeof date === "string" && /^20\d{2}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date));
 
@@ -55,6 +66,17 @@ Deno.serve(async req => {
    return json({error:"Forbidden action"},403);
   }
   if (["save","save-schedule","claim","release","run"].includes(action) && who !== "production") return json({error:"Production writer required"},403);
+  if (action === "publish-nar-analysis" && who !== "github") return json({error:"GitHub analysis workflow required"},403);
+  if (action === "nar-analysis" && who === "github") return json({error:"REIN reader required"},403);
+  if (action === "publish-nar-analysis") {
+   if(JSON.stringify(b.report).length>900_000 || !validNarAnalysis(b.report)) return json({error:"Invalid NAR analysis report"},400);
+   checked(await admin.from("rein_nar_analysis_snapshots").upsert({id:true,report:b.report,updated_at:new Date().toISOString()}));
+   return json({published:true});
+  }
+  if (action === "nar-analysis") {
+   const analysis=checked(await admin.from("rein_nar_analysis_snapshots").select("report,updated_at").eq("id",true).maybeSingle());
+   return json({analysis});
+  }
   if (action === "save") {
    const record = snapshotRecord(b.payload,b.preview === true);
    const saved=checked(await admin.rpc("rein_store_race_snapshot",{r:record}));

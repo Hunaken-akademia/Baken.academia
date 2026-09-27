@@ -24,5 +24,14 @@ export function snapshotRecord(body: any, preview: boolean, now = Date.now()) {
 }
 
 export function validGithubCaptureClaims(claims: Record<string, unknown>) {
-  return claims.repository_id === "1376323200" && claims.repository === "Hunaken-akademia/Baken.academia" && claims.ref === "refs/heads/main" && claims.workflow_ref === "Hunaken-akademia/Baken.academia/.github/workflows/rein-daily-capture.yml@refs/heads/main" && ["schedule", "workflow_dispatch", "push"].includes(String(claims.event_name));
+  const workflow = String(claims.workflow_ref);
+  const event = String(claims.event_name);
+  const daily = workflow === "Hunaken-akademia/Baken.academia/.github/workflows/rein-daily-capture.yml@refs/heads/main"
+    && ["schedule", "workflow_dispatch", "push"].includes(event);
+  const narAnalysis = workflow === "Hunaken-akademia/Baken.academia/.github/workflows/nar-partial-analysis.yml@refs/heads/main"
+    && ["schedule", "workflow_dispatch", "push", "workflow_run"].includes(event);
+  return claims.repository_id === "1376323200"
+    && claims.repository === "Hunaken-akademia/Baken.academia"
+    && claims.ref === "refs/heads/main"
+    && (daily || narAnalysis);
 }
