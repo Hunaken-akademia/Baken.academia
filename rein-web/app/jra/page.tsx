@@ -27,6 +27,7 @@ import { RaceFormationMap } from "@/components/race-formation-map";
 import { PredictionJournal, HorseNotebook } from "@/components/prediction-journal";
 import { MarketRankMap } from "@/components/market-rank-map";
 import { PredictionDataStatus } from "@/components/prediction-data-status";
+import { ReinCloudProvider } from "@/components/rein-cloud-provider";
 
 type HistoryFactor = {
   label: string;
@@ -757,6 +758,18 @@ function AnalysisScreen({
   onBack,
   onHorse,
 }: {
+  data: Analysis;
+  activeHorse: Horse | null;
+  danger: Horse | undefined;
+  loading: boolean;
+  onRetry: () => void;
+  onBack: () => void;
+  onHorse: (horse: Horse) => void;
+}) {
+  return <ReinCloudProvider><AnalysisScreenContent data={data} activeHorse={activeHorse} danger={danger} loading={loading} onRetry={onRetry} onBack={onBack} onHorse={onHorse} /></ReinCloudProvider>;
+}
+
+function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, onBack, onHorse }: {
   data: Analysis;
   activeHorse: Horse | null;
   danger: Horse | undefined;
