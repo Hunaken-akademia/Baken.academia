@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CORNER_AUDIT_MAE, CORNER_MODEL_VERSION, courseStages, horseSequences, mapSlot, predictCorner, stagePosition, type MapHorse } from "@/lib/corner-reference";
+import { CORNER_AUDIT_MAE, CORNER_MODEL_VERSION, courseStages, horseSequences, predictCorner, stagePosition, type MapHorse } from "@/lib/corner-reference";
 
 const frameColors = ["#94a3b8", "#f8fafc", "#171717", "#dc433c", "#3778dc", "#f4d641", "#329249", "#ec9a30", "#d94c90"];
 const styleOrder: Record<string, number> = { "逃げ": 1, "先行": 2, "好位": 3, "差し": 4, "追込": 5 };
@@ -24,7 +23,7 @@ export function RaceFormationMap({ horses, title, course, raceId, pace }: {
   const ai = active.startsWith("ai");
   const past = active.startsWith("past");
   const corner = ai ? Number(active.slice(2)) : past ? Number(active.slice(4)) : 0;
-  const curved = corner > 0;
+
   const projected = horses.map((horse) => {
     const estimate = ai ? predictCorner(horse, corner, horses.length, course) : null;
     const prior = past ? stagePosition(horseSequences(horse)[0] ?? [], corner) : null;
@@ -37,20 +36,19 @@ export function RaceFormationMap({ horses, title, course, raceId, pace }: {
   const tops = [...horses].filter((h) => (h.firstSuitability ?? 0) > 0).sort((a,b) => (b.firstSuitability ?? 0)-(a.firstSuitability ?? 0)).slice(0,3).map((h) => h.number);
   const modeLabel = options.find((item) => item.id === active)?.label;
   const legacy = horses.some((h) => h.mapPositions === undefined);
+  const groupSize = Math.max(1, Math.ceil(visible.length / 3));
 
   return (
-    <section className="mb-5 overflow-hidden rounded-2xl border border-emerald-400/25 bg-[#0c192a] text-white">
+    <section className="mb-5 overflow-hidden rounded-2xl border border-cyan-300/20 bg-[#0c192a] text-white">
       <div className="p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-xl font-bold">隊列マップ</h2>
-          <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200">{ai ? "AI位置取り予測 β" : past ? "前走の通過順位" : "近走の脚質傾向"}</span>
+          <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-200">{ai ? "AI位置取り予測 β" : past ? "前走の通過順位" : "近走の脚質傾向"}</span>
         </div>
         <p className="mt-2 text-sm text-slate-300">ペース想定：{pace}</p>
-        <Tabs value={active} onValueChange={(next) => { setMode(next); setSelected(null); }} className="mt-4">
-          <TabsList aria-label="隊列マップの場面" className="flex h-auto w-full flex-wrap justify-start gap-1 bg-[#071220] p-1">
-            {options.map((option) => <TabsTrigger key={option.id} value={option.id} className="min-h-10 px-3 text-sm data-[state=active]:bg-emerald-600 data-[state=active]:text-white">{option.label}</TabsTrigger>)}
-          </TabsList>
-        </Tabs>
+        <div role="group" aria-label="隊列マップの場面" className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4" data-testid="formation-controls">
+          {options.map((option) => <button key={option.id} type="button" aria-pressed={active === option.id} onClick={() => { setMode(option.id); setSelected(null); }} className={`min-h-11 rounded-lg border px-2 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${active === option.id ? "border-cyan-300 bg-cyan-300 text-[#071220]" : "border-slate-700 bg-[#101f32] text-slate-300 hover:border-slate-500 hover:text-white"}`}>{option.label}</button>)}
+        </div>
         <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-300">
           {["逃げ", "先行", "好位", "差し", "追込"].map((style) => {
             const count = horses.filter((h) => h.style === style).length;
@@ -61,45 +59,36 @@ export function RaceFormationMap({ horses, title, course, raceId, pace }: {
       </div>
       <div className="grid gap-5 px-4 pb-5 sm:px-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)]">
         <div className="min-w-0">
-          <div className="relative mx-auto aspect-[400/330] w-full max-w-[640px] overflow-hidden rounded-2xl bg-[#78ac44]" aria-label={`${modeLabel}の隊列。先頭側から${visible.map((p) => p.horse.number).join("、")}番。間隔と横位置は表示上の配置です。`}>
-            <svg viewBox="0 0 400 330" className="absolute inset-0 h-full w-full" aria-hidden="true">
-              <rect width="400" height="330" fill="#91be59" />
-              {curved ? <>
-                <path d="M 165 18 A 147 147 0 0 1 18 165 L 0 165 L 0 0 L 165 0 Z" fill="#487e38" />
-                <path d="M 165 0 L 165 18 A 147 147 0 0 1 18 165 L 0 165" fill="none" stroke="#fff" strokeWidth="4" />
-                <path d="M 340 18 A 322 322 0 0 1 18 340" fill="none" stroke="#dcecbe" strokeWidth="2" strokeDasharray="7 6" />
-                <path d="M 211 18 A 193 193 0 0 1 18 211 M 267 18 A 249 249 0 0 1 18 267" fill="none" stroke="#c6de99" strokeWidth="1" />
-                <text x="29" y="60" fill="#e7f2dd" fontSize="15" fontWeight="700">{corner}コーナー</text>
-                <text x="29" y="83" fill="#d4e5c6" fontSize="11">形状は模式図</text>
-                <text x="28" y="124" fill="#f0f7e8" fontSize="14" fontWeight="700">↓ 先頭側</text>
-                <text x="294" y="38" fill="#183422" fontSize="14" fontWeight="700">後方側</text>
-              </> : <>
-                <rect width="400" height="63" fill="#cfe5eb" />
-                <path d="M0 69 H400" stroke="#fff" strokeWidth="5" />
-                <path d="M0 286 H400" stroke="#dcecbe" strokeWidth="3" strokeDasharray="9 7" />
-                <text x="23" y="39" fill="#173e40" fontSize="15" fontWeight="700">← 先頭側</text>
-                <text x="317" y="39" fill="#173e40" fontSize="15" fontWeight="700">後方側</text>
-                <text x="200" y="316" textAnchor="middle" fill="#183422" fontSize="12">{active === "style" ? "脚質の傾向順" : "最初の通過地点の位置取り"}</text>
-              </>}
-            </svg>
-            {visible.map((entry, index) => {
-              const { horse } = entry;
-              const point = mapSlot(index, visible.length, curved);
-              const topIndex = tops.indexOf(horse.number);
-              const ring = topIndex >= 0 ? ["#fb7185", "#fb923c", "#fde047"][topIndex] : "transparent";
-              return <button key={horse.number} type="button" aria-pressed={selected === horse.number} aria-label={`${horse.number}番 ${horse.name} ${ai && entry.estimate ? `推定${entry.estimate.position.toFixed(1)}番手` : past ? `前走${entry.value}番手` : horse.style}`} onClick={() => setSelected(horse.number)} className="absolute flex h-[44px] w-[44px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-cyan-700" style={{ left: `${point.x/4}%`, top: `${point.y/3.3}%` }}>
-                <span className="flex size-7 items-center justify-center rounded-full border-2 border-white text-sm font-extrabold shadow-md sm:size-11 sm:text-xl" style={{ background: frameColors[horse.gate ?? 0] ?? frameColors[0], color: horse.gate === 1 || horse.gate === 5 || horse.gate === 7 ? "#111827" : "#fff", boxShadow: `0 0 0 ${selected === horse.number ? 5 : 3}px ${selected === horse.number ? "#164e63" : ring}, 0 3px 7px #173e4055` }}>{horse.number}</span>
-              </button>;
-            })}
-            {!visible.length && <div className="absolute inset-x-6 top-1/2 rounded-xl bg-[#10233a]/95 p-4 text-center text-sm leading-6">この場面を推定できる通過順データがありません。<br/>データのない馬は無理に配置しません。</div>}
+          <div className="overflow-hidden rounded-xl border border-slate-700 bg-[#071220]" aria-label={`${modeLabel}の隊列。先頭側から${visible.map((p) => p.horse.number).join("、")}番。内外や馬身差は表しません。`} data-testid="formation-board">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700 px-3 py-3 text-xs text-slate-400">
+              <span className="font-bold text-cyan-200">{corner ? `${corner}コーナー` : active === "style" ? "脚質の並び" : "最初の通過地点"}</span>
+              <span>{visible.length}/{horses.length}頭を配置</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 p-3 sm:gap-3">
+              {["先頭側", "中ほど", "後方側"].map((label, column) => <div key={label} className="min-w-0">
+                <p className="mb-3 flex items-center justify-between border-b border-slate-700 pb-2 text-xs font-semibold text-slate-400"><span>{label}</span><span aria-hidden="true">{column < 2 ? "→" : ""}</span></p>
+                <div className="grid gap-2">
+                  {visible.slice(column * groupSize, (column + 1) * groupSize).map(({ horse, value, estimate }) => {
+                    const topIndex = tops.indexOf(horse.number);
+                    const selectedHorse = selected === horse.number;
+                    return <button key={horse.number} type="button" data-formation-horse={horse.number} aria-pressed={selectedHorse} aria-label={`${horse.number}番 ${horse.name} ${ai && estimate ? `推定${estimate.position.toFixed(1)}番手` : past ? `前走${value}番手` : horse.style}`} onClick={() => setSelected(horse.number)} className={`relative min-h-16 min-w-0 overflow-hidden rounded-lg border px-2 py-2 pl-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${selectedHorse ? "border-cyan-300 bg-cyan-300/15" : "border-slate-700 bg-[#132338] hover:border-cyan-300/60"}`}>
+                      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 border-r border-white/20" style={{ background: frameColors[horse.gate ?? 0] ?? frameColors[0] }} />
+                      <span className="flex items-center justify-between gap-1"><span className="text-xl font-extrabold tabular-nums">{horse.number}</span>{topIndex >= 0 && <span className={`rounded px-1 py-0.5 text-[10px] font-bold ${topIndex === 0 ? "bg-cyan-300/15 text-cyan-200" : topIndex === 1 ? "bg-violet-300/15 text-violet-200" : "bg-amber-300/15 text-amber-200"}`}>適{topIndex + 1}</span>}</span>
+                      <span className="mt-1 block whitespace-nowrap text-[10px] leading-4 text-slate-300 sm:text-xs">{ai && estimate ? `${estimate.position.toFixed(1)}番手` : past ? `${value}番手` : horse.style}</span>
+                    </button>;
+                  })}
+                </div>
+              </div>)}
+            </div>
+            {!visible.length && <p className="px-4 pb-5 text-center text-sm leading-6 text-slate-400">この場面を推定できる通過順データがありません。</p>}
           </div>
-          <p className="mt-3 text-xs leading-5 text-slate-400">丸の色＝枠色。赤・橙・黄のリング＝1着適性の上位3頭。馬番をタップで詳細。前後の順を図示し、間隔・内外の配置は見やすさのための調整です。</p>
+          <p className="mt-3 text-xs leading-5 text-slate-400">各列の上から下、左の列から右の列へ前後順に配置。枠色はカードの左端、適1〜3は1着適性の上位3頭です。内外・馬身差は表しません。</p>
         </div>
         <div className="min-w-0 space-y-3">
           <div className="rounded-xl border border-slate-700 bg-black/10 p-4" aria-live="polite">
             {current ? <>
               <p className="font-bold">{current.horse.number}　{current.horse.name}</p>
-              <p className="mt-2 text-sm text-emerald-200">{current.estimate ? `推定 ${current.estimate.position.toFixed(1)}番手 / 目安 ${current.estimate.low}〜${current.estimate.high}番手` : past ? current.value === null ? "該当コーナーの記録なし" : `前走 ${current.value}番手` : `近走の脚質：${current.horse.style}`}</p>
+              <p className="mt-2 text-sm text-cyan-200">{current.estimate ? `推定 ${current.estimate.position.toFixed(1)}番手 / 目安 ${current.estimate.low}〜${current.estimate.high}番手` : past ? current.value === null ? "該当コーナーの記録なし" : `前走 ${current.value}番手` : `近走の脚質：${current.horse.style}`}</p>
               <p className="mt-2 break-words text-xs leading-5 text-slate-400">近走通過順（新しい順）：{horseSequences(current.horse).map((s) => s.join("-")).join(" / ") || "未取得"}</p>
               {current.estimate && <p className="mt-1 text-xs text-slate-400">この地点の履歴 {current.estimate.samples}走。履歴が少ない馬は参考度が下がります。</p>}
             </> : <><p className="font-semibold">位置取りの根拠を見る</p><p className="mt-2 text-sm leading-6 text-slate-400">馬番をタップすると、推定番手と近走の通過順を確認できます。</p></>}
@@ -110,8 +99,8 @@ export function RaceFormationMap({ horses, title, course, raceId, pace }: {
             <div className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
               <p>AIは2019〜2024年の過去データで学習した位置取りモデルです。近走通過順・頭数・距離・芝ダート・枠から地点別に推定します。当日オッズ・人気・今回の着順結果は使いません。</p>
               <p>2026年データの4角検証では平均誤差 {CORNER_AUDIT_MAE.toFixed(2)}番手。目安幅は2025年の検証誤差から算出したもので、各馬に同じ確率を保証するものではありません。</p>
-              <p>序盤は最初の記録地点の予測で、発馬直後ではありません。1・2角を通らないコースでは該当タブを出しません。直線・障害・未登録コースではAIコーナー予測を保留します。</p>
-              <p>内外の進路・馬身差・想定タイムはまだ予測対象外です。前走タブは各馬の別レースの通過順位を比較する参考図です。</p>
+              <p>序盤は最初の記録地点の予測で、発馬直後ではありません。1・2角を通らないコースでは該当ボタンを出しません。直線・障害・未登録コースではAIコーナー予測を保留します。</p>
+              <p>内外の進路・馬身差・想定タイムはまだ予測対象外です。前走表示は各馬の別レースの通過順位を比較する参考図です。</p>
               <p>総合評価・1〜3着適性・買い目は変更していません。{legacy ? "一部は既存保存データの通過順を使用しています。" : ""}</p>
               <p>モデル：{CORNER_MODEL_VERSION} / 検証期間：2026年1月〜9月13日</p>
             </div>
