@@ -6,9 +6,9 @@ import type { HorseNote } from "@/lib/account-data";
 export const dynamic = "force-dynamic";
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "cache-control": "private, no-store" } });
 
-async function readAccountData(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+async function readAccountData(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, notesOnly = false) {
   const [predictionResult, noteResult] = await Promise.all([
-    supabase.from("rein_saved_predictions").select("entry_id,prediction,result,saved_at").eq("user_id", userId).order("saved_at", { ascending: false }).limit(JOURNAL_LIMIT),
+    notesOnly ? Promise.resolve({ data: [], error: null }) : supabase.from("rein_saved_predictions").select("entry_id,prediction,result,saved_at").eq("user_id", userId).order("saved_at", { ascending: false }).limit(JOURNAL_LIMIT),
     supabase.from("rein_horse_notes").select("horse_id,note_data,updated_at").eq("user_id", userId),
   ]);
   if (predictionResult.error || noteResult.error) throw new Error("Account data could not be read");
@@ -22,12 +22,12 @@ async function readAccountData(supabase: Awaited<ReturnType<typeof createClient>
   return { userId, entries: validEntries, notes };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
   const userId = typeof data?.claims?.sub === "string" ? data.claims.sub : "";
   if (error || !userId) return json({ error: "ログインしてください" }, 401);
-  try { return json(await readAccountData(supabase, userId)); }
+  try { return json(await readAccountData(supabase, userId, request.nextUrl.searchParams.get("notes") === "1")); }
   catch { return json({ error: "保存データを取得できませんでした" }, 500); }
 }
 
@@ -57,12 +57,12 @@ export async function POST(request: NextRequest) {
     if (typeof note.horseId !== "string" || !/^\d{1,16}$/.test(note.horseId) || typeof note.name !== "string" || note.name.length > 100 || typeof note.note !== "string" || note.note.length > 1200 || typeof note.watched !== "boolean") return json({ error: "馬メモの形式が正しくありません" }, 400);
     notesByHorse.set(note.horseId, { user_id: userId, horse_id: note.horseId, note_data: { name: note.name, note: note.note, watched: note.watched, updatedAt: typeof note.updatedAt === "string" ? note.updatedAt : new Date().toISOString() } });
   }
-  const { error: predictionError } = await supabase.rpc("rein_sync_saved_predictions", { p_entries: rpcEntries });
+  const { error: predictionError } = rpcEntries.length ? await supabase.rpc("rein_sync_saved_predictions", { p_entries: rpcEntries }) : { error: null };
   if (predictionError) return json({ error: "予想をサーバーに保存できませんでした" }, 500);
   if (notesByHorse.size) {
-    const { error: noteError } = await supabase.from("rein_horse_notes").upsert([...notesByHorse.values()], { onConflict: "user_id,horse_id" });
+    const { error: noteError } = await supabase.from("rein_horse_notes").upsert([...notesByHorse.values()].map(row => ({ ...row, updated_at: new Date().toISOString() })), { onConflict: "user_id,horse_id" });
     if (noteError) return json({ error: "馬メモをサーバーに保存できませんでした" }, 500);
   }
-  try { return json(await readAccountData(supabase, userId)); }
+  try { return json(await readAccountData(supabase, userId, request.nextUrl.searchParams.get("notes") === "1")); }
   catch { return json({ error: "保存後データを取得できませんでした" }, 500); }
 }

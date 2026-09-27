@@ -1,0 +1,107 @@
+name: REIN daily race capture
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/rein-daily-capture.yml", "scripts/rein_daily_capture.py"]
+  schedule:
+    # 22:35 JST: completed day. 06:35 JST: recover only missing previous day.
+    - cron: '35 13 * * *'
+    - cron: '35 21 * * *'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'JST date YYYY-MM-DD (last 7 days); empty selects completed day'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: rein-daily-capture
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      date: ${{ steps.date.outputs.date }}
+    steps:
+      - name: Select completed race day
+        id: date
+        env:
+          REQUESTED_DATE: ${{ inputs.date }}
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime, timedelta, timezone, date
+          now = datetime.now(timezone(timedelta(hours=9)))
+          requested = os.environ.get('REQUESTED_DATE', '')
+          target = date.fromisoformat(requested) if requested else now.date() - timedelta(days=now.hour < 22)
+          if not now.date()-timedelta(days=7) <= target <= now.date():
+              raise ValueError('Date must be within the last seven days')
+          if target == now.date() and now.hour < 22:
+              raise ValueError('Capture current-day final data after 22:00 JST')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              print(f'date={target}', file=f)
+          PY
+  archive:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        dataset: [jra, nar]
+    env:
+      PYTHONPATH: src
+      CAPTURE_DATE: ${{ needs.plan.outputs.date }}
+      DATASET: ${{ matrix.dataset }}
+      SUPABASE_BROKER_URL: https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/rein-server-data
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set archive path
+        run: |
+          echo "ARCHIVE_OBJECT_PATH=daily/${DATASET}/${CAPTURE_DATE:0:4}/${CAPTURE_DATE}.tar.gz" >> "$GITHUB_ENV"
+      - name: Skip verified completed days
+        id: existing
+        run: bash scripts/check_supabase_archive.sh
+      - uses: actions/setup-python@v5
+        if: steps.existing.outputs.exists != 'true'
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: scripts/rein-daily-requirements.txt
+      - name: Install capture-only dependencies
+        if: steps.existing.outputs.exists != 'true'
+        run: python -m pip install -r scripts/rein-daily-requirements.txt
+      - name: Capture results, final odds and payouts
+        if: steps.existing.outputs.exists != 'true'
+        run: python scripts/rein_daily_capture.py --dataset "$DATASET" --date "$CAPTURE_DATE" --output-dir daily
+      - name: Archive directly to private storage and verify SHA-256
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          ARCHIVE_FILE: daily.tar.gz
+          ARCHIVE_DATASET: ${{ matrix.dataset }}-daily
+        run: |
+          test -s daily/complete.json
+          tar -czf daily.tar.gz -C daily .
+          bash scripts/upload_archive_to_supabase.sh
+  reconcile:
+    needs: [plan, archive]
+    if: always() && !cancelled() && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CAPTURE_DATE: ${{ needs.plan.outputs.date }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Complete stored race snapshots and result matching
+        run: bash scripts/reconcile_rein_snapshots.sh

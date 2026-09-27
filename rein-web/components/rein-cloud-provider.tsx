@@ -1,103 +1,71 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { accountJournalKey, accountNoteKey, accountPayload, CLOUD_OWNER_KEY, readLegacyNotes, type AccountData, type HorseNote } from "@/lib/account-data";
-import { JOURNAL_KEY, readJournal, type JournalEntry } from "@/lib/prediction-journal";
+import { CLOUD_OWNER_KEY, readLegacyNotes, NOTE_KEY, type HorseNote } from "@/lib/account-data";
 
-type CloudContext = AccountData & { ready: boolean; status: string; saveEntries: (entries: JournalEntry[]) => void; saveNote: (horseId: string, note: Omit<HorseNote, "updatedAt">) => void };
-const empty: CloudContext = { userId: "", entries: [], notes: {}, ready: false, status: "", saveEntries: () => {}, saveNote: () => {} };
-const Context = createContext<CloudContext>(empty);
-
-function fromServer(value: unknown): AccountData | null {
-  if (!value || typeof value !== "object") return null;
-  const data = value as Partial<AccountData>;
-  if (typeof data.userId !== "string" || !Array.isArray(data.entries) || !data.notes || typeof data.notes !== "object") return null;
-  return { userId: data.userId, entries: readJournal(JSON.stringify(data.entries)), notes: data.notes as Record<string, HorseNote> };
+type NotesData = { userId: string; notes: Record<string, HorseNote> };
+type CloudContext = NotesData & { ready: boolean; status: string; saveNote: (horseId: string, note: Omit<HorseNote, "updatedAt">) => void };
+const Context = createContext<CloudContext>({ userId: "", notes: {}, ready: false, status: "", saveNote: () => {} });
+function fromServer(value: unknown): NotesData {
+  const data = value as NotesData;
+  if (!data || typeof data.userId !== "string" || !data.notes || typeof data.notes !== "object") throw new Error("Invalid notes response");
+  return { userId: data.userId, notes: data.notes };
+}
+async function writeNotes(notes: Array<{ horseId: string } & Omit<HorseNote, "updatedAt">>) {
+  const response = await fetch("/api/account-data?notes=1", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ entries: [], notes }), cache: "no-store" });
+  if (!response.ok) throw new Error("Note save failed");
+  return fromServer(await response.json());
 }
 
-function storeLocal(data: AccountData) {
-  try {
-    localStorage.setItem(accountJournalKey(data.userId), JSON.stringify(data.entries));
-    for (const [horseId, note] of Object.entries(data.notes)) localStorage.setItem(accountNoteKey(data.userId, horseId), JSON.stringify(note));
-    localStorage.setItem(CLOUD_OWNER_KEY, data.userId);
-  } catch {}
-}
-
-export function ReinCloudProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<AccountData>({ userId: "", entries: [], notes: {} });
+export function ReinCloudProvider({ children, enabled = true }: { children: ReactNode; enabled?: boolean }) {
+  const [data, setData] = useState<NotesData>({ userId: "", notes: {} });
   const [ready, setReady] = useState(false);
-  const [status, setStatus] = useState("サーバーから保存データを読み込み中…");
-  const [revision, setRevision] = useState(0);
-  const [pendingEntries, setPendingEntries] = useState<JournalEntry[] | null>(null);
-  const [pendingNotes, setPendingNotes] = useState<Record<string, HorseNote>>({});
-  const syncQueue = useRef<Promise<void>>(Promise.resolve());
-
-  const sync = useCallback(async (next: AccountData) => {
-    if (!next.userId) return;
-    setData(next); setPendingEntries(next.entries); setPendingNotes(next.notes); storeLocal(next); setStatus("サーバーへ保存中…");
-    syncQueue.current = syncQueue.current.catch(() => {}).then(async () => {
-      try {
-        const response = await fetch("/api/account-data", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(accountPayload(next)), cache: "no-store" });
-        if (!response.ok) throw new Error("sync failed");
-        const canonical = fromServer(await response.json());
-        if (!canonical) throw new Error("invalid response");
-        setData(canonical); setPendingEntries(canonical.entries); setPendingNotes(canonical.notes); storeLocal(canonical); setStatus("サーバーに保存済み・他の端末と同期しています");
-      } catch { setStatus("サーバーに接続できません。端末内に一時保存し、再接続時に同期します。"); }
-    });
-    await syncQueue.current;
-  }, []);
-
+  const [status, setStatus] = useState("");
+  const queue = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
+    setReady(false); setStatus("サーバーから馬メモを読み込み中…");
     async function load() {
       try {
-        const response = await fetch("/api/account-data", { cache: "no-store" });
-        if (!response.ok) throw new Error("load failed");
-        const server = fromServer(await response.json());
-        if (!server || cancelled) throw new Error("invalid response");
-        const owner = localStorage.getItem(CLOUD_OWNER_KEY);
-        const mayImportLegacy = !owner || owner === server.userId;
-        const accountEntries = readJournal(localStorage.getItem(accountJournalKey(server.userId)));
-        const legacyEntries = mayImportLegacy ? readJournal(localStorage.getItem(JOURNAL_KEY)) : [];
-        const byId = new Map<string, JournalEntry>();
-        for (const entry of [...accountEntries, ...legacyEntries, ...server.entries]) byId.set(entry.id, entry);
-        const merged: AccountData = { ...server, entries: [...byId.values()].sort((a,b) => a.generatedAt.localeCompare(b.generatedAt)).slice(-60), notes: { ...(mayImportLegacy ? readLegacyNotes() : {}), ...server.notes } };
-        const cachedNotes: Record<string, HorseNote> = {};
-        if (owner === server.userId) {
+        const response = await fetch("/api/account-data?notes=1", { cache: "no-store" });
+        if (!response.ok) throw new Error("Notes load failed");
+        let server = fromServer(await response.json());
+        // Read existing device notes once, scoped to their first signed-in owner.
+        // Existing server notes always win. Forecasts are no longer uploaded by clients.
+        const imported: Record<string, HorseNote> = {};
+        try {
+          const owner = localStorage.getItem(CLOUD_OWNER_KEY);
+          if (!owner) localStorage.setItem(CLOUD_OWNER_KEY, server.userId);
+          if (!owner || owner === server.userId) Object.assign(imported, readLegacyNotes());
+          const prefix = `${NOTE_KEY}${server.userId}:`;
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            const prefix = `rein-horse-note-v1:${server.userId}:`;
             if (!key?.startsWith(prefix)) continue;
-            const horseId = key.slice(prefix.length);
-            try { const value = JSON.parse(localStorage.getItem(key) || "null"); if (/^\d{1,16}$/.test(horseId) && value && typeof value.note === "string" && value.note.length <= 1200) cachedNotes[horseId] = { name: typeof value.name === "string" ? value.name.slice(0,100) : "", note: value.note, watched: value.watched === true, updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : new Date(0).toISOString() }; } catch {}
+            const id = key.slice(prefix.length);
+            const value = JSON.parse(localStorage.getItem(key) || "null");
+            if (/^\d{1,16}$/.test(id) && value && typeof value.note === "string" && value.note.length <= 1200) imported[id] = { ...value, name: String(value.name ?? "").slice(0, 100), watched: value.watched === true };
           }
-        }
-        merged.notes = { ...cachedNotes, ...merged.notes };
-        if (!cancelled) { setData(merged); storeLocal(merged); setReady(true); setPendingEntries(merged.entries); setPendingNotes(merged.notes); setStatus("サーバーに保存済み・他の端末と同期しています"); }
-        if (JSON.stringify(accountPayload(merged)) !== JSON.stringify(accountPayload(server))) await sync(merged);
+        } catch {}
+        const missing = Object.entries(imported).filter(([id]) => !server.notes[id]).map(([horseId, note]) => ({ horseId, ...note }));
+        if (missing.length) server = await writeNotes(missing.slice(0, 500));
+        if (!cancelled) { setData(server); setReady(true); setStatus("馬メモはアカウントに保存され、別の端末でも確認できます。"); }
       } catch {
-        if (!cancelled) { setReady(true); setStatus("サーバーの保存データを読み込めません。再読み込みしてください。"); }
+        if (!cancelled) { setReady(false); setStatus("馬メモを読み込めません。詳細を開き直してください。"); }
       }
     }
     void load(); return () => { cancelled = true; };
-  }, [revision, sync]);
-
-  useEffect(() => {
-    if (!ready || !data.userId) return;
-    const onStorage = (event: StorageEvent) => { if (event.key === accountJournalKey(data.userId)) { setPendingEntries(null); setRevision(x => x + 1); } };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [data.userId, ready]);
-
-  const saveEntries = useCallback((entries: JournalEntry[]) => { if (ready && data.userId) { setPendingEntries(entries.slice(-60)); void sync({ ...data, entries: entries.slice(-60) }); } }, [data, ready, sync]);
+  }, [enabled]);
   const saveNote = useCallback((horseId: string, note: Omit<HorseNote, "updatedAt">) => {
     if (!ready || !data.userId) return;
-    const next = { ...data, notes: { ...data.notes, [horseId]: { ...note, updatedAt: new Date().toISOString() } } };
-    setPendingNotes(next.notes);
-    void sync(next);
-  }, [data, ready, sync]);
-  const value = useMemo(() => ({ ...data, entries: pendingEntries ?? data.entries, notes: pendingNotes, ready, status, saveEntries, saveNote }), [data, pendingEntries, pendingNotes, ready, status, saveEntries, saveNote]);
+    setStatus("サーバーへ保存中…");
+    // Send only the edited horse; another device's unrelated notes cannot be overwritten.
+    queue.current = queue.current.catch(() => {}).then(async () => {
+      try { setData(await writeNotes([{ horseId, ...note }])); setStatus("サーバーに保存しました。"); }
+      catch { setStatus("サーバー保存に失敗しました。通信を確認して、もう一度保存してください。"); }
+    });
+  }, [ready, data.userId]);
+  const value = useMemo(() => ({ ...data, ready, status, saveNote }), [data, ready, status, saveNote]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
-
 export function useReinCloudData() { return useContext(Context); }

@@ -65,6 +65,8 @@ function requiredAreaForPath(pathname: string): ReinArea | null {
     pathname.startsWith("/jra/") ||
     pathname === "/api/races" ||
     pathname.startsWith("/api/races/") ||
+    pathname === "/api/race-history" ||
+    pathname.startsWith("/api/race-history/") ||
     pathname === "/api/analyze" ||
     pathname.startsWith("/api/analyze/")
   ) return "jra";

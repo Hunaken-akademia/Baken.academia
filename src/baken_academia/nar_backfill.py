@@ -70,6 +70,17 @@ def parse_schedule_links(payload: bytes) -> list[str]:
     ))
 
 
+def filter_day_links(links: list[str], start_day: int | None, end_day: int | None) -> list[str]:
+    if not start_day and not end_day:
+        return links
+    selected = []
+    for link in links:
+        matched = re.search(r"/(\d{1,2})$", _query(link, "k_raceDate") or "")
+        if matched and (start_day or 1) <= int(matched.group(1)) <= (end_day or 31):
+            selected.append(link)
+    return selected
+
+
 def parse_result_links(payload: bytes) -> list[str]:
     doc = html.fromstring(payload.decode("utf-8-sig", errors="replace"))
     links = set(
@@ -276,7 +287,16 @@ async def backfill(args):
     month_url = f"{MONTH_URL}?{urlencode({'k_year': args.year, 'k_month': args.month})}"
     errors, odds_errors, paths = [], [], []
     async with PoliteNarClient(args.work_dir / "cache", args.min_delay, args.max_delay) as client:
-        venue_days = parse_schedule_links(await client.fetch(month_url))
+        available_days = parse_schedule_links(await client.fetch(month_url))
+        venue_days = filter_day_links(available_days, args.start_day, args.end_day)
+        if not venue_days and getattr(args, "allow_empty", False):
+            if not available_days:
+                raise ValueError("NAR月間日程を確認できません。未開催扱いにはしません")
+            report = {"status": "no_meeting", "races": 0, "year": args.year, "month": args.month,
+                      "start_day": args.start_day, "end_day": args.end_day, "errors": [], "odds_errors": []}
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.with_suffix(".audit.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))
+            return report
         result_links = []
         for i, venue_url in enumerate(venue_days, 1):
             try:
@@ -287,16 +307,7 @@ async def backfill(args):
             if i % 25 == 0 or i == len(venue_days):
                 print(json.dumps({"venue_days": f"{i}/{len(venue_days)}", "races_found": len(result_links), "errors": len(errors)}, ensure_ascii=False), flush=True)
         result_links = sorted(set(result_links))
-        if args.start_day or args.end_day:
-            start_day = args.start_day or 1
-            end_day = args.end_day or 31
-            filtered = []
-            for result_url in result_links:
-                race_date = _query(result_url, "k_raceDate") or ""
-                matched = re.search(r"/(\d{1,2})$", race_date)
-                if matched and start_day <= int(matched.group(1)) <= end_day:
-                    filtered.append(result_url)
-            result_links = filtered
+        result_links = filter_day_links(result_links, args.start_day, args.end_day)
         if args.max_races:
             result_links = result_links[:args.max_races]
         odds_cells, odds_manifests, payout_rows = [], [], []

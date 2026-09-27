@@ -10,7 +10,7 @@ const cache = getCache({ namespace: "rein-failure-v1" });
 export const FAILURE_TTL_SECONDS = 30;
 
 export const failureCacheHeaders = {
-  "Cache-Control": `public, max-age=0, s-maxage=${FAILURE_TTL_SECONDS}, stale-while-revalidate=30`,
+  "Cache-Control": "private, no-store",
 };
 
 // The status is part of the cached answer: a race that is not ready yet replays as 404

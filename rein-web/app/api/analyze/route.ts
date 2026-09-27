@@ -5,6 +5,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { loadHistory, scoreHistory } from "@/lib/history";
 import { buildTickets } from "@/lib/tickets";
 import { responseCache } from "@/lib/response-cache";
+import { storedSnapshot, saveSnapshot, claimCapture, releaseCapture, serverData, dateJst } from "@/lib/server-snapshots";
 import {
   parseMarket,
   parsePopularity,
@@ -23,7 +24,6 @@ import { extractMapPositions } from "@/lib/corner-reference";
 import {
   isSnapshotFresh,
   metaFromBody,
-  refreshLockKey,
   snapshotKey,
   snapshotMetaKey,
   snapshotTtlSeconds,
@@ -38,7 +38,7 @@ import {
 const cachedAnalysis = responseCache(15_000);
 const sharedCache = getCache({ namespace: "rein-analysis-v1" });
 const publicCacheHeaders = {
-  "Cache-Control": "public, max-age=0, s-maxage=15, stale-while-revalidate=30",
+  "Cache-Control": "private, no-store",
 };
 const ROLE_CACHE_VERSION = "2026-09-26-market-top4-v1";
 // Last complete prediction generated before the start time, kept for post-start review.
@@ -240,110 +240,81 @@ export async function GET(request: NextRequest) {
   }
 
   if (!forceRefresh) {
-    try {
-      const snapshot = await sharedCache.get(snapshotKey(raceId, preview));
-      if (typeof snapshot === "string") {
-        const meta = metaFromBody(JSON.parse(snapshot), preview);
-        const fresh = meta ? isSnapshotFresh(meta, Date.now()) : false;
-        // Past its freshness window the snapshot is still shown at once (its data
-        // timestamps are on screen) while a single background refresh replaces it.
-        if (!fresh) waitUntil(refreshInBackground(request, raceId, preview));
-        return new NextResponse(snapshot, {
-          status: 200,
-          headers: {
-            ...publicCacheHeaders,
-            "content-type": "application/json; charset=utf-8",
-            "x-rein-fallback": "0",
-            "x-rein-snapshot": "1",
-            "x-rein-stale": fresh ? "0" : "1",
-          },
-        });
-      }
-    } catch (error) {
-      console.error(
-        "REIN snapshot read failed",
-        error instanceof Error ? error.message : "unknown",
-      );
+    let snapshot: string | null = null;
+    let source = "cache";
+    try { const value = await sharedCache.get(snapshotKey(raceId, preview)); if (typeof value === "string") snapshot = value; } catch {}
+    if (!snapshot) {
+      try {
+        const saved = await storedSnapshot(raceId, preview ? "preview" : "live");
+        if (saved.snapshot) {
+          snapshot = JSON.stringify(saved.snapshot.payload); source = "server";
+          const meta = metaFromBody(saved.snapshot.payload, preview);
+          if (meta) waitUntil(sharedCache.set(snapshotKey(raceId, preview), snapshot, { ttl: snapshotTtlSeconds(meta) }).catch(() => {}));
+        }
+      } catch (error) { console.error("REIN durable read failed", error instanceof Error ? error.message : "unknown"); }
     }
-
+    if (snapshot) {
+      const meta = metaFromBody(JSON.parse(snapshot), preview);
+      const fresh = meta ? isSnapshotFresh(meta, Date.now()) : false;
+      if (!fresh) waitUntil(refreshInBackground(request, raceId, preview));
+      return new NextResponse(snapshot, { headers: { ...publicCacheHeaders, "content-type": "application/json; charset=utf-8", "x-rein-fallback": "0", "x-rein-snapshot": "1", "x-rein-store": source, "x-rein-stale": fresh ? "0" : "1" } });
+    }
     const failure = await readFailure(`analyze:${preview ? "preview:" : ""}${raceId}`);
-    if (failure) {
-      return new NextResponse(failure.body, {
-        status: failure.status,
-        headers: {
-          ...failureCacheHeaders,
-          "content-type": "application/json; charset=utf-8",
-          "x-rein-snapshot": "0",
-          "x-rein-failure-cache": "1",
-        },
-      });
-    }
+    if (failure) return new NextResponse(failure.body, { status: failure.status, headers: { ...failureCacheHeaders, "content-type": "application/json; charset=utf-8" } });
+    // A missed cron can enqueue one known scheduled race. Arbitrary IDs never start inference.
+    waitUntil(refreshInBackground(request, raceId, preview, true));
+    return NextResponse.json({ preparing: true, error: "サーバーでレース情報の保存を準備しています。少し待つと自動で表示します。" }, { status: 202, headers: { ...publicCacheHeaders, "Retry-After": "15" } });
   }
-
-  const response = forceRefresh
-    ? await analyze(request)
-    : await cachedAnalysis(`${raceId}:${preview ? "preview" : "market"}`, () => analyze(request));
-  await storeAnalysis(response, raceId, preview);
-  response.headers.set("x-rein-snapshot", "0");
-  return response;
+  return await computeOnce(request, raceId, preview);
 }
 
-async function storeAnalysis(response: Response, raceId: string, preview: boolean) {
+async function computeOnce(request: NextRequest, raceId: string, preview: boolean) {
+  const key = `race:${preview ? "preview" : "live"}:${raceId}`;
+  const lease = await claimCapture(key, 180).catch(() => null);
+  if (!lease?.acquired || !lease.token) return NextResponse.json({ preparing: true }, { status: 202, headers: { ...publicCacheHeaders, "x-rein-persisted": "0" } });
+  try {
+    const response = await cachedAnalysis(`${raceId}:${preview ? "preview" : "market"}`, () => analyze(request));
+    const persisted = await storeAnalysis(response, raceId, preview);
+    response.headers.set("x-rein-snapshot", "0");
+    response.headers.set("x-rein-persisted", persisted ? "1" : "0");
+    return response;
+  } finally { await releaseCapture(key,lease.token).catch(() => {}); }
+}
+
+async function storeAnalysis(response: Response, raceId: string, preview: boolean): Promise<boolean> {
   if (response.ok && response.headers.get("x-rein-fallback") === "0") {
+    const text = await response.clone().text();
+    const body = JSON.parse(text), meta = metaFromBody(body, preview);
+    if (!meta) return false;
+    // Durable storage succeeds before a capture is counted as complete.
+    let persisted = false;
+    try { persisted = (await saveSnapshot(body, preview)).saved; }
+    catch (error) { console.error("REIN durable write failed", error instanceof Error ? error.message : "unknown"); }
     try {
-      const text = await response.clone().text();
-      const meta = metaFromBody(JSON.parse(text), preview);
-      if (!meta) return;
       const ttl = snapshotTtlSeconds(meta);
-      await sharedCache.set(snapshotKey(raceId, preview), text, {
-        ttl,
-        tags: [`rein-race-${raceId}`, "rein-live"],
-        name: "REIN race analysis",
-      });
-      // Small record the cron reads to decide what to precompute.
-      await sharedCache.set(snapshotMetaKey(raceId, preview), meta, {
-        ttl,
-        tags: [`rein-race-${raceId}`, "rein-live"],
-        name: "REIN race analysis metadata",
-      });
-    } catch (error) {
-      console.error(
-        "REIN snapshot write failed",
-        error instanceof Error ? error.message : "unknown",
-      );
-    }
-  } else if (!response.ok) {
-    await writeFailure(
-      `analyze:${preview ? "preview:" : ""}${raceId}`,
-      { status: response.status, body: await response.clone().text() },
-      [`rein-race-${raceId}`, "rein-live"],
-    );
+      await Promise.all([
+        sharedCache.set(snapshotKey(raceId, preview), text, { ttl, tags: [`rein-race-${raceId}`,"rein-live"] }),
+        sharedCache.set(snapshotMetaKey(raceId, preview), meta, { ttl, tags: [`rein-race-${raceId}`,"rein-live"] }),
+      ]);
+    } catch {}
+    return persisted;
   }
+  if (!response.ok) await writeFailure(`analyze:${preview ? "preview:" : ""}${raceId}`, {status:response.status,body:await response.clone().text()},[`rein-race-${raceId}`,"rein-live"]);
+  return false;
 }
 
-async function refreshInBackground(request: NextRequest, raceId: string, preview: boolean) {
-  const lock = refreshLockKey(raceId, preview);
+async function refreshInBackground(request: NextRequest, raceId: string, preview: boolean, mustBeScheduled = false) {
   try {
-    if (await sharedCache.get(lock)) return;
-    await sharedCache.set(lock, "1", { ttl: 150, name: "REIN snapshot refresh lock" });
-  } catch {
-    // Without the shared lock the in-process dedupe below still applies.
-  }
-  try {
-    const response = await cachedAnalysis(
-      `${raceId}:${preview ? "preview" : "market"}`,
-      () => analyze(request),
-    );
-    await storeAnalysis(response, raceId, preview);
-  } catch (error) {
-    console.error("REIN background refresh failed", error instanceof Error ? error.message : "unknown");
-  } finally {
-    try {
-      await sharedCache.delete(lock);
-    } catch {
-      // The lock expires on its own.
+    if (mustBeScheduled) {
+      const { schedule } = await serverData<{schedule:{payload:{venues:Array<{races:Array<{raceId:string}>}>}}|null}>("schedule",{date:dateJst(preview?1:0)});
+      if (!schedule?.payload.venues.some(v=>v.races.some(r=>r.raceId===raceId))) return;
     }
-  }
+    // A completed but not-yet-final result keeps its original prediction time.
+    // Limit viewer-triggered retries as well as simultaneous requests.
+    const cooldown = await claimCapture(`race:background:${preview ? "preview" : "live"}:${raceId}`, 300);
+    if (!cooldown.acquired) return;
+    await computeOnce(request,raceId,preview);
+  } catch (error) { console.error("REIN background capture failed", error instanceof Error ? error.message : "unknown"); }
 }
 
 function isCronRequest(request: NextRequest) {
@@ -1067,7 +1038,7 @@ async function analyze(request: NextRequest) {
     } else if (phase === "poststart" || phase === "final") {
       try {
         const saved = await sharedCache.get(`${PRESTART_KEY}:${raceId}`);
-        const prestart = typeof saved === "string" ? (JSON.parse(saved) as typeof body) : null;
+        const prestart = typeof saved === "string" ? (JSON.parse(saved) as typeof body) : (await storedSnapshot(raceId, "prestart")).snapshot?.payload as typeof body | null;
         if (prestart && prestart.runnerKey === runnerKey) {
           // Show the stored pre-start prediction next to the current result; the
           // result and final odds never rewrite it.

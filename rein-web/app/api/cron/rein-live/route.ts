@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCache } from "@vercel/functions";
-import { hasBearerSecret } from "@/lib/internal-auth";
+import { authorizedCapture } from "@/lib/capture-auth";
+import { claimCapture, releaseCapture, durableMetas, serverData, dateJst } from "@/lib/server-snapshots";
 import { mapWithConcurrency, type RaceVenue } from "@/lib/rein-live";
 import {
   planPrecompute,
-  snapshotMetaKey,
   type PrecomputeRace,
-  type SnapshotMeta,
 } from "@/lib/analysis-cache";
 
 export const runtime = "nodejs";
@@ -14,8 +12,6 @@ export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 const PRODUCTION_ORIGIN = "https://rein-web.vercel.app";
-// Same namespace as /api/analyze, which writes the snapshots and their metadata.
-const analysisCache = getCache({ namespace: "rein-analysis-v1" });
 // Stop starting new work early enough that a started analysis can finish in time.
 const START_BUDGET_MS = 200_000;
 const ANALYZE_TIMEOUT_MS = 150_000;
@@ -41,7 +37,7 @@ async function loadRaces(origin: string, secret: string, day: "today" | "tomorro
 export async function GET(request: NextRequest) {
   const startedAt = Date.now();
   const secret = process.env.CRON_SECRET || "";
-  if (!hasBearerSecret(request.headers.get("authorization"), secret)) {
+  if (!await authorizedCapture(request.headers.get("authorization"), secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -49,24 +45,26 @@ export async function GET(request: NextRequest) {
     ? PRODUCTION_ORIGIN
     : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : request.nextUrl.origin;
 
+  const requested = request.nextUrl.searchParams.get("date");
+  const targetDate = requested ?? dateJst();
+  if (![dateJst(), dateJst(-1)].includes(targetDate)) return NextResponse.json({error:"Invalid capture date"},{status:400});
+  const lockKey = `cron:${targetDate}`;
+  const lease = await claimCapture(lockKey,300).catch(() => null);
+  if (!lease?.acquired || !lease.token) return NextResponse.json({ok:true,deferred:true,reason:"capture-in-progress"},{status:202});
   try {
-    const today = await loadRaces(origin, secret, "today");
+    const stored = targetDate !== dateJst() ? await serverData<{schedule:{payload:{venues:RaceVenue[]}}|null}>("schedule",{date:targetDate}) : null;
+    if (targetDate !== dateJst() && !stored?.schedule) return NextResponse.json({ok:false,error:"No saved schedule for requested date"},{status:404});
+    const todaysRaces = stored ? (stored.schedule?.payload.venues ?? []).flatMap(v=>(v.races??[]).map(r=>({...r,preview:false}))) : await loadRaces(origin, secret, "today");
     // Tomorrow's card is optional work; a failure there must not stop today's refresh.
-    const tomorrow = await loadRaces(origin, secret, "tomorrow").catch((error) => {
+    const today = todaysRaces.map(r=>({...r,date:targetDate}));
+    const localHour = new Date(Date.now()+9*3600_000).getUTCHours();
+    const tomorrow = localHour >= 16 && !requested ? await loadRaces(origin, secret, "tomorrow").catch((error) => {
       console.error("REIN precompute: tomorrow schedule unavailable", error instanceof Error ? error.message : "unknown");
       return [] as PrecomputeRace[];
-    });
+    }) : [];
     const races = [...today, ...tomorrow];
-    const metas = new Map<string, SnapshotMeta | null>();
-    await mapWithConcurrency(races, 8, async (race) => {
-      const key = `${race.preview ? "preview" : "live"}:${race.raceId}`;
-      try {
-        const meta = await analysisCache.get(snapshotMetaKey(race.raceId, race.preview));
-        metas.set(key, meta && typeof meta === "object" ? (meta as SnapshotMeta) : null);
-      } catch {
-        metas.set(key, null);
-      }
-    });
+    const metas = await durableMetas(targetDate);
+    if (tomorrow.length) for (const [key,value] of await durableMetas(dateJst(1))) metas.set(key,value);
     const planned = planPrecompute(races, metas, new Date());
     const near = planned.filter((job) => job.reason === "near-start");
     const jobs = [...near, ...planned.filter((job) => job.reason !== "near-start").slice(0, MAX_BACKLOG_JOBS)];
@@ -87,7 +85,7 @@ export async function GET(request: NextRequest) {
           raceId: job.raceId,
           preview: job.preview,
           reason: job.reason,
-          ok: response.ok && response.headers.get("x-rein-fallback") === "0",
+          ok: response.ok && response.headers.get("x-rein-fallback") === "0" && response.headers.get("x-rein-persisted") === "1",
           status: response.status,
         };
       } catch {
@@ -97,6 +95,7 @@ export async function GET(request: NextRequest) {
 
     const summary = {
       checkedAt: new Date().toISOString(),
+      date: targetDate,
       planned: planned.length,
       attempted: jobs.length,
       updated: results.filter((result) => result.ok).length,
@@ -105,8 +104,9 @@ export async function GET(request: NextRequest) {
       deferred: results.filter((result) => result.status === -1).length,
       elapsedMs: Date.now() - startedAt,
     };
+    await serverData("run", { summary: { ...summary, results } });
     console.info("REIN precompute", JSON.stringify(summary));
-    return NextResponse.json({ ok: summary.failed === 0, ...summary, results }, {
+    return NextResponse.json({ ok: summary.failed === 0 && summary.incomplete === 0, ...summary, remaining: Math.max(0, planned.length-summary.updated), results }, {
       headers: { "Cache-Control": "private, no-store" },
     });
   } catch (error) {
@@ -115,5 +115,5 @@ export async function GET(request: NextRequest) {
       status: 502,
       headers: { "Cache-Control": "private, no-store" },
     });
-  }
+  } finally { await releaseCapture(lockKey,lease.token).catch(() => {}); }
 }

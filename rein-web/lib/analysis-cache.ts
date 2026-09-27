@@ -11,8 +11,8 @@ const MINUTE = 60_000;
 // every run, later races and previews less often.
 export const NEAR_START_MINUTES = 60;
 export const NEAR_MAX_AGE_MS = 12 * MINUTE;
-export const FAR_MAX_AGE_MS = 65 * MINUTE;
-export const PREVIEW_MAX_AGE_MS = 180 * MINUTE;
+export const FAR_MAX_AGE_MS = 180 * MINUTE;
+export const PREVIEW_MAX_AGE_MS = 360 * MINUTE;
 
 // Storage lifetime is longer than freshness so an older snapshot can be shown while
 // a refresh runs.
@@ -75,6 +75,7 @@ export type PrecomputeRace = {
   start: string;
   status?: string;
   preview: boolean;
+  date?: string;
 };
 
 export type PrecomputeJob = PrecomputeRace & { reason: "near-start" | "stale" | "missing" | "result" };
@@ -108,20 +109,21 @@ export function planPrecompute(
       else if (!isSnapshotFresh(meta, nowMs)) previews.push({ ...race, reason: "stale" });
       continue;
     }
-    const minutes = minutesUntilStart(race.start, now);
+    const minutes = race.date && /^\d{1,2}:\d{2}$/.test(race.start)
+      ? (Date.parse(`${race.date}T${race.start.padStart(5,"0")}:00+09:00`) - nowMs) / MINUTE
+      : minutesUntilStart(race.start, now);
     if (minutes === null) continue;
-    // The schedule does not mark results, so look for them 10-90 minutes after the
-    // start until a result snapshot exists (a handful of attempts per race).
+    // Keep unfinished results eligible for the nightly and next-morning catch-up.
     if (minutes < 0) {
-      if (minutes <= -10 && minutes > -90 && !meta?.final) results.push({ ...race, reason: "result" });
+      if (minutes <= -10 && !meta?.final) results.push({ ...race, reason: "result" });
       continue;
     }
     if (minutes <= NEAR_START_MINUTES) {
-      near.push({ ...race, reason: "near-start" });
+      if (!meta || nowMs-Date.parse(meta.generatedAt)>=8*MINUTE) near.push({ ...race, reason: "near-start" });
       continue;
     }
     if (!meta) later.push({ ...race, reason: "missing", minutes });
-    else if (nowMs - Date.parse(meta.generatedAt) >= FAR_MAX_AGE_MS - 10 * MINUTE)
+    else if (nowMs - Date.parse(meta.generatedAt) >= FAR_MAX_AGE_MS)
       later.push({ ...race, reason: "stale", minutes });
   }
   near.sort((a, b) => (minutesUntilStart(a.start, now) ?? 0) - (minutesUntilStart(b.start, now) ?? 0));

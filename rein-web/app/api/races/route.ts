@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCache } from "@vercel/functions";
+import { getCache, waitUntil } from "@vercel/functions";
 import { responseCache } from "@/lib/response-cache";
+import { serverData, dateJst } from "@/lib/server-snapshots";
 import { raceProgress } from "@/lib/race-progress";
 import { fetchSource } from "@/lib/source-fetch";
 import { failureCacheHeaders, readFailure, writeFailure } from "@/lib/failure-cache";
 
 const cachedSchedule = responseCache(120_000, 1);
 const sharedSchedule = getCache({ namespace: "rein-schedule-v1" });
-const publicCache = { "Cache-Control": "public, max-age=0, s-maxage=120, stale-while-revalidate=300" };
+const publicCache = { "Cache-Control": "private, no-store" };
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -73,7 +74,7 @@ function races(html: string, nextRace: number) {
 
 export async function GET(request: NextRequest) {
   const day: ScheduleDay = request.nextUrl.searchParams.get("day") === "tomorrow" ? "tomorrow" : "today";
-  const cacheKey = day;
+  const cacheKey = dateJst(day === "tomorrow" ? 1 : 0);
   try {
     const shared = await sharedSchedule.get(cacheKey);
     if (typeof shared === "string") {
@@ -90,19 +91,31 @@ export async function GET(request: NextRequest) {
     console.error("REIN schedule cache read failed", error instanceof Error ? error.message : "unknown");
   }
 
+  try {
+    const { schedule } = await serverData<{ schedule: { payload: unknown; generated_at: string } | null }>("schedule", { date: cacheKey });
+    if (schedule) {
+      const age = Date.now() - Date.parse(schedule.generated_at);
+      if (age > (day === "today" ? 3600_000 : 3 * 3600_000)) waitUntil(refreshSchedule(day, cacheKey).catch(() => { console.error("REIN schedule refresh failed"); }));
+      else await sharedSchedule.set(cacheKey, JSON.stringify(schedule.payload), { ttl: 900 }).catch(() => {});
+      return NextResponse.json(schedule.payload, { headers: { ...publicCache, "x-rein-store": "server" } });
+    }
+  } catch (error) { console.error("REIN stored schedule read failed", error instanceof Error ? error.message : "unknown"); }
+
   // Expected failures are cached too, so an upstream outage does not fan out with audience size.
-  const failure = await readFailure(`schedule:${day}`);
+  const failure = await readFailure(`schedule:${cacheKey}`);
   if (failure) {
     return new NextResponse(failure.body, {
       status: failure.status,
       headers: { ...failureCacheHeaders, "content-type": "application/json; charset=utf-8", "x-rein-failure-cache": "1" },
     });
   }
-  const response = await cachedSchedule(`schedule:${day}`, () => loadSchedule(day));
+  const response = await cachedSchedule(`schedule:${cacheKey}`, () => loadSchedule(day));
   if (response.ok) {
     try {
-      await sharedSchedule.set(cacheKey, await response.clone().text(), {
-        ttl: day === "tomorrow" ? 900 : 120,
+      const payload = await response.clone().json();
+      await serverData("save-schedule", { date: cacheKey, payload });
+      await sharedSchedule.set(cacheKey, JSON.stringify(payload), {
+        ttl: 900,
         tags: ["rein-live", "rein-schedule"],
         name: "REIN schedule",
       });
@@ -110,9 +123,17 @@ export async function GET(request: NextRequest) {
       console.error("REIN schedule cache write failed", error instanceof Error ? error.message : "unknown");
     }
   } else {
-    await writeFailure(`schedule:${day}`, { status: response.status, body: await response.clone().text() }, ["rein-live"]);
+    await writeFailure(`schedule:${cacheKey}`, { status: response.status, body: await response.clone().text() }, ["rein-live"]);
   }
   return response;
+}
+
+async function refreshSchedule(day: ScheduleDay, cacheKey: string) {
+  const response = await cachedSchedule(`schedule:${cacheKey}`, () => loadSchedule(day));
+  if (!response.ok) return;
+  const payload = await response.json();
+  await serverData("save-schedule", { date: cacheKey, payload });
+  await sharedSchedule.set(cacheKey, JSON.stringify(payload), { ttl: 900 });
 }
 
 async function loadSchedule(day: ScheduleDay) {
