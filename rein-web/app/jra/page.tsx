@@ -24,6 +24,9 @@ import { raceProgress } from "@/lib/race-progress";
 import { reasonViews } from "@/lib/feature-labels";
 import { roleOrder, type Picks, type MarkPick } from "@/lib/marks";
 import { RaceFormationMap } from "@/components/race-formation-map";
+import { PredictionJournal, HorseNotebook } from "@/components/prediction-journal";
+import { MarketRankMap } from "@/components/market-rank-map";
+import { PredictionDataStatus } from "@/components/prediction-data-status";
 
 type HistoryFactor = {
   label: string;
@@ -36,6 +39,7 @@ type HistoryFactor = {
   averageFinish?: number;
 };
 type Horse = {
+  horseId?: string;
   number: number;
   gate?: number;
   name: string;
@@ -107,6 +111,8 @@ type Analysis = {
     start: string;
     updated: string;
     raceId: string;
+    startsAt?: number | null;
+    dataTimes?: { odds?: string | null; card?: string | null };
   };
   prediction?: {
     phase: "preview" | "prestart" | "poststart" | "final";
@@ -965,6 +971,7 @@ function AnalysisScreen({
       <RaceIntelligence data={data} insights={insights} />
       <RaceFormationMap key={data.race.raceId} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} />
       <RaceShapeReference data={data} />
+      <PredictionJournal data={data} />
       <ConditionReferenceRankings data={data} />
       <Tabs defaultValue="ranking" onSwipeBack={onBack}>
         <TabsList className="mb-4 grid h-auto min-h-11 w-full grid-cols-4 bg-[#0c192a]">
@@ -1240,6 +1247,7 @@ function RaceIntelligence({ data, insights }: { data: Analysis; insights: RaceIn
           <p className="mt-3 text-xs leading-5 text-slate-500">
             未発表項目は評価に混ぜず、取得後の再分析で更新します。
           </p>
+          <PredictionDataStatus data={data} />
         </InfoPanel>
       </div>
     </section>
@@ -1410,7 +1418,8 @@ function ReferenceRankingCard({
                 {historical ? (
                   <>
                     <p className={`text-xs font-bold ${(value ?? 0) >= 0 ? "text-cyan-300" : "text-rose-300"}`}>{value > 0 ? "+" : ""}{value.toFixed(1)}</p>
-                    <p className="text-[10px] text-slate-500">{samples ?? 0}走 ・ 3着内{top3Rate ?? 0}%</p>
+                    <p className="text-[10px] text-slate-500">{samples === undefined ? "母数不明" : `${samples}走`} ・ 3着内{top3Rate === undefined ? "未集計" : `${top3Rate}%`}</p>
+                    {samples !== undefined && samples < 5 && <p className="text-[10px] text-amber-200">{samples === 0 ? "履歴なし" : "履歴1〜4走"}</p>}
                   </>
                 ) : (
                   <>
@@ -1527,6 +1536,7 @@ function MarketReinComparison({ data, horses }: { data: Analysis; horses: Horse[
         <h2 className="mt-1 text-xl font-bold">人気と着順適性の比較</h2>
         <p className="mt-1 text-xs leading-5 text-slate-500">人気のコピーではなく、着順ごとにREINがどこを上げ下げしたかを一覧化。</p>
       </div>
+      <MarketRankMap horses={data.horses} />
       <div className="grid gap-2 p-3 md:hidden">
         {ranked.map((horse) => (
           <div key={horse.number} className="rounded-xl border border-slate-700 bg-black/10 p-3">
@@ -2069,6 +2079,7 @@ function HorseDetails({ horse, data }: { horse: Horse; data: Analysis }) {
     value === undefined ? "未取得" : `${(value * 100).toFixed(1)}%`;
   return (
     <div>
+      <HorseNotebook horseId={horse.horseId} name={horse.name} />
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-lg font-bold sm:text-xl">
@@ -2463,6 +2474,12 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
                     <Metric label="市場モデルとの差" value={typeof pick.marketGap === "number" ? `+${(pick.marketGap * 100).toFixed(1)}ポイント` : "算出中"} />
                     <Metric label="2着適性順位" value={secondRank ? `${secondRank}位` : "算出中"} />
                     <Metric label="3着適性順位" value={thirdRank ? `${thirdRank}位` : "算出中"} />
+                  </div>
+                  <div className="mt-3 border-t border-rose-400/15 pt-2">
+                    <p className="text-xs font-semibold text-slate-300">1着適性モデルが参照した要因</p>
+                    {reasonViews(horse.roleReasons?.first, 3).map((reason, i) => <p key={i} className={`mt-1 break-words text-xs leading-5 ${reason.direction === "up" ? "text-cyan-200" : "text-rose-300"}`}>{reason.direction === "up" ? "↑" : "↓"} {reason.label}</p>)}
+                    {!horse.roleReasons?.first?.length && <p className="mt-1 text-xs text-slate-500">要因データは未取得です。</p>}
+                    <p className="mt-2 text-[11px] leading-5 text-slate-500">矢印はモデル評価への影響です。穴候補の選定条件は上記の適性順位と市場差です。</p>
                   </div>
                 </button>
               );
