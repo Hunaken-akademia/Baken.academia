@@ -49,7 +49,7 @@ async def capture(kind: str, target: date, directory: Path):
             if odds.get("errors") or odds["pages_by_bet_type"].get("win_place", 0) != result["races"]:
                 raise ValueError("Missing JRA win/place pages")
             result["odds"] = odds
-    summary = {"dataset": kind, "date": str(target), "status": result.get("status", "complete"),
+    summary = {"capture_schema": 2, "dataset": kind, "date": str(target), "status": result.get("status", "complete"),
                "captured_at": datetime.now(timezone.utc).isoformat(), "result": result}
     (directory / "complete.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2))
     print(json.dumps(summary, ensure_ascii=False), flush=True)

@@ -152,7 +152,8 @@ def parse_results_page(payload: bytes, source_cname: str) -> list[dict[str, obje
             if horse_link is None:
                 continue
             horse_name = _text(horse_link)
-            horse_id = _id_from_value(horse_link.get("href"), "pw01dud10")
+            horse_id = (_id_from_value(horse_link.get("href"), "pw01dud10")
+                        or _id_from_value(horse_link.get("href"), "pw01dud00"))
             if not horse_id:
                 raise ValueError(f"馬IDを解析できません: {horse_name}")
 
@@ -247,12 +248,12 @@ def parse_current_year_month(payload: bytes) -> int:
 
 def parse_event_cnames(payload: bytes) -> list[str]:
     decoded = payload.decode("cp932", errors="replace")
-    return sorted(set(re.findall(r"'((?:pw01srl10)\d+/[0-9A-F]{2})'", decoded)))
+    return sorted(set(re.findall(r"'((?:pw01srl(?:00|10))\d+/[0-9A-F]{2})'", decoded)))
 
 
 def parse_all_results_cname(payload: bytes) -> str:
     decoded = payload.decode("cp932", errors="replace")
-    matches = re.findall(r"'((?:pw01ses10)\d+/[0-9A-F]{2})'", decoded)
+    matches = re.findall(r"'((?:pw01ses(?:00|01|10))\d+/[0-9A-F]{2})'", decoded)
     if not matches:
         raise ValueError("開催ページから全レース結果リンクを検出できません")
     return matches[0]
@@ -391,6 +392,7 @@ async def backfill(args: argparse.Namespace) -> dict[str, object]:
         current_year_month = parse_current_year_month(entry)
 
         event_cnames: list[str] = []
+        calendar_payloads: list[bytes] = []
         for year, month in _months(start, end):
             key = f"{year % 100:02d}{month:02d}"
             checksum = checksums.get(key)
@@ -401,6 +403,7 @@ async def backfill(args: argparse.Namespace) -> dict[str, object]:
             month_cname = f"{prefix}{year}{month:02d}/{checksum}"
             month_payload = entry if target_year_month == current_year_month else await client.fetch(month_cname)
             event_cnames.extend(parse_event_cnames(month_payload))
+            calendar_payloads.append(month_payload)
 
         selected = []
         for cname in sorted(set(event_cnames)):
@@ -415,6 +418,12 @@ async def backfill(args: argparse.Namespace) -> dict[str, object]:
         if not selected and getattr(args, "allow_empty", False):
             if not event_cnames:
                 raise ValueError("JRA月間日程を確認できません。未開催扱いにはしません")
+            for payload in calendar_payloads:
+                doc = html.fromstring(payload.decode("cp932", errors="replace"))
+                for heading in doc.xpath("//h3[contains(@class,'sub_header')]"):
+                    m = re.search(r"(\d+)月(\d+)日", _text(heading))
+                    if m and start.month == int(m[1]) and start.day <= int(m[2]) <= end.day:
+                        raise ValueError("開催日の見出しがありますが結果リンクを解析できません。未開催扱いにはしません")
             report = {"status": "no_meeting", "races": 0, "start_date": args.start_date, "end_date": args.end_date, "errors": []}
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.with_suffix(".audit.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))

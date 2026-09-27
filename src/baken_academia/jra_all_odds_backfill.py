@@ -24,7 +24,7 @@ BET_TYPES = {
 }
 
 ODDS_CNAME_PATTERN = re.compile(
-    r"pw15(?P<kind>[1345678])ou10(?P<course>\d{2})(?P<year>\d{4})(?P<meeting>\d{2})"
+    r"pw15(?P<kind>[1345678])ou(?:10|S3)(?P<course>\d{2})(?P<year>\d{4})(?P<meeting>\d{2})"
     r"(?P<day>\d{2})(?P<race>\d{2})(?P<date>20\d{6})Z(?:99)?/[0-9A-F]{2}"
 )
 
@@ -44,9 +44,22 @@ def merge_odds_cnames(*payloads: bytes) -> list[str]:
 async def fetch_odds_families(
     client, result_payload: bytes, endpoint: str, scope: dict[str, object] | None = None
 ) -> dict[str, bytes]:
-    """Follow odds navigation until all reachable bet pages have been fetched once."""
+    """Fetch bet tabs only for races linked by the requested result page.
+
+    Today's odds navigation also links yesterday and other venues. Following that
+    graph without a race boundary collects unrelated days and repeats requests.
+    """
     payloads: dict[str, bytes] = {}
     queue = parse_all_odds_cnames(result_payload)
+    if scope is not None:
+        queue = [name for name in queue if all(
+            parse_odds_cname(name)[key] == scope[key]
+            for key in ("course_code", "race_date", "race_no")
+        )]
+    def race_key(name):
+        meta = parse_odds_cname(name)
+        return tuple(meta[key] for key in ("course_code", "race_date", "race_no"))
+    requested_races = {race_key(name) for name in queue}
     while queue:
         cname = queue.pop(0)
         if cname in payloads:
@@ -54,10 +67,8 @@ async def fetch_odds_families(
         payload = await client.fetch(cname, endpoint=endpoint)
         payloads[cname] = payload
         for linked in parse_all_odds_cnames(payload):
-            if scope is not None:
-                meta = parse_odds_cname(linked)
-                if any(meta[key] != scope[key] for key in ("course_code", "race_date", "race_no")):
-                    continue
+            if race_key(linked) not in requested_races:
+                continue
             if linked not in payloads and linked not in queue:
                 queue.append(linked)
     return payloads

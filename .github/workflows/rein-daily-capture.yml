@@ -70,7 +70,7 @@ jobs:
           echo "ARCHIVE_OBJECT_PATH=daily/${DATASET}/${CAPTURE_DATE:0:4}/${CAPTURE_DATE}.tar.gz" >> "$GITHUB_ENV"
       - name: Skip verified completed days
         id: existing
-        run: bash scripts/check_supabase_archive.sh
+        run: bash scripts/check_rein_daily_archive.sh
       - uses: actions/setup-python@v5
         if: steps.existing.outputs.exists != 'true'
         with:
@@ -91,7 +91,7 @@ jobs:
         run: |
           test -s daily/complete.json
           tar -czf daily.tar.gz -C daily .
-          bash scripts/upload_archive_to_supabase.sh
+          bash scripts/upload_rein_daily_archive.sh
   reconcile:
     needs: [plan, archive]
     if: always() && !cancelled() && needs.plan.result == 'success'

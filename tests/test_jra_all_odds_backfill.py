@@ -1,4 +1,5 @@
 import unittest
+import asyncio
 
 from baken_academia.jra_all_odds_backfill import (
     parse_all_odds_cnames,
@@ -6,6 +7,7 @@ from baken_academia.jra_all_odds_backfill import (
     parse_odds_cells,
     parse_odds_cname,
     parse_win_place_odds,
+    fetch_odds_families,
 )
 
 
@@ -37,6 +39,23 @@ class JraAllOddsBackfillTest(unittest.TestCase):
         self.assertEqual(row["horse_number"], 4)
         self.assertEqual((row["win_odds"], row["place_odds_min"], row["place_odds_max"]),
                          (2.8, 1.1, 1.2))
+
+    def test_same_day_navigation_stays_inside_requested_races(self):
+        target = "pw151ouS306202604090120260927Z/AB"
+        tab = "pw154ouS306202604090120260927Z/37"
+        other_day = "pw151ou1006202604080120260926Z/B5"
+        other_venue = "pw151ouS309202604090120260927Z/89"
+        class Client:
+            def __init__(self): self.requests = []
+            async def fetch(self, name, endpoint):
+                self.requests.append(name)
+                return " ".join([target, tab, other_day, other_venue]).encode()
+        client = Client()
+        payloads = asyncio.run(fetch_odds_families(client, target.encode(), "test"))
+        self.assertEqual(set(payloads), {target, tab})
+        self.assertEqual(client.requests, [target, tab])
+        self.assertEqual(parse_odds_cname(target)["course_code"], "06")
+        self.assertEqual(parse_odds_cname(tab)["bet_type"], "quinella")
 
 
 if __name__ == "__main__":

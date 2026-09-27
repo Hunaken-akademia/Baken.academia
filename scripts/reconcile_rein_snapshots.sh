@@ -17,6 +17,11 @@ for attempt in {1..8}; do
     rm -f "${response_file}"; exit 0
   fi
   if [[ "${status}" == "202" ]]; then rm -f "${response_file}"; sleep 30; continue; fi
+  # A push can finish its lightweight archive checks before the production build
+  # switches over. Retry briefly against the still-old authenticated endpoint.
+  if [[ "${status}" =~ ^(401|502|503)$ && "${attempt}" -le 4 ]]; then
+    rm -f "${response_file}"; sleep 30; continue
+  fi
   [[ "${status}" == "200" ]]
   remaining="$(jq -er '.remaining' "${response_file}")"
   updated="$(jq -er '.updated' "${response_file}")"
