@@ -70,3 +70,12 @@ test('yesterday result catch-up uses the race date and completed races are not r
   assert.equal(planPrecompute([race],new Map(),now)[0].reason,'result');
   assert.deepEqual(planPrecompute([race],new Map([['live:yesterday',meta(500,{final:true})]]),now),[]);
 });
+
+test('a held card remains displayable but eligible for result refresh', () => {
+  const body = {race:{startsAt:at('10:00')},prediction:{generatedAt:now.toISOString()},review:{isFinished:true},capture:{complete:false}};
+  const value = metaFromBody(body,false);
+  assert.equal(value.final,false);
+  assert.equal(isSnapshotFresh(value,now.getTime()),true);
+  assert.equal(isSnapshotFresh(value,now.getTime()+minutes(13)),false);
+  assert.equal(planPrecompute([{raceId:'held',start:'10:00',preview:false}],new Map([['live:held',value]]),now)[0].reason,'result');
+});

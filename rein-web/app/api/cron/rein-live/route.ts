@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
 
     const results = await mapWithConcurrency(jobs, 3, async (job) => {
       const remaining = START_BUDGET_MS - (Date.now() - startedAt);
-      if (remaining <= 0) return { raceId: job.raceId, preview: job.preview, reason: job.reason, ok: false, status: -1 };
+      if (remaining <= 0) return { raceId: job.raceId, preview: job.preview, reason: job.reason, ok: false, complete: false, status: -1 };
       try {
         const response = await fetch(
           `${origin}/api/analyze?raceId=${encodeURIComponent(job.raceId)}&refresh=1${job.preview ? "&preview=1" : ""}`,
@@ -85,11 +85,12 @@ export async function GET(request: NextRequest) {
           raceId: job.raceId,
           preview: job.preview,
           reason: job.reason,
-          ok: response.ok && response.headers.get("x-rein-fallback") === "0" && response.headers.get("x-rein-persisted") === "1",
+          ok: response.ok && response.headers.get("x-rein-persisted") === "1",
+          complete: response.headers.get("x-rein-fallback") === "0",
           status: response.status,
         };
       } catch {
-        return { raceId: job.raceId, preview: job.preview, reason: job.reason, ok: false, status: 0 };
+        return { raceId: job.raceId, preview: job.preview, reason: job.reason, ok: false, complete: false, status: 0 };
       }
     });
 
@@ -99,6 +100,7 @@ export async function GET(request: NextRequest) {
       planned: planned.length,
       attempted: jobs.length,
       updated: results.filter((result) => result.ok).length,
+      held: results.filter((result) => result.ok && !result.complete).length,
       incomplete: results.filter((result) => !result.ok && result.status > 0).length,
       failed: results.filter((result) => result.status === 0).length,
       deferred: results.filter((result) => result.status === -1).length,

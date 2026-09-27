@@ -11,7 +11,7 @@ for attempt in {1..8}; do
   response_file="$(mktemp)"
   status="$(curl --silent --show-error --max-time 300 --retry 2 --output "${response_file}" --write-out '%{http_code}' -H "Authorization: Bearer ${oidc_token}" "https://rein-web.vercel.app/api/cron/rein-live?date=${CAPTURE_DATE}")"
   # Logs contain counts only, never signed URLs, cookies or identity tokens.
-  jq '{ok,date,planned,attempted,updated,incomplete,failed,deferred,remaining,error}' "${response_file}"
+  jq '{ok,date,planned,attempted,updated,held,incomplete,failed,deferred,remaining,error}' "${response_file}"
   if [[ "${status}" == "404" ]]; then
     echo '::warning::No saved schedule for this date; raw capture remains independent.'
     rm -f "${response_file}"; exit 0

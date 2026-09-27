@@ -10,7 +10,8 @@ export function snapshotRecord(body: any, preview: boolean, now = Date.now()) {
   const hasStart = typeof starts === "number" && Number.isFinite(starts);
   const date = new Date((hasStart ? starts : generated) + 9 * 3600_000).toISOString().slice(0,10);
   const roles = ["firstProbability", "secondProbability", "thirdProbability"];
-  const authentic = !preview && hasStart && generated < starts && body.prediction.source !== "rebuilt" && (body.prediction.phase === "prestart" || body.prediction.source === "prestart") && body.evaluation?.roleModel === "ready" && body.horses.every((h: any) => roles.every(r => typeof h[r] === "number" && Number.isFinite(h[r]) && h[r] >= 0 && h[r] <= 1));
+  const complete = body.capture?.complete !== false;
+  const authentic = complete && !preview && hasStart && generated < starts && body.prediction.source !== "rebuilt" && (body.prediction.phase === "prestart" || body.prediction.source === "prestart") && body.evaluation?.roleModel === "ready" && body.horses.every((h: any) => roles.every(r => typeof h[r] === "number" && Number.isFinite(h[r]) && h[r] >= 0 && h[r] <= 1));
   const journal = authentic ? {
     schema: 1, id: `${id}:${body.prediction.generatedAt}`, raceId: id, title: body.race.title,
     generatedAt: body.prediction.generatedAt, startsAt: starts, model: body.model?.version ?? "不明",
@@ -19,7 +20,7 @@ export function snapshotRecord(body: any, preview: boolean, now = Date.now()) {
   } : null;
   const finishers = body.review?.isFinished && Array.isArray(body.review.finishers) ? body.review.finishers.filter((r: any) => r.finish >= 1 && r.finish <= 3).map((r: any) => ({ number: r.number, finish: r.finish })) : [];
   const result = finishers.length === 3 && new Set(finishers.map((r: any) => r.number)).size === 3 && [1,2,3].every(n => finishers.filter((r: any) => r.finish === n && numbers.includes(r.number)).length === 1) ? finishers : null;
-  return { race_id: id, race_date: date, slot: preview ? "preview" : "live", generated_at: body.prediction.generatedAt, starts_at: hasStart ? new Date(starts).toISOString() : null, is_final: body.review?.isFinished === true, payload: body, journal, result, roster, prestart: authentic && body.prediction.phase === "prestart" };
+  return { race_id: id, race_date: date, slot: preview ? "preview" : "live", generated_at: body.prediction.generatedAt, starts_at: hasStart ? new Date(starts).toISOString() : null, is_final: complete && body.review?.isFinished === true, payload: body, journal, result, roster, prestart: authentic && body.prediction.phase === "prestart" };
 }
 
 export function validGithubCaptureClaims(claims: Record<string, unknown>) {
