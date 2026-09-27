@@ -84,3 +84,8 @@ export function marketRankPoints(horses: JournalHorse[], role: typeof roles[numb
   if (!horses.length || horses.some(h => !Number.isInteger(h.popularity) || h.popularity < 1 || h.popularity > horses.length || typeof h[role] !== "number" || !Number.isFinite(h[role]))) return [];
   return [...horses].sort((a,b) => (b[role] ?? -1)-(a[role] ?? -1)).map((horse,index) => ({ ...horse, rank: index+1, difference: horse.popularity-index-1 }));
 }
+
+export type SharedJournal = {
+  scope: "server"; entries: JournalEntry[]; races: number; fromDate: string | null; throughDate: string | null;
+  summary: Array<{ minPopularity: number; roles: Array<{ target: number; races: number; hits: number }> }>;
+};

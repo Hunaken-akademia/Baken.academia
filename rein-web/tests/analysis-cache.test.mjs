@@ -15,14 +15,14 @@ const meta = (ageMinutes, extra = {}) => ({
   startsAt: at('11:30'), final: false, preview: false, ...extra,
 });
 
-test('freshness follows the cron cadence: 12 min near the start, 65 min earlier, results forever', () => {
+test('freshness follows the cron cadence: 12 min near the start, 180 min earlier, results forever', () => {
   assert.equal(isSnapshotFresh(meta(11), now.getTime()), true);
   assert.equal(isSnapshotFresh(meta(13), now.getTime()), false);
   assert.equal(isSnapshotFresh(meta(50, { startsAt: at('14:00') }), now.getTime()), true);
-  assert.equal(isSnapshotFresh(meta(70, { startsAt: at('14:00') }), now.getTime()), false);
+  assert.equal(isSnapshotFresh(meta(181, { startsAt: at('14:00') }), now.getTime()), false);
   assert.equal(isSnapshotFresh(meta(600, { final: true }), now.getTime()), true);
   assert.equal(isSnapshotFresh(meta(170, { preview: true }), now.getTime()), true);
-  assert.equal(isSnapshotFresh(meta(190, { preview: true }), now.getTime()), false);
+  assert.equal(isSnapshotFresh(meta(361, { preview: true }), now.getTime()), false);
   // Snapshots written before startsAt existed are treated as near-start.
   assert.equal(isSnapshotFresh(meta(13, { startsAt: null }), now.getTime()), false);
   assert.ok(snapshotTtlSeconds(meta(0)) * 1000 > minutes(65));
@@ -50,7 +50,7 @@ test('cron plan: near-start first, then missing/stale later races, then results,
   ];
   const metas = new Map([
     ['live:later-fresh', meta(20, { startsAt: at('14:00') })],
-    ['live:later-stale', meta(56, { startsAt: at('13:00') })],
+    ['live:later-stale', meta(181, { startsAt: at('13:00') })],
     ['live:near-1', meta(1)],
     ['live:finished', meta(30, { startsAt: at('10:20') })],
     ['live:finished-done', meta(5, { final: true })],
@@ -58,9 +58,15 @@ test('cron plan: near-start first, then missing/stale later races, then results,
   ]);
   const plan = planPrecompute(races, metas, now);
   assert.deepEqual(plan.map((job) => `${job.raceId}:${job.reason}`), [
-    'near-1:near-start', 'near-2:near-start',
+    'near-2:near-start',
     'later-stale:stale', 'later-missing:missing',
-    'finished:result',
+    'finished:result', 'old:result',
     'tomorrow-missing:missing',
   ]);
+});
+
+test('yesterday result catch-up uses the race date and completed races are not recalculated', () => {
+  const race = {raceId: 'yesterday', start: '16:00', date: '2026-09-25', preview:false};
+  assert.equal(planPrecompute([race],new Map(),now)[0].reason,'result');
+  assert.deepEqual(planPrecompute([race],new Map([['live:yesterday',meta(500,{final:true})]]),now),[]);
 });

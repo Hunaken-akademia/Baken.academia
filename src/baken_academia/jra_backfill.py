@@ -412,6 +412,14 @@ async def backfill(args: argparse.Namespace) -> dict[str, object]:
 
         print(json.dumps({"event_pages": len(selected), "start": str(start), "end": str(end)}, ensure_ascii=False), flush=True)
 
+        if not selected and getattr(args, "allow_empty", False):
+            if not event_cnames:
+                raise ValueError("JRA月間日程を確認できません。未開催扱いにはしません")
+            report = {"status": "no_meeting", "races": 0, "start_date": args.start_date, "end_date": args.end_date, "errors": []}
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.with_suffix(".audit.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))
+            return report
+
         for index, event_cname in enumerate(selected, 1):
             event_date = _cname_date(event_cname)
             event_key = event_cname.split("/")[0]

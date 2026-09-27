@@ -194,6 +194,9 @@ export default function Home() {
   // Set while an older snapshot is shown and the server refreshes it in the background.
   const [refreshing, setRefreshing] = useState(false);
   const staleRetry = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedRace = useRef("");
+  const analysisRequest = useRef(0);
+  const visitCache = useRef(new Map<string, Analysis>());
   const danger = useMemo(
     () => data?.horses.find((h) => h.popularity > 0 && h.popularity <= 3 && h.score < 78),
     [data],
@@ -227,34 +230,46 @@ export default function Home() {
     }
   }
 
-  async function analyze(race: Pick<Race, "raceId">, background = false) {
+  async function analyze(race: Pick<Race, "raceId">, background = false, attempt = 0) {
+    const key = `${scheduleDay}:${race.raceId}`;
+    if (background && selectedRace.current !== key) return;
+    const serial = ++analysisRequest.current;
+    if (staleRetry.current) clearTimeout(staleRetry.current);
+    staleRetry.current = null;
     if (!background) {
-      setLoading(true);
-      setError("");
-      setFailedRace(null);
+      selectedRace.current = key;
+      const existing = visitCache.current.get(key);
+      setData(existing ?? null);
+      setActiveHorse(null);
+      setLoading(!existing);
+      setError(""); setFailedRace(null);
     }
     try {
       const response = await fetch(`/api/analyze?raceId=${race.raceId}${scheduleDay === "tomorrow" ? "&preview=1" : ""}`);
       const result = (await response.json().catch(() => ({}))) as Analysis & { error?: string };
+      if (serial !== analysisRequest.current || selectedRace.current !== key) return;
+      if (response.status === 202) {
+        setRefreshing(true); setFailedRace(race.raceId);
+        setError(attempt < 4 ? "サーバーが保存データを準備中です。15秒後に自動で確認します。" : "保存データを準備中です。少し時間をおいて再読み込みしてください。");
+        if (attempt < 4) staleRetry.current = setTimeout(() => void analyze(race, true, attempt + 1), 15_000);
+        return;
+      }
       if (!response.ok || !result.race) throw new Error(result.error || "レース情報を取得できませんでした");
       const stale = response.headers.get("x-rein-stale") === "1";
-      if (staleRetry.current) clearTimeout(staleRetry.current);
-      staleRetry.current = null;
-      setRefreshing(stale);
-      // Pick up the refreshed snapshot once; the CDN keeps responses for 15s.
-      if (stale && !background)
-        staleRetry.current = setTimeout(() => void analyze(race, true), 25_000);
+      setRefreshing(stale); setError(""); setFailedRace(null);
+      if (stale && !background) staleRetry.current = setTimeout(() => void analyze(race, true), 25_000);
+      visitCache.current.delete(key);
+      visitCache.current.set(key, result);
+      if (visitCache.current.size > 48) visitCache.current.delete(visitCache.current.keys().next().value!);
       setData(result);
-      setActiveHorse((current) =>
-        background && current ? result.horses.find((horse) => horse.number === current.number) ?? null : null,
-      );
+      setActiveHorse(current => background && current ? result.horses.find(horse => horse.number === current.number) ?? null : null);
     } catch (value) {
-      if (!background) {
+      if (serial === analysisRequest.current && (!background || attempt > 0)) {
         setError(value instanceof Error ? value.message : "レース情報を取得できませんでした");
         setFailedRace(race.raceId);
       }
     } finally {
-      if (!background) setLoading(false);
+      if (serial === analysisRequest.current) setLoading(false);
     }
   }
 
@@ -292,9 +307,14 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [data?.race.raceId, data?.review?.isFinished]);
 
-  const back = () => {
+  const cancelAnalysis = () => {
+    selectedRace.current = ""; analysisRequest.current++;
     if (staleRetry.current) clearTimeout(staleRetry.current);
-    staleRetry.current = null;
+    staleRetry.current = null; setLoading(false);
+  };
+  useEffect(() => () => { analysisRequest.current++; if (staleRetry.current) clearTimeout(staleRetry.current); }, []);
+  const back = () => {
+    cancelAnalysis();
     setRefreshing(false);
     setError("");
     setFailedRace(null);
@@ -458,6 +478,7 @@ export default function Home() {
               if (day === scheduleDay) return;
               setSchedule(null);
               setVenue(null);
+              cancelAnalysis();
               setData(null);
               setScheduleDay(day);
             }}
@@ -766,7 +787,7 @@ function AnalysisScreen({
   onBack: () => void;
   onHorse: (horse: Horse) => void;
 }) {
-  return <ReinCloudProvider><AnalysisScreenContent data={data} activeHorse={activeHorse} danger={danger} loading={loading} onRetry={onRetry} onBack={onBack} onHorse={onHorse} /></ReinCloudProvider>;
+  return <ReinCloudProvider enabled={!!activeHorse}><AnalysisScreenContent data={data} activeHorse={activeHorse} danger={danger} loading={loading} onRetry={onRetry} onBack={onBack} onHorse={onHorse} /></ReinCloudProvider>;
 }
 
 function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, onBack, onHorse }: {

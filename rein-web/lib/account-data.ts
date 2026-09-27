@@ -14,7 +14,7 @@ export function readLegacyNotes(): Record<string, HorseNote> {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       const id = key?.startsWith(NOTE_KEY) ? key.slice(NOTE_KEY.length) : "";
-      if (!key || !/^\\d{1,16}$/.test(id)) continue;
+      if (!key || !/^\d{1,16}$/.test(id)) continue;
       try {
         const value = JSON.parse(localStorage.getItem(key) || "null");
         if (value && typeof value.note === "string" && value.note.length <= 1200) notes[id] = { name: typeof value.name === "string" ? value.name.slice(0,100) : "", note: value.note, watched: value.watched === true, updatedAt: typeof value.updatedAt === "string" && Number.isFinite(Date.parse(value.updatedAt)) ? value.updatedAt : new Date(0).toISOString() };

@@ -1,0 +1,108 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.116.0";
+import { createRemoteJWKSet, jwtVerify } from "npm:jose@5.10.0";
+import { snapshotRecord, validGithubCaptureClaims } from "./records.ts";
+
+const ISSUER = "https://oidc.vercel.com/hunaken-akademia";
+const VERCEL_JWKS = createRemoteJWKSet(new URL(`${ISSUER}/.well-known/jwks`));
+const GH_ISSUER = "https://token.actions.githubusercontent.com";
+const GH_JWKS = createRemoteJWKSet(new URL(`${GH_ISSUER}/.well-known/jwks`));
+const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { autoRefreshToken: false, persistSession: false } });
+const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+let summaryCache: { value: unknown; until: number } | undefined;
+
+async function identity(req: Request): Promise<"production" | "preview" | "github"> {
+  const header = req.headers.get("authorization") ?? "";
+  if (!header.startsWith("Bearer ")) throw new Error("Unauthorized");
+  const token = header.slice(7);
+  // Issuer is only a routing hint here; signature, issuer, audience and claims are all verified below.
+  const unverified = JSON.parse(atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+  if (unverified.iss === GH_ISSUER) {
+    const { payload } = await jwtVerify(token, GH_JWKS, { issuer: GH_ISSUER, audience: "rein-supabase-archive-v1" });
+    if (!validGithubCaptureClaims(payload)) throw new Error("Unauthorized workflow");
+    return "github";
+  }
+  const { payload } = await jwtVerify(token, VERCEL_JWKS, { issuer: ISSUER, audience: "https://vercel.com/hunaken-akademia" });
+  if (payload.owner_id !== "team_JoV13Y5pkEXrjvf8JCKP6tNY" || payload.project_id !== "prj_8X6LIxRxvKKNyVQWxFKF6AQJ6wrm" || !["production","preview"].includes(String(payload.environment))) throw new Error("Unauthorized project");
+  return payload.environment as "production" | "preview";
+}
+function checked<T>(result: { data: T; error: any }) { if (result.error) throw new Error(result.error.message); return result.data; }
+const raceIdValid = (id: unknown) => typeof id === "string" && /^\d{10,12}$/.test(id);
+const dateValid = (date: unknown) => typeof date === "string" && /^20\d{2}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date));
+
+Deno.serve(async req => {
+ if (req.method !== "POST") return json({error:"Method not allowed"},405);
+ let who: Awaited<ReturnType<typeof identity>>;
+ try { who = await identity(req); } catch { return json({error:"Unauthorized"},401); }
+ try {
+  const text = await req.text();
+  if (text.length>1_000_000) return json({error:"Too large"},413);
+  const b = JSON.parse(text), action = b.action;
+  if (action === "health") return json({ok:true,identity:who});
+  if (who === "github") {
+   const path = b.path;
+   if (typeof path !== "string" || !/^daily\/(?:jra|nar)\/20\d{2}\/20\d{2}-\d{2}-\d{2}\.(?:tar\.gz|manifest\.json)$/.test(path)) return json({error:"Invalid archive path"},400);
+   const storage = admin.storage.from("baken-archive");
+   if(action === "exists") { const {data,error}=await storage.exists(path); if(error) throw error; return json({exists:data}); }
+   if(action === "sign-upload") { const value=checked(await storage.createSignedUploadUrl(path,{upsert:true})); return json({signed_url:value.signedUrl}); }
+   if(action === "sign-download") { const value=checked(await storage.createSignedUrl(path,600)); return json({signed_url:value.signedUrl}); }
+   return json({error:"Forbidden action"},403);
+  }
+  if (["save","save-schedule","claim","release","run"].includes(action) && who !== "production") return json({error:"Production writer required"},403);
+  if (action === "save") {
+   const record = snapshotRecord(b.payload,b.preview === true);
+   const saved=checked(await admin.rpc("rein_store_race_snapshot",{r:record}));
+   summaryCache=undefined;
+   return json({saved});
+  }
+  if (action === "read") {
+   if(!raceIdValid(b.raceId)||!["live","preview","prestart"].includes(b.slot))return json({error:"Invalid race"},400);
+   const snapshot=checked(await admin.from("rein_race_snapshots").select("payload,generated_at,starts_at,is_final,slot,captured_at").eq("race_id",b.raceId).eq("slot",b.slot).maybeSingle());
+   return json({snapshot});
+  }
+  if (action === "metas") {
+   if(!dateValid(b.date)) return json({error:"Invalid date"},400);
+   const snapshots=checked(await admin.from("rein_race_snapshots").select("race_id,slot,generated_at,starts_at,is_final,captured_at").eq("race_date",b.date).in("slot",["live","preview"]));
+   return json({snapshots});
+  }
+  if (action === "schedule" || action === "save-schedule") {
+   if(!dateValid(b.date))return json({error:"Invalid date"},400);
+   if(action === "schedule") return json({schedule:checked(await admin.from("rein_schedule_snapshots").select("payload,generated_at").eq("race_date",b.date).maybeSingle())});
+   if(!Array.isArray(b.payload?.venues)||b.payload.venues.some((v:any)=>!Array.isArray(v.races)||v.races.some((r:any)=>!raceIdValid(r.raceId))))return json({error:"Invalid schedule"},400);
+   checked(await admin.from("rein_schedule_snapshots").upsert({race_date:b.date,payload:b.payload,generated_at:new Date().toISOString()}));
+   return json({saved:true});
+  }
+  if (action === "history") {
+   if(!raceIdValid(b.raceId))return json({error:"Invalid race"},400);
+   const [rows,outcome]=await Promise.all([
+    admin.from("rein_prediction_history").select("entry").eq("race_id",b.raceId).order("generated_at").limit(1000),
+    admin.from("rein_race_outcomes").select("roster,finishers").eq("race_id",b.raceId).maybeSingle()
+   ]);
+   const result=checked(outcome);
+   const entries=checked(rows).map((r:any)=>({...r.entry,...(result?.finishers && result.roster===r.entry.roster?{finishers:result.finishers}:{})}));
+   if(!summaryCache || summaryCache.until<Date.now())summaryCache={value:checked(await admin.rpc("rein_shared_journal_summary")),until:Date.now()+300_000};
+   return json({entries,scope:"server",...(summaryCache.value as object)});
+  }
+  if (action === "claim") {
+   if(typeof b.key!=="string"||!(/^(?:cron:|race:)/.test(b.key)))return json({error:"Invalid key"},400);
+   const token=checked(await admin.rpc("rein_acquire_capture",{p_key:b.key,p_ttl:Math.min(300,Math.max(10,Number(b.ttl)||180))}));
+   return json({acquired:!!token,token});
+  }
+  if (action === "release") {
+   if(typeof b.key!=="string" || typeof b.token!=="string")return json({error:"Invalid lease"},400);
+   checked(await admin.from("rein_capture_leases").delete().eq("key",b.key).eq("token",b.token));
+   return json({ok:true});
+  }
+  if (action === "run") {
+   if(!b.summary || JSON.stringify(b.summary).length>50_000)return json({error:"Invalid summary"},400);
+   checked(await admin.from("rein_capture_runs").insert({summary:b.summary}));
+   // Operational logs expire after 31 days; predictions and results are retained.
+   checked(await admin.from("rein_capture_runs").delete().lt("checked_at",new Date(Date.now()-31*86400_000).toISOString()));
+   return json({ok:true});
+  }
+  return json({error:"Unknown action"},400);
+ } catch(error) {
+  console.error("REIN snapshot operation failed",error instanceof Error ? error.message : "unknown");
+  return json({error:"Snapshot operation failed"},500);
+ }
+});

@@ -13,6 +13,7 @@ export const config = {
     "/api/races/:path*",
     "/api/analyze/:path*",
     "/api/account-data/:path*",
+    "/api/race-history/:path*",
     "/api/nar/:path*",
   ],
 };
