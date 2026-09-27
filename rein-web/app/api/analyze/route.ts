@@ -16,6 +16,7 @@ import {
   horseName,
   isRunnerRow,
   isScratched,
+  withdrawnResultNumbers,
   parseSexAge,
 } from "@/lib/race-card";
 import { selectPicks } from "@/lib/marks";
@@ -254,10 +255,11 @@ export async function GET(request: NextRequest) {
       } catch (error) { console.error("REIN durable read failed", error instanceof Error ? error.message : "unknown"); }
     }
     if (snapshot) {
-      const meta = metaFromBody(JSON.parse(snapshot), preview);
+      const cachedBody = JSON.parse(snapshot);
+      const meta = metaFromBody(cachedBody, preview);
       const fresh = meta ? isSnapshotFresh(meta, Date.now()) : false;
       if (!fresh) waitUntil(refreshInBackground(request, raceId, preview));
-      return new NextResponse(snapshot, { headers: { ...publicCacheHeaders, "content-type": "application/json; charset=utf-8", "x-rein-fallback": "0", "x-rein-snapshot": "1", "x-rein-store": source, "x-rein-stale": fresh ? "0" : "1" } });
+      return new NextResponse(snapshot, { headers: { ...publicCacheHeaders, "content-type": "application/json; charset=utf-8", "x-rein-fallback": cachedBody.capture?.complete === false ? "1" : "0", "x-rein-snapshot": "1", "x-rein-store": source, "x-rein-stale": fresh ? "0" : "1" } });
     }
     const failure = await readFailure(`analyze:${preview ? "preview:" : ""}${raceId}`);
     if (failure) return new NextResponse(failure.body, { status: failure.status, headers: { ...failureCacheHeaders, "content-type": "application/json; charset=utf-8" } });
@@ -282,9 +284,12 @@ async function computeOnce(request: NextRequest, raceId: string, preview: boolea
 }
 
 async function storeAnalysis(response: Response, raceId: string, preview: boolean): Promise<boolean> {
-  if (response.ok && response.headers.get("x-rein-fallback") === "0") {
-    const text = await response.clone().text();
-    const body = JSON.parse(text), meta = metaFromBody(body, preview);
+  if (response.ok) {
+    const body = await response.clone().json();
+    // Keep the card available while model/market-dependent sections are held.
+    // Partial snapshots stay eligible for refresh and never enter performance history.
+    body.capture = { complete: response.headers.get("x-rein-fallback") === "0" };
+    const text = JSON.stringify(body), meta = metaFromBody(body, preview);
     if (!meta) return false;
     // Durable storage succeeds before a capture is counted as complete.
     let persisted = false;
@@ -365,8 +370,9 @@ async function analyze(request: NextRequest) {
     // Geldings are written 「せん」 on Yahoo. The old 「セ」-only filter silently dropped
     // them, and the popularity sanity check then rejected the whole race.
     const allCardRows = tableRows(card).filter(isRunnerRow);
-    const scratchedRows = allCardRows.filter(isScratched);
-    const cardRows = allCardRows.filter((row) => !isScratched(row));
+    const withdrawn = withdrawnResultNumbers(tableRows(result));
+    const scratchedRows = allCardRows.filter(row => isScratched(row) || withdrawn.has(+row.cells[1]));
+    const cardRows = allCardRows.filter(row => !isScratched(row) && !withdrawn.has(+row.cells[1]));
     const oddsRows = tableRows(odds, 5).filter(
       (row) =>
         /^\d+$/.test(row.cells[1] || "") &&

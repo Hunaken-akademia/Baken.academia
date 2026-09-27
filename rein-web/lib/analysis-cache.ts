@@ -38,6 +38,7 @@ export type SnapshotMeta = {
 };
 
 type SnapshotBody = {
+  capture?: { complete?: boolean };
   race?: { startsAt?: number | null };
   prediction?: { generatedAt?: string; phase?: string };
   review?: { isFinished?: boolean };
@@ -50,7 +51,7 @@ export function metaFromBody(body: SnapshotBody, preview: boolean): SnapshotMeta
   return {
     generatedAt,
     startsAt: typeof startsAt === "number" && Number.isFinite(startsAt) ? startsAt : null,
-    final: Boolean(body.review?.isFinished),
+    final: Boolean(body.review?.isFinished) && body.capture?.complete !== false,
     preview,
   };
 }

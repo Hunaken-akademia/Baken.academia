@@ -1,7 +1,7 @@
 // Yahoo race-card row parsing. Yahoo writes geldings as 「せん」 (e.g. "せん5/鹿毛");
 // the training data (JRA results) uses the same 「せん」 category, so it is kept as is.
 const SEX_AGE = /(牡|牝|せん|セ)\s*(\d+)/;
-const SCRATCH = /取消|除外|競走中止/;
+const SCRATCH = /取消|除外/;
 
 export type CardCells = { html: string; cells: string[] };
 
@@ -26,4 +26,11 @@ export function horseName(horseCell: string) {
 
 export function isScratched(row: CardCells) {
   return SCRATCH.test(row.cells.slice(6).join(" ")) || SCRATCH.test(row.cells[2] || "");
+}
+
+// A race card may retain "****" odds without marking a withdrawal. The result
+// page's status is authoritative. A DNF/disqualification still counts as a starter.
+export function withdrawnResultNumbers(rows: CardCells[]) {
+  return new Set(rows.filter(row => SCRATCH.test(row.cells[0] || "") && /^\d+$/.test(row.cells[2] || ""))
+    .map(row => Number(row.cells[2])));
 }
