@@ -961,6 +961,7 @@ function AnalysisScreen({
         </div>
       </section>
       <RaceIntelligence data={data} insights={insights} />
+      <RaceShapeReference data={data} />
       <ConditionReferenceRankings data={data} />
       <Tabs defaultValue="ranking" onSwipeBack={onBack}>
         <TabsList className="mb-4 grid h-auto min-h-11 w-full grid-cols-4 bg-[#0c192a]">
@@ -1237,6 +1238,100 @@ function RaceIntelligence({ data, insights }: { data: Analysis; insights: RaceIn
             未発表項目は評価に混ぜず、取得後の再分析で更新します。
           </p>
         </InfoPanel>
+      </div>
+    </section>
+  );
+}
+
+function RaceShapeReference({ data }: { data: Analysis }) {
+  const lanes = [
+    { label: "逃げ", color: "bg-rose-500/20 border-rose-400/40" },
+    { label: "先行", color: "bg-amber-500/20 border-amber-400/40" },
+    { label: "好位", color: "bg-emerald-500/20 border-emerald-400/40" },
+    { label: "差し", color: "bg-sky-500/20 border-sky-400/40" },
+    { label: "追込", color: "bg-violet-500/20 border-violet-400/40" },
+    { label: "未判定", color: "bg-slate-500/20 border-slate-400/40" },
+  ];
+  const groups = lanes.map((lane) => ({
+    ...lane,
+    horses: [...data.horses]
+      .filter((horse) => (lanes.some((item) => item.label === horse.style) ? horse.style : "未判定") === lane.label)
+      .sort((a, b) => (a.earlyPosition ?? 99) - (b.earlyPosition ?? 99) || a.number - b.number),
+  }));
+  const marketReady = roleReady(data) && data.horses.length > 0 && data.horses.every(
+    (horse) => horse.popularity > 0 && horse.odds !== null && horse.odds > 0 &&
+      typeof horse.firstProbability === "number" && Number.isFinite(horse.firstProbability) && horse.firstProbability >= 0,
+  );
+  const modelTotal = marketReady ? data.horses.reduce((sum, horse) => sum + (horse.firstProbability ?? 0), 0) : 0;
+  const marketTotal = marketReady ? data.horses.reduce((sum, horse) => sum + 1 / (horse.odds ?? 1), 0) : 0;
+  const bands = [
+    { label: "1〜3番人気", min: 1, max: 3 },
+    { label: "4〜6番人気", min: 4, max: 6 },
+    { label: "7〜9番人気", min: 7, max: 9 },
+    { label: "10番人気以下", min: 10, max: Infinity },
+  ].map((band) => {
+    const horses = data.horses.filter((horse) => horse.popularity >= band.min && horse.popularity <= band.max);
+    return {
+      ...band,
+      horses,
+      model: modelTotal > 0 ? 100 * horses.reduce((sum, horse) => sum + (horse.firstProbability ?? 0), 0) / modelTotal : 0,
+      market: marketTotal > 0 ? 100 * horses.reduce((sum, horse) => sum + 1 / (horse.odds ?? 1), 0) / marketTotal : 0,
+    };
+  });
+
+  return (
+    <section className="mb-5 grid gap-3 lg:grid-cols-2">
+      <div className="rounded-2xl border border-emerald-400/20 bg-[#0c192a] p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-bold text-white">参考隊列マップ</h2>
+          <Badge className="bg-emerald-300/10 text-emerald-200">近走通過順ベース</Badge>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-slate-400">前方 → 後方の並び。位置は近走の序盤通過順から分類した目安で、今回の4角位置や馬身差の予測ではありません。</p>
+        <div className="mt-4 space-y-2">
+          {groups.filter((group) => group.horses.length).map((group) => (
+            <div key={group.label} className={`flex min-h-14 items-center gap-2 rounded-xl border px-3 py-2 ${group.color}`}>
+              <span className="w-12 shrink-0 text-xs font-bold text-white">{group.label}</span>
+              <div className="flex flex-wrap gap-1.5">
+                {group.horses.map((horse) => (
+                  <span key={horse.number} title={`${horse.name}・近走序盤平均 ${horse.earlyPosition ?? "不明"}番手`} className="inline-flex min-w-8 items-center justify-center rounded-full border border-white/30 bg-[#10233a] px-2 py-1 text-xs font-bold text-white">
+                    {horse.number}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-slate-400">今回のペース想定：{data.pace.label}。出走取消・近走データの不足によって並びは変わります。</p>
+      </div>
+      <div className="rounded-2xl border border-amber-400/20 bg-[#0c192a] p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-bold text-white">人気帯とREINの評価差</h2>
+          <Badge className="bg-amber-300/10 text-amber-200">1着評価・参考</Badge>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-slate-400">人気帯ごとに、REINの1着モデル評価の全頭内シェアと、単勝オッズの逆数から求めた市場シェアを比較します。</p>
+        {marketReady && modelTotal > 0 && marketTotal > 0 ? (
+          <div className="mt-4 space-y-3">
+            {bands.filter((band) => band.horses.length).map((band) => {
+              const difference = band.model - band.market;
+              return (
+                <div key={band.label} className={`rounded-xl border p-3 ${band.min === 10 && difference >= 3 ? "border-rose-400/40 bg-rose-400/[.06]" : "border-slate-700 bg-black/10"}`}>
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className="font-bold text-white">{band.label} <span className="ml-1 text-xs font-normal text-slate-400">{band.horses.map((horse) => horse.number).join("・")}</span></span>
+                    <span className={`shrink-0 text-xs font-bold ${difference >= 3 ? "text-rose-300" : difference <= -3 ? "text-sky-300" : "text-slate-400"}`}>
+                      {difference >= 3 ? "市場より高評価" : difference <= -3 ? "市場より慎重" : "市場と近い"}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-3 text-xs text-slate-300">
+                    <div>REIN評価シェア <strong className="text-base text-white">{band.model.toFixed(1)}%</strong></div>
+                    <div>市場シェア <strong className="text-base text-white">{band.market.toFixed(1)}%</strong></div>
+                  </div>
+                  <div className="mt-2 h-2 rounded-full bg-slate-700" aria-hidden="true"><div className="h-2 rounded-full bg-amber-400" style={{ width: `${Math.min(100, band.model)}%` }} /></div>
+                </div>
+              );
+            })}
+          </div>
+        ) : <p className="mt-4 rounded-xl border border-slate-700 p-4 text-sm text-slate-400">モデル評価と全頭の単勝オッズが揃ってから表示します。</p>}
+        <p className="mt-3 text-[11px] leading-5 text-slate-500">各帯の値は勝率・的中率ではなく、全出走馬の中での相対的な評価割合です。複勝圏確率や朝からのオッズ変化は算出していません。総合順位・買い目への加点はありません。</p>
       </div>
     </section>
   );
