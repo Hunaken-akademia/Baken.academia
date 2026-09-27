@@ -23,6 +23,7 @@ import { compactSelections } from "@/lib/tickets";
 import { raceProgress } from "@/lib/race-progress";
 import { reasonViews } from "@/lib/feature-labels";
 import { roleOrder, type Picks, type MarkPick } from "@/lib/marks";
+import { RaceFormationMap } from "@/components/race-formation-map";
 
 type HistoryFactor = {
   label: string;
@@ -58,6 +59,7 @@ type Horse = {
   weightCarried?: number;
   earlyPosition?: number | null;
   recentPositions?: string[];
+  mapPositions?: string[];
   paceAdjustment?: number;
   marketScore?: number;
   reinScore?: number;
@@ -961,6 +963,7 @@ function AnalysisScreen({
         </div>
       </section>
       <RaceIntelligence data={data} insights={insights} />
+      <RaceFormationMap key={data.race.raceId} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} />
       <RaceShapeReference data={data} />
       <ConditionReferenceRankings data={data} />
       <Tabs defaultValue="ranking" onSwipeBack={onBack}>
@@ -1244,20 +1247,6 @@ function RaceIntelligence({ data, insights }: { data: Analysis; insights: RaceIn
 }
 
 function RaceShapeReference({ data }: { data: Analysis }) {
-  const lanes = [
-    { label: "逃げ", color: "bg-rose-500/20 border-rose-400/40" },
-    { label: "先行", color: "bg-amber-500/20 border-amber-400/40" },
-    { label: "好位", color: "bg-emerald-500/20 border-emerald-400/40" },
-    { label: "差し", color: "bg-sky-500/20 border-sky-400/40" },
-    { label: "追込", color: "bg-violet-500/20 border-violet-400/40" },
-    { label: "未判定", color: "bg-slate-500/20 border-slate-400/40" },
-  ];
-  const groups = lanes.map((lane) => ({
-    ...lane,
-    horses: [...data.horses]
-      .filter((horse) => (lanes.some((item) => item.label === horse.style) ? horse.style : "未判定") === lane.label)
-      .sort((a, b) => (a.earlyPosition ?? 99) - (b.earlyPosition ?? 99) || a.number - b.number),
-  }));
   const marketReady = roleReady(data) && data.horses.length > 0 && data.horses.every(
     (horse) => horse.popularity > 0 && horse.odds !== null && horse.odds > 0 &&
       typeof horse.firstProbability === "number" && Number.isFinite(horse.firstProbability) && horse.firstProbability >= 0,
@@ -1280,29 +1269,7 @@ function RaceShapeReference({ data }: { data: Analysis }) {
   });
 
   return (
-    <section className="mb-5 grid gap-3 lg:grid-cols-2">
-      <div className="rounded-2xl border border-emerald-400/20 bg-[#0c192a] p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-bold text-white">参考隊列マップ</h2>
-          <Badge className="bg-emerald-300/10 text-emerald-200">近走通過順ベース</Badge>
-        </div>
-        <p className="mt-2 text-xs leading-5 text-slate-400">前方 → 後方の並び。位置は近走の序盤通過順から分類した目安で、今回の4角位置や馬身差の予測ではありません。</p>
-        <div className="mt-4 space-y-2">
-          {groups.filter((group) => group.horses.length).map((group) => (
-            <div key={group.label} className={`flex min-h-14 items-center gap-2 rounded-xl border px-3 py-2 ${group.color}`}>
-              <span className="w-12 shrink-0 text-xs font-bold text-white">{group.label}</span>
-              <div className="flex flex-wrap gap-1.5">
-                {group.horses.map((horse) => (
-                  <span key={horse.number} title={`${horse.name}・近走序盤平均 ${horse.earlyPosition ?? "不明"}番手`} className="inline-flex min-w-8 items-center justify-center rounded-full border border-white/30 bg-[#10233a] px-2 py-1 text-xs font-bold text-white">
-                    {horse.number}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-slate-400">今回のペース想定：{data.pace.label}。出走取消・近走データの不足によって並びは変わります。</p>
-      </div>
+    <section className="mb-5">
       <div className="rounded-2xl border border-amber-400/20 bg-[#0c192a] p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold text-white">人気帯とREINの評価差</h2>

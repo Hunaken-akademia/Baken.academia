@@ -19,6 +19,7 @@ import {
 } from "@/lib/race-card";
 import { selectPicks } from "@/lib/marks";
 import { buildRaceConfidence, type RaceConfidence } from "@/lib/race-confidence";
+import { extractMapPositions } from "@/lib/corner-reference";
 import {
   isSnapshotFresh,
   metaFromBody,
@@ -580,6 +581,7 @@ async function analyze(request: NextRequest) {
         trainer,
         earlyPosition: styleProfile.earlyPosition,
         recentPositions: styleProfile.recentPositions,
+        mapPositions: extractMapPositions(pastRows[number - 1] || ""),
         paceAdjustment: 0,
         horseId,
         jockeyId,
