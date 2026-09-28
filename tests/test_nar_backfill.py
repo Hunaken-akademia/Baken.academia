@@ -1,5 +1,5 @@
 import unittest
-from baken_academia.nar_backfill import build_odds_urls, parse_odds_cells, parse_result_links, parse_result_page, parse_schedule_links
+from baken_academia.nar_backfill import build_odds_urls, parse_odds_cells, parse_result_links, parse_result_page, parse_schedule_links, requested_odds_urls
 
 
 class NarBackfillTest(unittest.TestCase):
@@ -33,8 +33,14 @@ class NarBackfillTest(unittest.TestCase):
         self.assertEqual(row["weight_carried"], 56.0)
         self.assertEqual(row["finish_time"], "1:25.0")
         self.assertEqual(row["last_3f"], 38.1)
+        self.assertEqual(row["finish_position"], 1)
         self.assertEqual(row["popularity"], 2)
         self.assertEqual(row["win_odds"], 3.4)
+
+    def test_default_scope_needs_only_win_odds_popularity_and_results(self):
+        url = "https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?k_raceDate=2019%2F01%2F01&k_raceNo=1&k_babaCode=3"
+        self.assertEqual(requested_odds_urls(url), {})
+        self.assertEqual(len(requested_odds_urls(url, include_all_bet_odds=True)), 7)
 
     def test_all_odds_urls(self):
         url = "https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?k_raceDate=2019%2F01%2F01&k_raceNo=1&k_babaCode=3"
