@@ -1,16 +1,29 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { REIN_PLANS, type ReinMembership } from "@/lib/rein-access";
+import { serverData } from "@/lib/server-snapshots";
 
 export const dynamic = "force-dynamic";
 
+type NarAnalysisReport = {
+  coverage: { chunks: number; date_from: string; date_to: string; races: number; runners: number; racecourses: number };
+  market_baseline: { pop1_win_rate?: number; pop1_top3_rate?: number; top3_contains_winner_rate?: number; top3_two_or_more_placed_rate?: number; top3_all_placed_rate?: number };
+};
+type NarAnalysisSnapshot = { report: NarAnalysisReport; updated_at: string };
+const percent = (value?: number) => typeof value === "number" ? `${(value * 100).toFixed(1)}%` : "—";
+
+
 export default async function NarPage() {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("rein_memberships")
-    .select("member_key,google_email,plan,status,access_starts_at,access_ends_at,free_period_ends_at")
-    .maybeSingle();
-  const membership = data as ReinMembership | null;
+  const [membershipResult, analysisResult] = await Promise.all([
+    supabase
+      .from("rein_memberships")
+      .select("member_key,google_email,plan,status,access_starts_at,access_ends_at,free_period_ends_at")
+      .maybeSingle(),
+    serverData<{ analysis: NarAnalysisSnapshot | null }>("nar-analysis").catch(() => ({ analysis: null })),
+  ]);
+  const membership = membershipResult.data as ReinMembership | null;
+  const analysis = analysisResult.analysis;
   const plan = membership ? REIN_PLANS[membership.plan] : REIN_PLANS.nar;
 
   return (
@@ -45,6 +58,54 @@ export default async function NarPage() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="mt-5 rounded-3xl border border-slate-700 bg-[#0b1727] p-6 sm:p-8">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold tracking-widest text-amber-300">取得済みデータ</p>
+              <h2 className="mt-2 text-xl font-black">地方競馬の暫定分析</h2>
+            </div>
+            <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
+              取得済み範囲
+            </span>
+          </div>
+          {analysis ? (
+            <>
+              <p className="mt-3 text-sm text-slate-300">
+                {analysis.report.coverage.date_from}〜{analysis.report.coverage.date_to}・{analysis.report.coverage.chunks.toLocaleString("ja-JP")}チャンク
+                <span className="mx-2 text-slate-600">/</span>
+                {analysis.report.coverage.races.toLocaleString("ja-JP")}レース
+                <span className="mx-2 text-slate-600">/</span>
+                {analysis.report.coverage.runners.toLocaleString("ja-JP")}頭分
+              </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {[
+                  ["1番人気の勝率", percent(analysis.report.market_baseline.pop1_win_rate)],
+                  ["1番人気の3着内率", percent(analysis.report.market_baseline.pop1_top3_rate)],
+                  ["人気上位3頭に勝ち馬が含まれる率", percent(analysis.report.market_baseline.top3_contains_winner_rate)],
+                  ["上位3頭から2頭以上が3着内", percent(analysis.report.market_baseline.top3_two_or_more_placed_rate)],
+                  ["上位3頭が全て3着内", percent(analysis.report.market_baseline.top3_all_placed_rate)],
+                  ["競馬場数", analysis.report.coverage.racecourses.toLocaleString("ja-JP")],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-2xl border border-slate-700 bg-black/15 p-4">
+                    <p className="text-xs text-slate-400">{label}</p>
+                    <p className="mt-2 text-lg font-bold text-slate-100">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-xs leading-6 text-slate-400">
+                取得・分析が完了したチャンクだけの集計です。バックフィルの進行に合わせて更新します。予想モデルへの適用とは分けて表示しています。
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                最終更新：{new Date(analysis.updated_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
+              </p>
+            </>
+          ) : (
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              取得済みデータの初回分析を待っています。分析が完了すると、対象期間と成績をここに表示します。
+            </p>
+          )}
         </section>
 
         <div className="mt-5 flex flex-wrap gap-3">

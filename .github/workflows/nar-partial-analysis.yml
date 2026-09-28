@@ -117,6 +117,25 @@ jobs:
         shell: bash
         run: cat artifacts/nar-partial-analysis/summary.md >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Publish latest partial NAR analysis to REIN
+        if: steps.archives.outputs.completed != '0'
+        shell: bash
+        env:
+          SUPABASE_SERVER_DATA_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/rein-server-data"
+        run: |
+          set -Eeuo pipefail
+          token_response="$(curl --fail-with-body --silent --show-error --retry 3 \
+            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=rein-supabase-archive-v1")"
+          oidc_token="$(jq -er '.value' <<<"${token_response}")"
+          payload="$(jq -c --slurpfile report artifacts/nar-partial-analysis/report.json \
+            '{action:"publish-nar-analysis",report:$report[0]}')"
+          curl --fail-with-body --silent --show-error --retry 3 \
+            -X POST "${SUPABASE_SERVER_DATA_URL}" \
+            -H "Authorization: Bearer ${oidc_token}" \
+            -H "Content-Type: application/json" \
+            --data "${payload}"
+
       - name: Remove temporary combined parquet before artifact upload
         if: steps.archives.outputs.completed != '0'
         run: rm -f artifacts/nar-partial-analysis/nar-partial-combined.parquet
