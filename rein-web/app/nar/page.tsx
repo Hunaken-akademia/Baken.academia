@@ -1,126 +1,31 @@
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { REIN_PLANS, type ReinMembership } from "@/lib/rein-access";
+import RaceDashboard from "@/components/race-dashboard";
+import { Suspense } from "react";
 import { serverData } from "@/lib/server-snapshots";
 
 export const dynamic = "force-dynamic";
-
-type NarAnalysisReport = {
-  coverage: { chunks: number; date_from: string; date_to: string; races: number; runners: number; racecourses: number };
-  market_baseline: { pop1_win_rate?: number; pop1_top3_rate?: number; top3_contains_winner_rate?: number; top3_two_or_more_placed_rate?: number; top3_all_placed_rate?: number };
+type Report = {
+ coverage:{chunks:number;date_from:string;date_to:string;races:number;runners:number;racecourses:number};
+ market_baseline:{pop1_win_rate:number;pop1_top3_rate:number;top3_contains_winner_rate:number};
+ live_model?:{status:string;roles:Record<string,{mode:string}>;comparison:Record<string,Record<string,{audit2026:Record<string,{races:number;hits:number;rate:number|null}>}>>;marketBaseline2026:Record<string,Record<string,{rate:number}>>};
 };
-type NarAnalysisSnapshot = { report: NarAnalysisReport; updated_at: string };
-const percent = (value?: number) => typeof value === "number" ? `${(value * 100).toFixed(1)}%` : "—";
-
-
-export default async function NarPage() {
-  const supabase = await createClient();
-  const [membershipResult, analysisResult] = await Promise.all([
-    supabase
-      .from("rein_memberships")
-      .select("member_key,google_email,plan,status,access_starts_at,access_ends_at,free_period_ends_at")
-      .maybeSingle(),
-    serverData<{ analysis: NarAnalysisSnapshot | null }>("nar-analysis").catch(() => ({ analysis: null })),
-  ]);
-  const membership = membershipResult.data as ReinMembership | null;
-  const analysis = analysisResult.analysis;
-  const plan = membership ? REIN_PLANS[membership.plan] : REIN_PLANS.nar;
-
-  return (
-    <main className="min-h-screen bg-[#07111f] px-4 py-8 text-slate-100">
-      <div className="mx-auto max-w-4xl">
-        <header className="mb-8 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-xl bg-amber-300 text-xl font-black text-[#07111f]">R</div>
-            <div>
-              <p className="text-lg font-black tracking-[.12em]">REIN</p>
-              <p className="text-xs text-slate-400">地方競馬</p>
-            </div>
-          </Link>
-          <div className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
-            {plan.name}
-          </div>
-        </header>
-
-        <section className="rounded-3xl border border-slate-700 bg-gradient-to-br from-[#251d10] to-[#0b1727] p-6 sm:p-8">
-          <p className="text-sm font-semibold tracking-widest text-amber-300">NAR</p>
-          <h1 className="mt-2 text-3xl font-black">地方競馬 REIN</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-            地方競馬版は、現在取得中の8年分データ・全券種最終オッズ・払戻を接続する土台まで完成しています。
-            10月1日の公開に向けて、中央競馬版と同じ全頭評価・着順適性・買い目UIへ接続します。
-          </p>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            {["全頭評価","1〜3着適性","買い目生成"].map((label) => (
-              <div key={label} className="rounded-2xl border border-amber-300/15 bg-black/15 p-4">
-                <p className="text-xs text-slate-500">公開機能</p>
-                <p className="mt-1 font-bold text-amber-200">{label}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-5 rounded-3xl border border-slate-700 bg-[#0b1727] p-6 sm:p-8">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold tracking-widest text-amber-300">取得済みデータ</p>
-              <h2 className="mt-2 text-xl font-black">地方競馬の暫定分析</h2>
-            </div>
-            <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
-              取得済み範囲
-            </span>
-          </div>
-          {analysis ? (
-            <>
-              <p className="mt-3 text-sm text-slate-300">
-                {analysis.report.coverage.date_from}〜{analysis.report.coverage.date_to}・{analysis.report.coverage.chunks.toLocaleString("ja-JP")}チャンク
-                <span className="mx-2 text-slate-600">/</span>
-                {analysis.report.coverage.races.toLocaleString("ja-JP")}レース
-                <span className="mx-2 text-slate-600">/</span>
-                {analysis.report.coverage.runners.toLocaleString("ja-JP")}頭分
-              </p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {[
-                  ["1番人気の勝率", percent(analysis.report.market_baseline.pop1_win_rate)],
-                  ["1番人気の3着内率", percent(analysis.report.market_baseline.pop1_top3_rate)],
-                  ["人気上位3頭に勝ち馬が含まれる率", percent(analysis.report.market_baseline.top3_contains_winner_rate)],
-                  ["上位3頭から2頭以上が3着内", percent(analysis.report.market_baseline.top3_two_or_more_placed_rate)],
-                  ["上位3頭が全て3着内", percent(analysis.report.market_baseline.top3_all_placed_rate)],
-                  ["競馬場数", analysis.report.coverage.racecourses.toLocaleString("ja-JP")],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-2xl border border-slate-700 bg-black/15 p-4">
-                    <p className="text-xs text-slate-400">{label}</p>
-                    <p className="mt-2 text-lg font-bold text-slate-100">{value}</p>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-4 text-xs leading-6 text-slate-400">
-                取得・分析が完了したチャンクだけの集計です。バックフィルの進行に合わせて更新します。予想モデルへの適用とは分けて表示しています。
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                最終更新：{new Date(analysis.updated_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
-              </p>
-            </>
-          ) : (
-            <p className="mt-3 text-sm leading-7 text-slate-300">
-              取得済みデータの初回分析を待っています。分析が完了すると、対象期間と成績をここに表示します。
-            </p>
-          )}
-        </section>
-
-        <div className="mt-5 flex flex-wrap gap-3">
-          {membership?.plan === "all" ? (
-            <Link href="/jra" className="rounded-xl border border-slate-600 px-4 py-2.5 text-sm font-semibold hover:bg-white/5">
-              中央競馬へ
-            </Link>
-          ) : null}
-          <form action="/auth/signout" method="post">
-            <button className="rounded-xl border border-slate-700 px-4 py-2.5 text-sm text-slate-400 hover:bg-white/5">
-              ログアウト
-            </button>
-          </form>
-        </div>
-      </div>
-    </main>
-  );
+export default function NarPage(){return <RaceDashboard area="nar"><Suspense fallback={<p className="mt-5 text-xs text-slate-400">地方の学習状況を読み込み中…</p>}><NarAnalysisStatus /></Suspense></RaceDashboard>;}
+async function NarAnalysisStatus(){
+ const {analysis,active}=await serverData<{analysis:{report:Report;updated_at:string}|null;active:{report:Report;activated_at:string}|null}>("nar-analysis").catch(()=>({analysis:null,active:null}));
+ const c=analysis?.report.coverage,model=active?.report.live_model;
+ return (
+  <section className="mt-5 rounded-2xl border border-amber-300/20 bg-[#0c192a] p-4 sm:p-5">
+   <h2 className="font-bold text-amber-200">地方競馬・先行公開中</h2>
+   <p className="mt-2 text-sm leading-6 text-slate-300">現在ある地方データで利用できます。取得は継続中のため、予測は暫定版です。全データがそろった後、検証して補正を改訂します。</p>
+   {c?<>
+    <p className="mt-3 text-sm text-slate-400">取得済み {c.races.toLocaleString("ja-JP")}レース・{c.runners.toLocaleString("ja-JP")}頭分 / {c.chunks}期間</p>
+    <p className="mt-1 text-xs leading-5 text-slate-500">{c.date_from}〜{c.date_to}の部分取得。期間内の全レース取得完了を意味しません。最終分析：{new Date(analysis.updated_at).toLocaleString("ja-JP",{timeZone:"Asia/Tokyo"})}</p>
+    <details className="mt-4 border-t border-slate-700 pt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-200">暫定モデルと検証範囲</summary>
+     <p className="mt-3 text-xs leading-6 text-slate-400">人気順ベースライン：1番人気の勝率 {(analysis.report.market_baseline.pop1_win_rate*100).toFixed(1)}%、3着内率 {(analysis.report.market_baseline.pop1_top3_rate*100).toFixed(1)}%。これはAIの的中率ではありません。</p>
+     {model?.status==="provisional"?<div className="mt-3 grid gap-3 sm:grid-cols-3">{[1,2,3].map(t=>{const role=model.roles[String(t)];const metrics=model.comparison[String(t)]?.[role?.mode]?.audit2026;return <div key={t} className="rounded-lg bg-black/20 p-3 text-xs text-slate-400"><p className="font-semibold text-white">{t}着適性・{{absolute:"絶対",relative:"相対",hybrid:"ハイブリッド"}[role?.mode]??role?.mode}評価</p>{[1,4,10].map(p=>{const m=metrics?.[String(p)],baseline=model.marketBaseline2026?.[String(t)]?.[String(p)];return <p key={p} className="mt-2">{p===1?"全体":`${p}番人気以下が来た場合`}：Top5 {m?.races?`${m.hits}/${m.races}（${(m.rate!*100).toFixed(1)}%）`:"母数なし"}<span className="block text-slate-500">人気順Top5：{baseline?`${(baseline.rate*100).toFixed(1)}%`:"未集計"}</span></p>})}</div>})}</div>:<p className="mt-3 text-xs text-slate-400">地方専用モデルの初回学習・検証を準備中です。出走表は先に表示できます。</p>}
+     <p className="mt-3 text-xs leading-6 text-amber-200">今回の暫定モデルは全体のTop5的中率で人気順を下回っています。参考評価として公開し、自動買い目・勝負度は未採用です。データ追加だけでは本番補正を切り替えず、再検証して改訂します。</p>
+     <p className="mt-3 text-xs leading-6 text-slate-500">2019〜2024年で学習、2025年で方式選択、2026年の取得済み範囲で監査。分母は該当人気帯の馬がその着順に入ったレース数です。実運用の発走前記録とは別の過去検証です。画面の％は未校正の評価シェアで、的中確率ではありません。</p>
+    </details>
+   </>:<p className="mt-3 text-xs text-slate-400">分析状況を一時的に取得できません。レース一覧から確認できます。</p>}
+  </section>
+ );
 }

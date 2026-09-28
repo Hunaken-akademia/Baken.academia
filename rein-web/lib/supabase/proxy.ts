@@ -33,7 +33,7 @@ function isTrustedInternalRequest(request: NextRequest) {
   const secret = process.env.CRON_SECRET || "";
   if (!secret) return false;
   const path = request.nextUrl.pathname;
-  if (!(path === "/api/races" || path === "/api/analyze")) return false;
+  if (!["/api/races", "/api/analyze", "/api/nar/races", "/api/nar/analyze"].includes(path)) return false;
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 

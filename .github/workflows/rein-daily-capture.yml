@@ -25,6 +25,7 @@ jobs:
     timeout-minutes: 3
     outputs:
       date: ${{ steps.date.outputs.date }}
+      snapshot_date: ${{ steps.date.outputs.snapshot_date }}
     steps:
       - name: Select completed race day
         id: date
@@ -43,6 +44,9 @@ jobs:
               raise ValueError('Capture current-day final data after 22:00 JST')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               print(f'date={target}', file=f)
+              # A release warms today's UI; raw archives still capture only a completed day.
+              snapshot = now.date() if os.environ.get('GITHUB_EVENT_NAME') == 'push' else target
+              print(f'snapshot_date={snapshot}', file=f)
           PY
   archive:
     needs: plan
@@ -98,11 +102,16 @@ jobs:
     if: always() && !cancelled() && needs.plan.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        area: [jra, nar]
     concurrency:
-      group: rein-snapshot-reconciliation
+      group: rein-snapshot-reconciliation-${{ matrix.area }}
       cancel-in-progress: false
     env:
-      CAPTURE_DATE: ${{ needs.plan.outputs.date }}
+      CAPTURE_DATE: ${{ needs.plan.outputs.snapshot_date }}
+      CAPTURE_AREA: ${{ matrix.area }}
     steps:
       - uses: actions/checkout@v4
         with:

@@ -16,7 +16,7 @@ export function PredictionJournal({ data }: { data: JournalInput }) {
     if (!open) return;
     const controller = new AbortController();
     setError(""); setHistory(null);
-    fetch(`/api/race-history?raceId=${encodeURIComponent(data.race.raceId)}`, { signal: controller.signal })
+    fetch(`${data.race.raceId.length === 12 ? "/api/nar" : "/api"}/race-history?raceId=${encodeURIComponent(data.race.raceId)}`, { signal: controller.signal })
       .then(async response => { if (!response.ok) throw new Error(); return response.json() as Promise<SharedJournal>; })
       .then(setHistory)
       .catch(() => { if (!controller.signal.aborted) setError("保存履歴を読み込めませんでした。"); });
@@ -34,7 +34,7 @@ export function PredictionJournal({ data }: { data: JournalInput }) {
     <p className="mt-2 text-xs leading-5 text-slate-400">画面を開かなくても定期取得で予想と結果を保存します。記録した発走前予想は残し、結果と照合します。</p>
     <details className="mt-4 border-t border-slate-700 pt-3" onToggle={e => setOpen(e.currentTarget.open)}><summary className="min-h-8 cursor-pointer text-sm font-semibold text-slate-200">全レースの成績と、このレースの保存履歴</summary>
       {error ? <div className="mt-3 text-xs text-amber-200" role="status">{error}<button type="button" onClick={() => setRevision(x => x + 1)} className="ml-2 min-h-11 underline">再読み込み</button></div> : !history ? <p className="mt-3 text-xs text-slate-400" role="status">サーバーの記録を読み込み中…</p> : <>
-      <p className="mt-3 text-xs leading-5 text-slate-400">自動記録を開始した後の照合済み {history.races} レース{history.fromDate ? `（${history.fromDate}〜${history.throughDate}）` : ""}を集計。同一レースは最後に記録した発走前予想を使用し、人気もその時点の順位です。</p>
+      <p className="mt-3 text-xs leading-5 text-slate-400">{data.race.raceId.length === 12 ? "地方競馬のみ" : "中央競馬のみ"}・自動記録を開始した後の照合済み {history.races} レース{history.fromDate ? `（${history.fromDate}〜${history.throughDate}）` : ""}を集計。同一レースは最後に記録した発走前予想を使用し、人気もその時点の順位です。</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">{history.summary.map(b => <div key={b.minPopularity} className="rounded-lg bg-black/15 p-3"><p className="text-sm font-semibold text-white">{b.minPopularity === 1 ? "全体" : `${b.minPopularity}番人気以下が来た場合`}</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-400">{b.roles.map(r => <span key={r.target}>{r.target}着適性Top5 <strong className="text-cyan-200">{r.races ? `${r.hits}/${r.races}（${Math.round(r.hits / r.races * 100)}%）` : "未集計"}</strong></span>)}</div></div>)}</div>
       <p className="mt-2 text-[11px] leading-5 text-slate-500">人気別の分母は、その人気帯の馬が該当着順に入ったレース数です。分子は、その馬を同じ着順の適性Top5に含めた数です。取消で出走馬が変わったレース、上位同着、発走後の再計算は除外します。</p>
       <h3 className="mt-4 text-sm font-semibold text-white">このレースの記録（{entries.length}件）</h3>

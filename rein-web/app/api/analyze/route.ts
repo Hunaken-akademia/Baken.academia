@@ -230,9 +230,9 @@ function raceClass(text: string) {
 export async function GET(request: NextRequest) {
   const raceId = request.nextUrl.searchParams.get("raceId") || "";
   const preview = request.nextUrl.searchParams.get("preview") === "1";
-  if (!/^\d{10,12}$/.test(raceId))
+  if (!/^\d{10}$/.test(raceId))
     return NextResponse.json(
-      { error: "レースIDは10〜12桁で入力してください" },
+      { error: "中央競馬のレースIDは10桁で入力してください" },
       { status: 400 },
     );
   const forceRefresh = request.nextUrl.searchParams.get("refresh") === "1";
