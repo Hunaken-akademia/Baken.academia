@@ -7,7 +7,7 @@ const HEADER_ALIASES = {
   joinedAt: ["joinedat", "参加日時", "支援開始日", "加入日", "参加日"],
 };
 
-const normalizeHeader = (value) => String(value || "").trim().toLowerCase().replace(/[\\s　_‐‑–—-]/g, "");
+const normalizeHeader = (value) => String(value || "").trim().toLowerCase().replace(/[\s　_‐‑–—-]/g, "");
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
 export class CampfireCsvError extends Error {
@@ -20,10 +20,10 @@ export class CampfireCsvError extends Error {
 
 function decodeCsv(bytes) {
   try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\\uFEFF/, "");
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "");
   } catch {
     try {
-      return new TextDecoder("shift_jis", { fatal: true }).decode(bytes).replace(/^\\uFEFF/, "");
+      return new TextDecoder("shift_jis", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "");
     } catch {
       throw new CampfireCsvError("CSVをUTF-8またはShift_JISとして読み取れませんでした。");
     }
@@ -47,8 +47,8 @@ function readCsvRows(text) {
     } else if (char === "," && !quoted) {
       row.push(cell);
       cell = "";
-    } else if ((char === "\\n" || char === "\\r") && !quoted) {
-      if (char === "\\r" && text[i + 1] === "\\n") i += 1;
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && text[i + 1] === "\n") i += 1;
       row.push(cell);
       if (row.some((value) => value.trim() !== "")) rows.push(row);
       row = [];
@@ -71,7 +71,7 @@ function findColumn(headers, aliases) {
 }
 
 function getPlan(value) {
-  const plan = String(value || "").trim().toLowerCase().replace(/[\\s　]/g, "");
+  const plan = String(value || "").trim().toLowerCase().replace(/[\s　]/g, "");
   if (!plan) return null;
   if (plan.includes("オール") || plan.includes("all") || /地方.*中央|中央.*地方/.test(plan)) return "all";
   if (plan.includes("地方") || plan === "nar") return "nar";
@@ -81,7 +81,7 @@ function getPlan(value) {
 
 function getStatus(value, hasStatusColumn) {
   if (!hasStatusColumn) return "active";
-  const status = String(value || "").trim().toLowerCase().replace(/[\\s　]/g, "");
+  const status = String(value || "").trim().toLowerCase().replace(/[\s　]/g, "");
   if (!status) return null;
   if (/退会|解約|キャンセル|取消|終了|停止|未決済|cancell?ed|expired|inactive/.test(status)) return "cancelled";
   if (/休会|保留|一時停止|paused|pending|確認中/.test(status)) return "paused";
@@ -122,12 +122,12 @@ export function parseCampfireMembers(bytes) {
     const plan = getPlan(cells[planColumn]);
     const status = getStatus(cells[statusColumn], statusColumn >= 0);
 
-    if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) issues.push(`行${line}: メールアドレスが空か形式不正です。`);
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) issues.push(`行${line}: メールアドレスが空か形式不正です。`);
     if (!plan) issues.push(`行${line}: プランを判定できません。`);
     if (!status) issues.push(`行${line}: 会員状態を判定できません。`);
     if (email && seenEmails.has(email)) issues.push(`行${line}: 同じメールアドレスが複数行あります。`);
     if (email) seenEmails.add(email);
-    if (!email || !plan || !status || (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))) continue;
+    if (!email || !plan || !status || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) continue;
 
     const externalId = memberIdColumn >= 0 ? String(cells[memberIdColumn] || "").trim() : "";
     const name = nameColumn >= 0 ? String(cells[nameColumn] || "").trim().slice(0, 200) : "";
