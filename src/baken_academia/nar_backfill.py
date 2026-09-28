@@ -12,7 +12,7 @@ from lxml import html
 
 BASE_URL = "https://www.keiba.go.jp"
 MONTH_URL = f"{BASE_URL}/KeibaWeb/MonthlyConveneInfo/MonthlyConveneInfoTop"
-USER_AGENT = "BakenAcademia-NAR-Backfill/1.1 (licensed; sequential low-rate requests)"
+USER_AGENT = "BakenAcademia-NAR-Backfill/1.2 (licensed; results with win odds and popularity)"
 
 ODDS_ENDPOINTS = {
     "win_place": "OddsTanFuku",
@@ -103,6 +103,11 @@ def build_odds_urls(result_url: str) -> dict[str, str]:
         bet_type: f"{BASE_URL}/KeibaWeb/TodayRaceInfo/{endpoint}?{urlencode(params)}"
         for bet_type, endpoint in ODDS_ENDPOINTS.items()
     }
+
+
+def requested_odds_urls(result_url: str, include_all_bet_odds: bool = False) -> dict[str, str]:
+    """Fetch auxiliary bet-type odds only when explicitly requested."""
+    return build_odds_urls(result_url) if include_all_bet_odds else {}
 
 
 def parse_odds_cells(payload: bytes, race_id: str, bet_type: str, source_url: str) -> list[dict[str, object]]:
@@ -332,7 +337,7 @@ async def backfill(args):
                             payout_rows.append({"race_id": race_id, **payout})
                     except json.JSONDecodeError:
                         pass
-                    for bet_type, odds_url in build_odds_urls(url).items():
+                    for bet_type, odds_url in requested_odds_urls(url, getattr(args, "include_all_bet_odds", False)).items():
                         raw_path = args.work_dir / "odds-pages" / str(args.year) / f"{args.month:02d}" / f"{race_key}-{bet_type}.html.gz"
                         try:
                             if raw_path.exists():
@@ -379,7 +384,10 @@ async def backfill(args):
                   "year": args.year, "month": args.month, "start_day": args.start_day, "end_day": args.end_day,
                   "created_at": datetime.now(timezone.utc).isoformat(),
                   "rows": len(frame), "races": frame.race_id.nunique(), "horses": frame.horse_id.nunique(),
-                  "bet_types": list(ODDS_ENDPOINTS), "odds_pages": len(odds_manifests), "odds_cells": len(odds_cells),
+                  "market_fields": ["win_odds", "popularity"],
+                  "all_bet_odds_collected": bool(getattr(args, "include_all_bet_odds", False)),
+                  "bet_types": list(ODDS_ENDPOINTS) if getattr(args, "include_all_bet_odds", False) else [],
+                  "odds_pages": len(odds_manifests), "odds_cells": len(odds_cells),
                   "payout_rows": len(payout_rows), "venue_days": len(venue_days), "network_requests": client.stats.network_requests,
                   "cache_hits": client.stats.cache_hits, "retries": client.stats.retries, "errors": errors, "odds_errors": odds_errors,
                   "sha256": hashlib.sha256(args.output.read_bytes()).hexdigest()}
@@ -388,7 +396,7 @@ async def backfill(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="NAR許諾済み結果・全通常券種最終オッズ・払戻を低負荷で取得")
+    parser = argparse.ArgumentParser(description="NAR許諾済み結果・単勝オッズ・人気を低負荷で取得")
     parser.add_argument("--year", type=int, required=True)
     parser.add_argument("--month", type=int, choices=range(1, 13), required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -397,6 +405,7 @@ def main():
     parser.add_argument("--max-delay", type=float, default=4.0)
     parser.add_argument("--start-day", type=int, choices=range(1, 32))
     parser.add_argument("--end-day", type=int, choices=range(1, 32))
+    parser.add_argument("--include-all-bet-odds", action="store_true", help="追加の券種別オッズページも取得する（通常分析では不要）")
     parser.add_argument("--max-races", type=int)
     parser.add_argument("--continue-on-error", action="store_true")
     parser.add_argument("--permission-confirmed", action="store_true")
