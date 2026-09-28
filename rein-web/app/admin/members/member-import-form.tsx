@@ -6,6 +6,9 @@ type ImportResult = {
   mode?: "preview" | "apply";
   total?: number;
   imported?: number;
+  emailSent?: number;
+  emailFailed?: number;
+  emailSkipped?: number;
   counts?: { nar: number; jra: number; all: number; active: number; cancelled: number };
   previewToken?: string;
   protectedMembers?: number;
@@ -85,6 +88,8 @@ export function MemberImportForm() {
           <p className="font-bold text-emerald-200">
             {result.mode === "apply" ? `${result.imported}人分を反映しました。` : `${result.total}人分を読み取りました。`}
           </p>
+          {result.mode === "apply" ? <p className="mt-1 text-slate-300">登録完了メール：{result.emailSent ?? 0}件送信 ／ {result.emailFailed ?? 0}件失敗{(result.emailSkipped ?? 0) > 0 ? ` ／ ${result.emailSkipped}件送信済み・処理中` : ""}</p> : null}
+          {result.mode === "apply" && (result.emailFailed ?? 0) > 0 ? <p className="mt-1 text-amber-200">未送信分は同じCSVを再度反映すると再送されます。</p> : null}
           <p className="mt-2 text-slate-300">
             {Object.entries(planNames).map(([plan, name]) => `${name} ${result.counts?.[plan as keyof typeof planNames] ?? 0}人`).join(" ／ ")}
           </p>
