@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorizedCapture } from "@/lib/capture-auth";
 import { claimCapture, releaseCapture, durableMetas, serverData, dateJst } from "@/lib/server-snapshots";
 import { mapWithConcurrency, type RaceVenue } from "@/lib/rein-live";
+import { loadNarRuntime } from "@/lib/nar-model";
+import { expireNarReleaseMetas } from "@/lib/nar-release";
 import {
   planPrecompute,
   type PrecomputeRace,
@@ -53,6 +55,9 @@ export async function GET(request: NextRequest) {
   const lease = await claimCapture(lockKey,300).catch(() => null);
   if (!lease?.acquired || !lease.token) return NextResponse.json({ok:true,deferred:true,reason:"capture-in-progress"},{status:202});
   try {
+    const expectedRelease=request.nextUrl.searchParams.get("release");
+    const narRuntime=league==="nar"?await loadNarRuntime(!!expectedRelease):null;
+    if(expectedRelease && (league!=="nar" || narRuntime?.model.release?.id!==expectedRelease))return NextResponse.json({error:"Model release pending"},{status:503});
     const stored = targetDate !== dateJst() ? await serverData<{schedule:{payload:{venues:RaceVenue[]}}|null}>("schedule",{date:targetDate,league}) : null;
     if (targetDate !== dateJst() && !stored?.schedule) return NextResponse.json({ok:false,error:"No saved schedule for requested date"},{status:404});
     const todaysRaces = stored ? (stored.schedule?.payload.venues ?? []).flatMap(v=>(v.races??[]).map(r=>({...r,preview:false}))) : await loadRaces(origin, secret, "today", league);
@@ -66,6 +71,7 @@ export async function GET(request: NextRequest) {
     const races = [...today, ...tomorrow];
     const metas = await durableMetas(targetDate);
     if (tomorrow.length) for (const [key,value] of await durableMetas(dateJst(1))) metas.set(key,value);
+    if(narRuntime)expireNarReleaseMetas(metas,narRuntime.updatedAt,Date.now());
     const planned = planPrecompute(races, metas, new Date());
     const near = planned.filter((job) => job.reason === "near-start");
     const jobs = [...near, ...planned.filter((job) => job.reason !== "near-start").slice(0, MAX_BACKLOG_JOBS)];
@@ -97,6 +103,7 @@ export async function GET(request: NextRequest) {
 
     const summary = {
       league,
+      ...(narRuntime?{narRelease:narRuntime.model.release?.id??null}:{}),
       checkedAt: new Date().toISOString(),
       date: targetDate,
       planned: planned.length,

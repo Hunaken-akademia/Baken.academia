@@ -133,6 +133,7 @@ type Analysis = {
   picks?: Picks;
   scratched?: Array<{ number: number; name: string }>;
   model?: {
+    release?: { id:string; validatedRanking:boolean; selectionYear:number; auditThrough:string };
     provisional?: boolean;
     probabilityKind?: string;
     version: string;
@@ -409,7 +410,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
             </div>
             <div>
               <p className="text-lg font-bold tracking-[.12em]">REIN</p>
-              <p className="text-xs text-slate-400">{area === "nar" ? "地方競馬・暫定版" : "中央競馬"}</p>
+              <p className="text-xs text-slate-400">{area === "nar" ? "地方競馬" : "中央競馬"}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -830,13 +831,14 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
     <>
       {data.model && (
         <section className="mb-4 flex flex-wrap gap-x-4 gap-y-1 rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-2 text-xs text-slate-400">
-          <span className="font-semibold text-cyan-300">{data.model.provisional ? "地方の取得済み履歴・暫定版" : "8年履歴 接続済み"}</span>
+          <span className="font-semibold text-cyan-300">{data.race.league === "nar" ? data.model.release?.validatedRanking ? "地方専用・全量履歴 接続済み" : "地方の取得済み履歴・暫定版" : "8年履歴 接続済み"}</span>
           <span>
             {data.model.races.toLocaleString()}レース・
             {data.model.runners.toLocaleString()}走
           </span>
           {data.model.overallPolicy && <span>{data.model.overallPolicy}</span>}
           <span>{data.model.strategy}</span>
+          {data.race.league === "nar" && <span>履歴：{data.model.dateFrom}〜{data.model.dateTo}</span>}
           {data.model.markPolicy && <span>印：{data.model.markPolicy}</span>}
           {data.prediction ? <span>{data.prediction.label}</span> : <span>{data.model.snapshotPolicy}</span>}
         </section>
@@ -1040,7 +1042,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
         <TabsContent value="ranking">
           <p className="mb-3 text-xs leading-5 text-slate-500">
             {data.race.league === "nar" && rankingReady
-              ? "総合順位は1〜3着適性のレース内順位を均等に合成した暫定評価です。ptはレース内の比較用で、勝率ではありません。当日人気・オッズは総合点に加えていません。"
+              ? "総合順位は1〜3着適性のレース内順位を均等に合成した評価です。ptはレース内の比較用で、勝率ではありません。当日人気・オッズは総合点に加えていません。"
               : rankingReady
               ? "順位は総合順位（上位4頭＝市場差式、5位以下＝従来の総合評価順）。ptは従来方式の総合評価点で、上限98のため上位馬は同点になることがあり、上位4頭の並びとは一致しません。"
               : "総合順位は保留中のため、馬番順で表示しています。"}
@@ -1676,11 +1678,11 @@ function DetailedComparison({ data, horses }: { data: Analysis; horses: Horse[] 
               <TableHead>人気</TableHead>
               <TableHead>単勝</TableHead>
               <TableHead>1着適性</TableHead>
-              <TableHead>{data.model?.provisional ? "1着評価シェア" : "1着確率"}</TableHead>
+              <TableHead>{data.model?.probabilityKind === "ranking-share" ? "1着評価シェア" : "1着確率"}</TableHead>
               <TableHead>2着適性</TableHead>
-              <TableHead>{data.model?.provisional ? "2着評価シェア" : "2着確率"}</TableHead>
+              <TableHead>{data.model?.probabilityKind === "ranking-share" ? "2着評価シェア" : "2着確率"}</TableHead>
               <TableHead>3着適性</TableHead>
-              <TableHead>{data.model?.provisional ? "3着評価シェア" : "3着確率"}</TableHead>
+              <TableHead>{data.model?.probabilityKind === "ranking-share" ? "3着評価シェア" : "3着確率"}</TableHead>
               <TableHead>コース</TableHead>
               <TableHead>近走</TableHead>
               <TableHead>展開補正</TableHead>
@@ -2085,7 +2087,7 @@ function MarketReinPanel({ horse, horses }: { horse: Horse; horses: Horse[] }) {
           <p className="text-xs font-semibold tracking-widest text-violet-300">REIN × 人気</p>
           <p className="mt-1 text-sm text-slate-400">人気順位と着順別モデルの順位を比較</p>
         </div>
-        <Badge className="bg-white/10 text-slate-300">{horse.probabilityKind ? `履歴 ${samples}走・暫定` : `信頼度 ${reliability}`}</Badge>
+        <Badge className="bg-white/10 text-slate-300">{horse.probabilityKind ? `地方履歴 ${samples}走` : `信頼度 ${reliability}`}</Badge>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-3">
         {roles.map(({ label, key }) => {
@@ -2252,14 +2254,14 @@ function HorseDetails({ horse, data }: { horse: Horse; data: Analysis }) {
       {horse.parameterFactors?.length || horse.historyFactors?.length ? (
         <div className="mt-3 rounded-xl border border-slate-700 p-4">
           <div className="mb-3">
-            <p className="text-sm font-semibold">{data.model?.provisional ? "取得済み地方履歴" : "8年履歴"}・項目別成績</p>
+            <p className="text-sm font-semibold">{data.race.league === "nar" ? "取得済み地方履歴" : "8年履歴"}・項目別成績</p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
               通算・近走・芝ダ・距離・競馬場は馬自身、騎手・厩舎は該当人物の集計です。
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {(horse.parameterFactors ?? horse.historyFactors ?? []).map((item) => (
-              <HistoryFactorCard key={item.label} item={item} relativeReference={data.model?.provisional} />
+              <HistoryFactorCard key={item.label} item={item} relativeReference={data.race.league === "nar"} />
             ))}
           </div>
           <p className="mt-3 text-[11px] leading-5 text-slate-600">

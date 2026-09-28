@@ -23,10 +23,11 @@ async function load(name, replacements=[]) {
   const {selectPicks}=await load('marks');
   const profile=JSON.parse(gunzipSync(fs.readFileSync(path.join(output,'model/nar-history-profile.json.gz'))));
   const report=JSON.parse(fs.readFileSync(path.join(output,'model/report.json')));
+  report.live_model.release={id:'nar-full-20260929',validatedRanking:true,selectionYear:2025,auditThrough:'2026-09-27'};
   const card=parseNarCard(fs.readFileSync(path.join(output,'card.html'),'utf8'),'202609281901');
   const horses=narRank({profile,model:report.live_model},card.horses,card.context);
   const venue=parseNarSchedule(fs.readFileSync(path.join(output,'schedule.html'),'utf8'),'2026-09-28','19');
-  const analysis={...card,horses,race:{...card.race,updated:'10:00',dataTimes:{}},model:{...profile.meta,provisional:true,probabilityKind:'ranking-share',version:'qa-nar-live',roleModes:{1:'relative',2:'relative',3:'absolute'}},prediction:{phase:'prestart',source:'live',generatedAt:'2026-09-28T01:00:00Z'},evaluation:{roleModel:'ready',overall:'ready',tickets:'held',held:[]},capture:{complete:true},picks:selectPicks(horses,{roleModelReady:true,marketReady:false}),pace:{label:'先行候補多め',detail:'暫定・精度未検証',leaders:[1,2]},warnings:['地方版・暫定評価。％は評価シェアであり的中確率ではありません。'],confidence:null,tickets:[]};
+  const analysis={...card,horses,race:{...card.race,updated:'10:00',dataTimes:{}},model:{...profile.meta,release:report.live_model.release,provisional:false,probabilityKind:'ranking-share',version:'qa-nar-live',roleModes:{1:'hybrid',2:'hybrid',3:'hybrid'}},prediction:{phase:'prestart',source:'live',generatedAt:'2026-09-28T01:00:00Z'},evaluation:{roleModel:'ready',overall:'ready',tickets:'held',held:[]},capture:{complete:true},picks:selectPicks(horses,{roleModelReady:true,marketReady:false}),pace:{label:'先行候補多め',detail:'暫定・精度未検証',leaders:[1,2]},warnings:['地方専用ハイブリッド。％は評価シェアであり的中確率ではありません。'],confidence:null,tickets:[]};
   const requests=[];
   const server=http.createServer((req,res)=>{
     requests.push({url:req.url,method:req.method});
@@ -43,14 +44,15 @@ async function load(name, replacements=[]) {
   await new Promise(r=>server.listen(8149,'127.0.0.1',r));
   if(process.argv.includes('--server-only')) {console.log('QA http://127.0.0.1:8149');return;}
   const {chromium}=require(require.resolve('playwright',{paths:[process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES]}));
-  const browser=await chromium.launch({headless:true,executablePath:'/tmp/rein-browser-runtime/chromium',args:['--no-sandbox','--disable-dev-shm-usage']});
+  const browser=await chromium.launch({headless:true,...(process.env.NAR_QA_CHROMIUM?{executablePath:process.env.NAR_QA_CHROMIUM}:{}),args:['--no-sandbox','--disable-dev-shm-usage']});
   try {
     const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];
     page.on('pageerror',e=>errors.push(String(e)));
     await page.goto('http://127.0.0.1:8149');
     await page.getByRole('button',{name:/NAR 船橋/}).click();
     await page.getByRole('button',{name:/1R Ｃ３四/}).click();
-    await page.getByText('地方履歴からの暫定評価').first().waitFor();
+    await page.getByText('地方専用ハイブリッド評価').first().waitFor();
+    await page.getByText('地方専用・全量履歴 接続済み').waitFor();
     assert.equal(await page.getByRole('button',{name:'この予想を保存',exact:true}).count(),0);
     assert.equal(await page.getByRole('button',{name:'AI1角',exact:true}).count(),0);
     await page.getByRole('button',{name:'暫定4角',exact:true}).click();

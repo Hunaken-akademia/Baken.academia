@@ -4,7 +4,8 @@ import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 async function load(file, replacements=[]){let s=readFileSync(new URL(file,import.meta.url),'utf8');for(const [a,b]of replacements)s=s.replace(a,b);const code=ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;return import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));}
 const {narRaceKey,narUrl,narVenueCodes,parseNarSchedule,parseNarCard,parseNarResult}=await load('../lib/nar-source.ts');
-const {narHistoryInputs,narRank}=await load('../lib/nar-model.ts',[[/import \{ serverData \} from "\.\/server-snapshots";/,'const serverData=()=>{throw new Error("No network in ranker tests")};']]);
+const {narHistoryInputs,narRank,validateNarModel}=await load('../lib/nar-model.ts',[[/import \{ serverData \} from "\.\/server-snapshots";/,'const serverData=()=>{throw new Error("No network in ranker tests")};']]);
+const {expireNarReleaseMetas}=await load('../lib/nar-release.ts');
 const entry=(number,gate,info='',market='')=>`<tr class="tBorder">${gate?`<td class="courseNum course_0${gate}">${gate}</td>`:''}<td class="horseNum">${number}</td><a class="horseName" href="/HorseMarkInfo?k_lineageLoginCode=${number}">馬${number}</a><a class="jockeyName" href="/RiderMark?k_riderLicenseNo=2">騎手（所属）</a><td class="odds_weight">${market}</td><table><tr><td>全</td><td>10-9-8-7</td></tr></table><td class="odds_weight">470<br>(-2)</td><td>1:12.3　2-3-4　38.5</td><td class="info">${info}</td></tr>`;
 const card=(entries)=>`<h4>2026年9月28日（月） 船 橋 第1競走 14:40発走</h4><section class="raceTitle"><h3>出走表テスト</h3><ul class="dataArea"><li>ダート 1200ｍ（左） 天候：晴 馬場：良</li></ul></section><section class="cardTable"><table>${entries}</table></section>`;
 test('NAR identity validates dates/venue, cannot overlap Yahoo JRA IDs',()=>{
@@ -49,4 +50,22 @@ test('NAR form ranks are independent of current popularity and odds',()=>{
  const first=narRank({profile,model},[horse(1),horse(2)],context);
  const second=narRank({profile,model},[{...horse(1),popularity:12,odds:999},{...horse(2),popularity:1,odds:1.1}],context);
  assert.deepEqual(first.map(h=>h.firstProbability),second.map(h=>h.firstProbability));
+});
+test('released hybrid coefficients must be finite and match each feature vector',()=>{
+ const valid={version:'nar-history-ranker-v1',features:Array(28).fill('test'),roles:Object.fromEntries([1,2,3].map(t=>[String(t),{mode:'hybrid',intercept:0,coef:Array(56).fill(0)}]))};
+ assert.doesNotThrow(()=>validateNarModel(valid));
+ for(const mutate of [m=>m.roles['2'].coef.pop(),m=>m.roles['1'].coef[0]=NaN,m=>m.roles['3'].intercept=Infinity,m=>m.roles['1'].mode='unknown',m=>m.version='unknown',m=>m.features.pop()]){
+  const bad=structuredClone(valid);mutate(bad);assert.throws(()=>validateNarModel(bad));
+ }
+ const ranked=narRank({profile,model:{...valid,release:{validatedRanking:true}}},[horse(1),horse(2)],context);
+ assert.equal(ranked[0].verdict,'地方専用ハイブリッド評価');
+ assert.equal(ranked[0].probabilityKind,'ranking-share');
+});
+test('model rollout refreshes future NAR forecasts only, preserving JRA and past audits',()=>{
+ const now=Date.parse('2026-09-29T00:00:00Z'),activation='2026-09-28T22:00:00Z';
+ const old={generatedAt:'2026-09-28T21:00:00Z',startsAt:now+3600000,final:false,preview:false};
+ const entries=[['live:202609291901',old],['preview:202609301901',{...old,preview:true}],['live:2606040911',old],['live:202609291902',{...old,startsAt:now}],['live:202609281901',{...old,final:true}],['live:202609291903',{...old,generatedAt:activation}],['live:202609291904',{...old,startsAt:null}]];
+ const metas=new Map(entries);expireNarReleaseMetas(metas,activation,now);
+ assert.deepEqual([...metas.keys()],entries.slice(2).map(([k])=>k));
+ const invalid=new Map(entries);expireNarReleaseMetas(invalid,'invalid',now);assert.equal(invalid.size,entries.length);
 });
