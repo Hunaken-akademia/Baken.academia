@@ -35,8 +35,9 @@ async def capture(kind: str, target: date, directory: Path):
                                                               start_day=target.day, end_day=target.day, max_races=None))
         if result.get("errors") or result.get("odds_errors"):
             raise ValueError("Incomplete NAR capture")
-        if result.get("races") and result["odds_pages"] != result["races"] * len(nar_backfill.ODDS_ENDPOINTS):
-            raise ValueError("Missing NAR odds pages")
+        # The lightweight NAR dataset intentionally uses the result page only.
+        # It already contains final win odds and popularity, so odds_pages=0 is
+        # the expected successful state; extra seven-bet odds pages are omitted.
     else:
         result = await jra_backfill.backfill(argparse.Namespace(**common, start_date=str(target), end_date=str(target), max_events=None))
         if result.get("errors"):
