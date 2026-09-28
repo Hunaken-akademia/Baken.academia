@@ -8,6 +8,11 @@ on:
         type: boolean
         required: false
         default: false
+      auto_retry_attempt:
+        description: "失敗チャンク自動再処理の試行回数"
+        type: number
+        required: false
+        default: 0
   push:
     branches: [main]
     # Code changes do not interrupt an active multi-day backfill.
@@ -101,3 +106,32 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run nar-partial-analysis.yml --ref main
+
+
+  finalize:
+    needs: [plan, backfill]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CURRENT_ATTEMPT: ${{ inputs.auto_retry_attempt || 0 }}
+      BACKFILL_RESULT: ${{ needs.backfill.result }}
+    steps:
+      - name: Retry only incomplete chunks through Supabase resume checks
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ "${BACKFILL_RESULT}" == "success" ]]; then
+            echo "All matrix jobs completed. The workflow_run analysis trigger will start the full analysis."
+            exit 0
+          fi
+
+          current="${CURRENT_ATTEMPT:-0}"
+          if (( current >= 3 )); then
+            echo "::error::Incomplete NAR chunks remain after 3 automatic retry runs."
+            exit 1
+          fi
+
+          next=$((current + 1))
+          echo "Dispatching automatic retry ${next}/3. Existing Supabase archives will be verified and skipped."
+          gh workflow run nar-backfill-8y.yml --ref main -f auto_retry_attempt="${next}"
