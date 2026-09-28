@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
         const { data: incremented, error: attemptError } = await admin.rpc("increment_rein_welcome_attempts", { target_member_key: memberKey });
         try {
           if (attemptError || !incremented) throw new Error("送信状態を更新できませんでした。");
-          const resendId = await sendReinWelcomeEmail({ apiKey: process.env.RESEND_API_KEY, email: recipient, memberKey });
+          const resendId = await sendReinWelcomeEmail({ apiKey: process.env.RESEND_API_KEY, email: recipient, memberKey, plan: record.plan });
           const { error: sentError } = await admin.from("rein_welcome_email_outbox").update({ status: "sent", resend_email_id: resendId, last_error: null, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("member_key", memberKey).eq("status", "sending");
           if (sentError) throw new Error("送信結果を保存できませんでした。");
           emailSent++;

@@ -31,7 +31,7 @@ Vercel rein-web のサーバー環境変数：
 
 ## 登録完了メール（Resend）
 
-有効会員の反映後、備考欄から取り込んだGoogleメール宛にREINログインリンク付きの登録完了メールを送ります。退会・停止会員には送信しません。送信済み・失敗は `rein_welcome_email_outbox` に記録します。同じCSVを再反映すると、送信済みはスキップし、未送信・失敗分だけ再試行します。メール送信に失敗しても会員情報の反映は取り消されず、画面に件数が表示されます。
+有効会員の反映後、備考欄から取り込んだGoogleメール宛に、登録完了・プラン別の利用範囲・REINログインリンクを記載したメールを送ります。オープンチャット「馬券アカデミア」の招待リンクと参加コードも案内し、REINの意見・要望や競馬情報を交換する場として紹介します。退会・停止会員には送信しません。送信済み・失敗は `rein_welcome_email_outbox` に記録します。同じCSVを再反映すると、送信済みはスキップし、未送信・失敗分だけ再試行します。メール送信に失敗しても会員情報の反映は取り消されず、画面に件数が表示されます。
 # Welcome email (Resend)
 
 On apply, newly imported active Campfire members receive a short registration completion email at their registered Google email, with the REIN login link. The verified sender domain is `hunaken-academia.com`.
