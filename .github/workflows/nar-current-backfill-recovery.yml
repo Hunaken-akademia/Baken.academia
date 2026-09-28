@@ -4,6 +4,10 @@ on:
   workflow_run:
     workflows: ["NAR licensed eight-year results backfill"]
     types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/nar-current-backfill-recovery.yml"
 
 permissions:
   actions: write
@@ -11,7 +15,12 @@ permissions:
 
 jobs:
   recover-current-run:
-    if: github.event.workflow_run.id == 36369793724 && github.event.workflow_run.conclusion != 'success'
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.id == 36369793724 &&
+       github.event.workflow_run.conclusion != 'success') ||
+      (github.event_name == 'push' &&
+       contains(github.event.head_commit.message, '[recover-current-run]'))
     runs-on: ubuntu-latest
     steps:
       - name: Resume incomplete chunks from Supabase state
@@ -20,4 +29,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           echo "Starting bounded automatic recovery for incomplete chunks."
-          gh workflow run nar-backfill-8y.yml --ref main -f auto_retry_attempt=1
+          gh workflow run nar-backfill-8y.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f auto_retry_attempt=1
