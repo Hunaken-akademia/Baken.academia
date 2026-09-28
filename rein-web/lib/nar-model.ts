@@ -4,14 +4,22 @@ import { serverData } from "./server-snapshots";
 import type { HistoryBundle } from "./history";
 import type { NarHorse } from "./nar-source";
 
-export type NarModel = {status:string;version:string;features:string[];roles:Record<string,{mode:"absolute"|"relative"|"hybrid";intercept:number;coef:number[]}>;comparison:Record<string,Record<string,{audit2026:Record<string,{races:number;hits:number;rate:number|null}>}>>;note:string};
+export type NarModel = {status:string;version:string;features:string[];roles:Record<string,{mode:"absolute"|"relative"|"hybrid";intercept:number;coef:number[]}>;comparison:Record<string,Record<string,{audit2026:Record<string,{races:number;hits:number;rate:number|null}>}>>;note:string;release?:{id:string;validatedRanking:boolean;selectionYear:number;auditThrough:string}};
 export type NarRuntime = {profile:HistoryBundle;model:NarModel;sha:string;updatedAt:string};
+export function validateNarModel(model:NarModel) {
+  if(model?.version!=="nar-history-ranker-v1" || model.features?.length!==28) throw new Error("地方モデルの形式を確認できません");
+  for(const target of ["1","2","3"]) {
+    const role=model.roles?.[target];
+    if(!role || !["absolute","relative","hybrid"].includes(role.mode) || !Number.isFinite(role.intercept) || role.coef?.length!==(role.mode==="hybrid"?56:28) || !role.coef.every(Number.isFinite)) throw new Error("地方モデルの係数を確認できません");
+  }
+}
 let cached:{until:number;value:Promise<NarRuntime>}|undefined;
-export function loadNarRuntime():Promise<NarRuntime> {
-  if (cached && cached.until>Date.now()) return cached.value;
+export function loadNarRuntime(force=false):Promise<NarRuntime> {
+  if (!force && cached && cached.until>Date.now()) return cached.value;
   const value = (async()=>{
     const {analysis,signed_url} = await serverData<{analysis:{report:{profileSha:string;live_model:NarModel};updated_at:string}|null;signed_url:string|null}>("nar-profile");
     if (!signed_url || !analysis || analysis.report.live_model?.status!=="provisional") throw new Error("地方専用モデルを準備中です");
+    validateNarModel(analysis.report.live_model);
     const response = await fetch(signed_url,{cache:"no-store",signal:AbortSignal.timeout(20_000)});
     if (!response.ok) throw new Error("地方履歴の読み込みに失敗しました");
     const bytes = Buffer.from(await response.arrayBuffer());
@@ -63,6 +71,6 @@ export function narRank(runtime:NarRuntime,horses:NarHorse[],context:{racecourse
     const factors=rows[i].factors.map(f=>{const j=labels.indexOf(f.label)*4+2;return {...f,impact:Math.round((rows[i].values[j]-means[j])*1000)/10};});
     const recent=runtime.profile.horseRecent5[clean(horse.horseId)];
     if(recent){const all=horses.map(h=>runtime.profile.horseRecent5[clean(h.horseId)]?.t??4.5/20);const wins=Math.max(0,Math.round(recent.w*(recent.n+20)-1.5)),top3=Math.max(0,Math.round(recent.t*(recent.n+20)-4.5));factors.push({label:"近5走",samples:recent.n,impact:Math.round((recent.t-all.reduce((s,v)=>s+v,0)/n)*1000)/10,wins,top3,winRate:Math.round(wins/recent.n*1000)/10,top3Rate:Math.round(top3/recent.n*1000)/10,averageFinish:recent.f});}
-    return {...horse,probabilityKind:"ranking-share" as const,score:Math.round((pts[0]+pts[1]+pts[2])/3),firstProbability:shares[0][i],secondProbability:shares[1][i],thirdProbability:shares[2][i],firstSuitability:pts[0],secondSuitability:pts[1],thirdSuitability:pts[2],historySamples:rows[i].samples,historyFactors:factors,parameterFactors:factors,positives:factors.filter(f=>f.samples>=5&&f.impact>0).sort((a,b)=>b.impact-a.impact).slice(0,3).map(f=>`${f.label} ${f.samples}走・3着内${f.top3Rate}%`),cautions:rows[i].samples<5?["取得済みの地方履歴が少ないため参考評価"]:[],verdict:"地方履歴からの暫定評価",mark:""};
+    return {...horse,probabilityKind:"ranking-share" as const,score:Math.round((pts[0]+pts[1]+pts[2])/3),firstProbability:shares[0][i],secondProbability:shares[1][i],thirdProbability:shares[2][i],firstSuitability:pts[0],secondSuitability:pts[1],thirdSuitability:pts[2],historySamples:rows[i].samples,historyFactors:factors,parameterFactors:factors,positives:factors.filter(f=>f.samples>=5&&f.impact>0).sort((a,b)=>b.impact-a.impact).slice(0,3).map(f=>`${f.label} ${f.samples}走・3着内${f.top3Rate}%`),cautions:rows[i].samples<5?["取得済みの地方履歴が少ないため参考評価"]:[],verdict:runtime.model.release?.validatedRanking?"地方専用ハイブリッド評価":"地方履歴からの暫定評価",mark:""};
   }).sort((a,b)=>b.score-a.score||a.number-b.number);
 }
