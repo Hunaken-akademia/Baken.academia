@@ -7,6 +7,10 @@ from pathlib import Path
 import pandas as pd
 
 from baken_academia.rein_history import build as build_history_profile
+try:
+    from nar_live_model import normalize_courses, fit_live_model
+except ModuleNotFoundError:
+    from scripts.nar_live_model import normalize_courses, fit_live_model
 
 
 def _pct(v: float) -> float:
@@ -183,7 +187,7 @@ def build_report(input_dir: Path, output_dir: Path) -> dict[str, object]:
         raise SystemExit("No NAR result parquet files were found")
 
     frames = [pd.read_parquet(p) for p in parts]
-    df = pd.concat(frames, ignore_index=True)
+    df = normalize_courses(pd.concat(frames, ignore_index=True))
     df["race_date"] = pd.to_datetime(df["race_date"], errors="coerce")
     df = df.sort_values(["race_date", "race_id", "horse_number"]).drop_duplicates(["race_id", "horse_id"])
     for column in ("finish_position", "popularity", "win_odds", "gate", "horse_number"):
@@ -216,6 +220,7 @@ def build_report(input_dir: Path, output_dir: Path) -> dict[str, object]:
         "by_racecourse_distance": _market_by_group(df, ["racecourse", "distance_bucket"], min_races=40),
         "payout_summary": _payout_summary(df),
         "history_profile": profile_meta,
+        "live_model": fit_live_model(df),
         "notes": [
             "取得済みチャンクだけの暫定集計。NAR取得が進むたび再実行して母数を増やす。",
             "市場人気は予測モデルの比較基準として使用し、最終モデルの入力だけで結論を出さない。",

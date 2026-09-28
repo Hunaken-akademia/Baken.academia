@@ -78,9 +78,21 @@ Deno.serve(async req => {
   }
 
   if (who === "github-nar-analysis") {
+   if (action === "nar-profile-upload") {
+    if (typeof b.sha !== "string" || !/^[a-f0-9]{64}$/.test(b.sha)) return json({error:"Invalid profile"},400);
+    const upload = checked(await admin.storage.from("baken-archive").createSignedUploadUrl(`nar/profiles/${b.sha}.json.gz`,{upsert:true}));
+    return json({signed_url:upload.signedUrl});
+   }
    if (action !== "publish-nar-analysis") return json({error:"Forbidden action"},403);
    const serialized = JSON.stringify(b.report);
    if (typeof serialized !== "string" || serialized.length > 900_000 || !validNarAnalysis(b.report)) return json({error:"Invalid NAR analysis report"},400);
+   if (b.report.profileSha) {
+    if (!/^[a-f0-9]{64}$/.test(b.report.profileSha)) return json({error:"Invalid profile"},400);
+    const object = checked(await admin.storage.from("baken-archive").download(`nar/profiles/${b.report.profileSha}.json.gz`));
+    if (object.size > 16_000_000) return json({error:"Profile too large"},413);
+    const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256",await object.arrayBuffer()))].map(v=>v.toString(16).padStart(2,"0")).join("");
+    if (digest !== b.report.profileSha) return json({error:"Profile checksum mismatch"},400);
+   }
    checked(await admin.from("rein_nar_analysis_snapshots").upsert({id:true,report:b.report,updated_at:new Date().toISOString()}));
    return json({published:true});
   }
@@ -92,6 +104,13 @@ Deno.serve(async req => {
   if (action === "nar-analysis") {
    const analysis = checked(await admin.from("rein_nar_analysis_snapshots").select("report,updated_at").eq("id",true).maybeSingle());
    return json({analysis});
+  }
+  if (action === "nar-profile") {
+   const analysis = checked(await admin.from("rein_nar_analysis_snapshots").select("report,updated_at").eq("id",true).maybeSingle());
+   const sha = analysis?.report?.profileSha;
+   if (!sha || !/^[a-f0-9]{64}$/.test(sha)) return json({analysis,signed_url:null});
+   const download = checked(await admin.storage.from("baken-archive").createSignedUrl(`nar/profiles/${sha}.json.gz`,600));
+   return json({analysis,signed_url:download.signedUrl});
   }
   if (action === "save") {
    const record = snapshotRecord(b.payload,b.preview === true);
