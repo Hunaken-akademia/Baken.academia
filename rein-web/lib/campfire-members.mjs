@@ -144,9 +144,10 @@ export function parseCampfireMembers(bytes) {
       normalized_email: email,
       plan,
       status,
-      ...(name ? { member_name: name } : {}),
+      member_name: name || null,
       reward_name: String(cells[planColumn] || "").trim().slice(0, 200),
-      ...(joinedAt ? { campfire_joined_at: joinedAt } : {}),
+      campfire_joined_at: joinedAt,
+      access_ends_at: null,
     });
     counts[plan] += 1;
     counts[status] += 1;
