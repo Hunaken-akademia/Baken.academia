@@ -8,27 +8,6 @@ import {
 } from "@/lib/rein-access";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./config";
 
-const ENTITLEMENT_TTL_MS = 300_000;
-const entitlementCache = new Map<string, { expires: number; value: ReinEntitlement | null }>();
-
-function getCachedEntitlement(userId: string) {
-  const hit = entitlementCache.get(userId);
-  if (!hit) return undefined;
-  if (hit.expires <= Date.now()) {
-    entitlementCache.delete(userId);
-    return undefined;
-  }
-  return hit.value;
-}
-
-function putCachedEntitlement(userId: string, value: ReinEntitlement | null) {
-  if (entitlementCache.size >= 2048) {
-    const oldest = entitlementCache.keys().next().value;
-    if (oldest) entitlementCache.delete(oldest);
-  }
-  entitlementCache.set(userId, { expires: Date.now() + ENTITLEMENT_TTL_MS, value });
-}
-
 function isTrustedInternalRequest(request: NextRequest) {
   const secret = process.env.CRON_SECRET || "";
   if (!secret) return false;
@@ -118,19 +97,12 @@ export async function updateSessionAndAuthorize(request: NextRequest) {
     return authError(request, 401, "Googleログインが必要です");
   }
 
-  let membership = getCachedEntitlement(userId);
-  if (membership === undefined) {
-    const { data, error: membershipError } = await supabase
-      .from("rein_memberships")
-      .select("plan,status,access_starts_at,access_ends_at")
-      .maybeSingle();
-
-    if (membershipError) {
-      return authError(request, 403, "REINの利用権を確認できません");
-    }
-    membership = data as ReinEntitlement | null;
-    putCachedEntitlement(userId, membership);
-  }
+  const { data, error: membershipError } = await supabase
+    .from("rein_memberships")
+    .select("plan,status,access_starts_at,access_ends_at")
+    .maybeSingle();
+  if (membershipError) return authError(request, 403, "REINの利用権を確認できません");
+  const membership = data as ReinEntitlement | null;
 
   if (!hasActiveReinAccess(membership)) {
     return authError(request, 403, "REINの利用権を確認できません");
@@ -151,3 +123,4 @@ export async function updateSessionAndAuthorize(request: NextRequest) {
   response.headers.set("cache-control", "private, no-store");
   return response;
 }
+

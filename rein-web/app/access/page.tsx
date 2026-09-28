@@ -11,12 +11,6 @@ function messageFor(membership: ReinMembership | null, now: Date) {
       body: "CAMPFIREで登録したGoogleアドレスと、現在ログインしているGoogleアカウントが一致しているか確認してください。",
     };
   }
-  if (membership.status === "cancelled") {
-    return {
-      title: "利用期間が終了しています",
-      body: "CAMPFIREの会員状態をご確認ください。再加入後は登録情報の反映後に利用できます。",
-    };
-  }
   if (membership.status === "paused") {
     return {
       title: "利用権を一時停止しています",
@@ -93,3 +87,4 @@ export default async function AccessPage() {
     </main>
   );
 }
+
