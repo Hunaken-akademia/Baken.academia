@@ -289,6 +289,10 @@ def _read_rows(path):
 async def backfill(args):
     if not args.permission_confirmed:
         raise ValueError("NARの許可確認後、--permission-confirmed を付けてください")
+    include_all_bet_odds = bool(getattr(args, "include_all_bet_odds", False))
+    # Legacy packagers may still include this directory. In results-only mode it
+    # is empty: no auxiliary odds-page requests or duplicate odds data are made.
+    (args.work_dir / "odds-pages" / str(args.year) / f"{args.month:02d}").mkdir(parents=True, exist_ok=True)
     month_url = f"{MONTH_URL}?{urlencode({'k_year': args.year, 'k_month': args.month})}"
     errors, odds_errors, paths = [], [], []
     async with PoliteNarClient(args.work_dir / "cache", args.min_delay, args.max_delay) as client:
@@ -328,7 +332,7 @@ async def backfill(args):
                 except Exception as exc:
                     errors.append({"url": url, "error": str(exc)})
                     if not args.continue_on_error: raise
-            if path.exists():
+            if include_all_bet_odds and path.exists():
                 race_rows = _read_rows(path)
                 if race_rows:
                     race_id = race_rows[0]["race_id"]
@@ -337,7 +341,7 @@ async def backfill(args):
                             payout_rows.append({"race_id": race_id, **payout})
                     except json.JSONDecodeError:
                         pass
-                    for bet_type, odds_url in requested_odds_urls(url, getattr(args, "include_all_bet_odds", False)).items():
+                    for bet_type, odds_url in requested_odds_urls(url, include_all_bet_odds).items():
                         raw_path = args.work_dir / "odds-pages" / str(args.year) / f"{args.month:02d}" / f"{race_key}-{bet_type}.html.gz"
                         try:
                             if raw_path.exists():
@@ -385,8 +389,10 @@ async def backfill(args):
                   "created_at": datetime.now(timezone.utc).isoformat(),
                   "rows": len(frame), "races": frame.race_id.nunique(), "horses": frame.horse_id.nunique(),
                   "market_fields": ["win_odds", "popularity"],
-                  "all_bet_odds_collected": bool(getattr(args, "include_all_bet_odds", False)),
-                  "bet_types": list(ODDS_ENDPOINTS) if getattr(args, "include_all_bet_odds", False) else [],
+                  "collection_scope": "all_bet_odds" if include_all_bet_odds else "results_win_odds_popularity",
+                  "all_bet_odds_requested": include_all_bet_odds,
+                  "result_pages_found": len(result_links),
+                  "bet_types": list(ODDS_ENDPOINTS) if include_all_bet_odds else [],
                   "odds_pages": len(odds_manifests), "odds_cells": len(odds_cells),
                   "payout_rows": len(payout_rows), "venue_days": len(venue_days), "network_requests": client.stats.network_requests,
                   "cache_hits": client.stats.cache_hits, "retries": client.stats.retries, "errors": errors, "odds_errors": odds_errors,

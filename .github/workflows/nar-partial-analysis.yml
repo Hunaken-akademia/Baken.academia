@@ -12,7 +12,7 @@ on:
   schedule:
     - cron: "17 */6 * * *"
   workflow_run:
-    workflows: ["NAR licensed eight-year backfill with all final odds"]
+    workflows: ["NAR licensed eight-year backfill with all final odds", "NAR licensed eight-year results backfill"]
     types: [completed]
 
 permissions:
@@ -93,7 +93,8 @@ jobs:
             signed_url="$(jq -er '.signed_url' <<<"${response}")"
             archive=".nar-archives/${period}.tar.gz"
             curl --fail-with-body --silent --show-error --retry 3 "${signed_url}" -o "${archive}"
-            tar --no-same-owner -xzf "${archive}" -C .nar-dataset
+            # Legacy archives include duplicate events and unused odds tables.
+            tar --no-same-owner --wildcards --no-anchored --exclude='*-odds-*' --exclude='*-payouts*' --exclude='*-manifest*' -xzf "${archive}" -C .nar-dataset 'nar-*.parquet'
             completed=$((completed + 1))
           done < /tmp/nar-periods.txt
 

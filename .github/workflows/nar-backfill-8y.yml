@@ -1,15 +1,17 @@
-name: NAR licensed eight-year backfill with all final odds
+name: NAR licensed eight-year results backfill
 
 on:
   workflow_dispatch:
     inputs:
-      include_all_bet_odds:
-        description: "追加の券種別オッズ表も取得する（通常分析では不要）"
+      replace_running:
+        description: "現在の同バックフィルを置き換える"
         type: boolean
         required: false
         default: false
   push:
     branches: [main]
+    # Code changes do not interrupt an active multi-day backfill.
+    # Editing the request file explicitly restarts from completed archives.
     paths:
       - .github/nar-backfill-8y-request.json
 
@@ -20,7 +22,7 @@ permissions:
 
 concurrency:
   group: nar-licensed-eight-year-backfill-v2
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'push' || inputs.replace_running }}
 
 jobs:
   plan:
@@ -44,8 +46,6 @@ jobs:
     needs: plan
     if: needs.plan.outputs.count != '0'
     runs-on: ubuntu-latest
-    # GitHub-hosted jobs have a 360-minute ceiling.  Keep the whole allowance;
-    # the collector itself is paced at the licensed three-second minimum below.
     timeout-minutes: 360
     strategy:
       fail-fast: false
@@ -60,13 +60,13 @@ jobs:
       SUFFIX: ${{ matrix.suffix }}
       PERIOD: ${{ matrix.period }}
       SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
-      ARCHIVE_DATASET: "nar-results-all-bet-types-odds-and-payouts-v2"
-      INCLUDE_ALL_BET_ODDS: ${{ inputs.include_all_bet_odds || false }}
+      ARCHIVE_DATASET: "nar-results-win-odds-popularity-v3"
     steps:
       - uses: actions/checkout@v4
       - id: archive
         name: Skip if verified archive already exists in Supabase
         run: |
+          # Reuse the authorized namespace and all completed v2 result rows.
           export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v2/${YEAR}/${PERIOD}.tar.gz"
           bash scripts/check_supabase_archive.sh
       - uses: actions/setup-python@v5
@@ -78,29 +78,17 @@ jobs:
         run: pip install -r requirements.txt
       - name: Fetch NAR results with win odds and popularity
         if: steps.archive.outputs.exists != 'true'
-        run: |
-          odds_options=()
-          if [[ "${INCLUDE_ALL_BET_ODDS}" == "true" ]]; then
-            odds_options+=(--include-all-bet-odds)
-          fi
-          python -m baken_academia.nar_backfill \\
-            --year "$YEAR" --month "$MONTH"
-            --start-day "$START_DAY" --end-day "$END_DAY"
-            --output "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.parquet"
-            --min-delay 3 --max-delay 3
-            --permission-confirmed --continue-on-error "${odds_options[@]}"
-      - name: Package verified NAR archive
+        run: >-
+          python -m baken_academia.nar_backfill
+          --year "$YEAR" --month "$MONTH"
+          --start-day "$START_DAY" --end-day "$END_DAY"
+          --output "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.parquet"
+          --min-delay 3 --max-delay 3
+          --permission-confirmed --continue-on-error
+      - name: Package verified NAR result archive
         if: steps.archive.outputs.exists != 'true'
         run: |
-          archive_paths=(
-            data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}*.parquet
-            "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.audit.json"
-            "data/raw/nar/events/${YEAR}/${MONTH_PADDED}"
-          )
-          if [[ -d "data/raw/nar/odds-pages/${YEAR}/${MONTH_PADDED}" ]]; then
-            archive_paths+=("data/raw/nar/odds-pages/${YEAR}/${MONTH_PADDED}")
-          fi
-          tar -czf "nar-${PERIOD}.tar.gz" "${archive_paths[@]}"
+          tar -czf "nar-${PERIOD}.tar.gz" "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.parquet" "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.audit.json"
           test -s "nar-${PERIOD}.tar.gz"
       - name: Archive verified chunk directly to Supabase
         if: steps.archive.outputs.exists != 'true'

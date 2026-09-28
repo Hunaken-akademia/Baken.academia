@@ -1,19 +1,13 @@
 {
-  "requested_at": "2026-09-25T06:42:04.541Z",
-  "state": "running",
-  "reason": "Restart corrected NAR v2 backfill after parser and Supabase archive path fix",
-  "durable_completed_range": "v1 retained as legacy; v2 rebuild starts from 2019-01",
-  "resume_from": "2019-01",
+  "requested_at": "2026-09-28T02:25:11.909339+00:00",
+  "state": "requested",
+  "reason": "Resume six-lane backfill with result-page data; skip auxiliary odds requests and reuse verified Supabase archives",
+  "collection_scope": "results_win_odds_popularity",
+  "include_all_bet_odds": false,
+  "resume_from": "verified_supabase_v2_archives",
   "max_parallel": 6,
   "parser_version": 2,
-  "bet_types": [
-    "win_place",
-    "bracket_quinella",
-    "quinella",
-    "exacta",
-    "wide",
-    "trio",
-    "trifecta"
-  ],
+  "supersedes_run": 36369038815,
+  "do_not_resume_run": 36251291777,
   "storage": "supabase"
 }
