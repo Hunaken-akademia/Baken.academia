@@ -9,6 +9,8 @@ on:
       - .github/workflows/nar-partial-analysis.yml
       - scripts/nar_partial_analysis.py
       - scripts/nar_live_model.py
+      - scripts/nar_full_revalidation.py
+      - reports/nar-current-release-model-20260928.json
   schedule:
     - cron: "17 */6 * * *"
   workflow_run:
@@ -146,6 +148,19 @@ jobs:
             -H "Authorization: Bearer ${oidc_token}" \
             -H "Content-Type: application/json" \
             --data "${payload}"
+
+      - name: Revalidate frozen NAR release against full data
+        if: steps.archives.outputs.completed != '0'
+        run: >-
+          python scripts/nar_full_revalidation.py
+          --input-file artifacts/nar-partial-analysis/nar-partial-combined.parquet
+          --frozen-release reports/nar-current-release-model-20260928.json
+          --output-dir artifacts/nar-partial-analysis/full-revalidation
+
+      - name: Publish full revalidation summary
+        if: steps.archives.outputs.completed != '0'
+        shell: bash
+        run: cat artifacts/nar-partial-analysis/full-revalidation/summary.md >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Remove temporary combined parquet before artifact upload
         if: steps.archives.outputs.completed != '0'
