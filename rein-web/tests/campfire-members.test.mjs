@@ -11,6 +11,12 @@ const csv = (status='退会申請中', month='202609', plan='REIN 地方競馬�
 const members = (...args) => parse(csv(...args)).members;
 const now = new Date('2026-09-28T00:00:00Z');
 const record = (...args) => prepare(members(...args), [], now).records[0];
+test('actual Shift_JIS Campfire export with header only reads as zero members', () => {
+ const source = readFileSync(new URL('./fixtures/campfire-empty-shift-jis.csv', import.meta.url));
+ const parsed = parse(source);
+ assert.equal(parsed.members.length, 0);
+ assert.deepEqual(parsed.counts, { nar: 0, jra: 0, all: 0, active: 0, cancelled: 0 });
+});
 test('WAKE headers prioritize remarks Google email and exclude generated column', () => {
  const r=record(); assert.equal(r.google_email,'user@example.com'); assert.equal(r.member_key,'campfire:1');
  assert.equal(r.access_ends_at,'2026-09-30T15:00:00.000Z'); assert.ok(!('normalized_email' in r));

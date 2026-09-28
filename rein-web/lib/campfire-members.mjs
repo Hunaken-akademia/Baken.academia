@@ -80,7 +80,7 @@ function statusOf(value) {
 
 export function parseCampfireMembers(bytes) {
   const rows = readCsv(bytes);
-  if (rows.length < 2 || rows.length > 10001) throw new CampfireCsvError("1〜10,000人分の会員一覧CSVを選択してください。");
+  if (rows.length < 1 || rows.length > 10001) throw new CampfireCsvError("0〜10,000人分の会員一覧CSVを選択してください。");
   const headers = rows[0].map(norm);
   if (new Set(headers).size !== headers.length) throw new CampfireCsvError("CSVに重複する列名があります。");
   const columns = Object.fromEntries(Object.entries(aliases).map(([k, names]) => [k, names.map(norm).map(n => headers.indexOf(n)).find(i => i >= 0) ?? -1]));

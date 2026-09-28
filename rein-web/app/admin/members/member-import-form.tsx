@@ -88,6 +88,7 @@ export function MemberImportForm() {
           <p className="mt-2 text-slate-300">
             {Object.entries(planNames).map(([plan, name]) => `${name} ${result.counts?.[plan as keyof typeof planNames] ?? 0}人`).join(" ／ ")}
           </p>
+          {result.total === 0 ? <p className="mt-2 text-slate-300">会員はまだいません。反映操作は不要です。</p> : null}
           <p className="mt-1 text-slate-400">
             継続 {result.counts.active}人 ／ 退会・停止予定（期限後停止を含む） {result.counts.cancelled}人
           </p>
@@ -100,4 +101,3 @@ export function MemberImportForm() {
     </div>
   );
 }
-

@@ -61,6 +61,11 @@ export async function POST(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   try {
+    if (parsed.members.length === 0) {
+      const { error } = await admin.from("rein_plan_catalog").select("plan").limit(1);
+      if (error) return json({ error: "Supabaseの管理用キーを確認できません。反映していません。" }, 503);
+      return json({ mode, total: 0, counts: parsed.counts, protectedMembers: 0, deadlines: [], imported: 0 });
+    }
     const existing = new Map<string, Record<string, unknown>>();
     for (let offset = 0; offset < parsed.members.length; offset += 100) {
       const batch = parsed.members.slice(offset, offset + 100);
