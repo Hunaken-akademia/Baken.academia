@@ -167,3 +167,11 @@ python -m baken_academia.rein_history \
 ```
 
 Web側では人気を履歴特徴へ混入させず、買い目生成時にのみ組み合わせます。本線は人気順、対抗は人気75%＋REIN25%、穴は人気50%＋REIN50%です。
+# REIN welcome email configuration
+
+Campfire member imports send a registration email to each newly imported active member after the Supabase membership upsert succeeds. The sender is `馬券アカデミア <noreply@hunaken-academia.com>`.
+
+- Set `RESEND_API_KEY` in the REIN Vercel project for Production (and Preview if those deployments should send mail).
+- Apply `supabase/migrations/20260928223902_rein_welcome_email_outbox.sql` before deploying the code. The outbox tracks send state and prevents re-sending successfully sent welcome mail.
+- Failed welcome emails do not roll back membership updates. The admin import screen shows the send count; upload and apply the same CSV again to retry only failed or pending messages.
+- Canceled members do not receive a welcome email. Keep the key server-side; never add it to `NEXT_PUBLIC_*` variables or source control.

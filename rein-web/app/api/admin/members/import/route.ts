@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SUPABASE_URL } from "@/lib/supabase/config";
 import { CampfireCsvError, parseCampfireMembers, prepareCampfireImport } from "@/lib/campfire-members.mjs";
 import { isReinAdmin } from "@/lib/rein-admin";
+import { sendReinWelcomeEmail } from "@/lib/rein-welcome-email.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -93,7 +94,39 @@ export async function POST(request: NextRequest) {
       const { error } = await admin.from("rein_memberships").upsert(records, { onConflict: "member_key" });
       if (error) return json({ error: "会員情報を反映できませんでした。重複やDB設定を確認してください。" }, 500);
     }
-    return json({ ...summary, imported: records.length });
+    let emailSent = 0;
+    let emailFailed = 0;
+    let emailSkipped = 0;
+    if (records.length) {
+      const memberByEmail = new Map(parsed.members.map(member => [member.google_email, member]));
+      for (const record of records) {
+        const member = memberByEmail.get(record.google_email);
+        if (member?.status !== "active") continue;
+        const recipient = String(record.google_email || "").trim().toLowerCase();
+        const memberKey = record.member_key;
+        const { error: insertError } = await admin.from("rein_welcome_email_outbox")
+          .upsert({ member_key: memberKey, recipient_email: recipient, status: "pending", updated_at: new Date().toISOString() },
+            { onConflict: "member_key", ignoreDuplicates: true });
+        if (insertError) { emailFailed++; continue; }
+        const { data: claimed, error: claimError } = await admin.from("rein_welcome_email_outbox")
+          .update({ status: "sending", recipient_email: recipient, last_error: null, updated_at: new Date().toISOString() })
+          .eq("member_key", memberKey).in("status", ["pending", "failed"]).select("member_key").maybeSingle();
+        if (claimError) { emailFailed++; continue; }
+        if (!claimed) { emailSkipped++; continue; }
+        const { data: incremented, error: attemptError } = await admin.rpc("increment_rein_welcome_attempts", { target_member_key: memberKey });
+        try {
+          if (attemptError || !incremented) throw new Error("送信状態を更新できませんでした。");
+          const resendId = await sendReinWelcomeEmail({ apiKey: process.env.RESEND_API_KEY, email: recipient, memberKey, plan: record.plan });
+          const { error: sentError } = await admin.from("rein_welcome_email_outbox").update({ status: "sent", resend_email_id: resendId, last_error: null, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("member_key", memberKey).eq("status", "sending");
+          if (sentError) throw new Error("送信結果を保存できませんでした。");
+          emailSent++;
+        } catch (error) {
+          await admin.from("rein_welcome_email_outbox").update({ status: "failed", last_error: String(error instanceof Error ? error.message : error).slice(0, 500), updated_at: new Date().toISOString() }).eq("member_key", memberKey).eq("status", "sending");
+          emailFailed++;
+        }
+      }
+    }
+    return json({ ...summary, imported: records.length, emailSent, emailFailed, emailSkipped });
   } catch (error) {
     if (error instanceof CampfireCsvError) return json({ error: error.message, issues: error.issues }, 400);
     return json({ error: "会員情報の処理に失敗しました。再度内容を確認してください。" }, 500);
