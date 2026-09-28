@@ -6,7 +6,10 @@ type ImportResult = {
   mode?: "preview" | "apply";
   total?: number;
   imported?: number;
-  counts?: { nar: number; jra: number; all: number; active: number; paused: number; cancelled: number };
+  counts?: { nar: number; jra: number; all: number; active: number; cancelled: number };
+  previewToken?: string;
+  protectedMembers?: number;
+  deadlines?: { at: string; count: number }[];
   error?: string;
   issues?: string[];
 };
@@ -23,7 +26,8 @@ export function MemberImportForm() {
       setResult({ error: "先にCampfireのCSVファイルを選択してください。" });
       return;
     }
-    if (mode === "apply" && !window.confirm("解析した会員情報をREINに反映します。続けますか？")) return;
+    if (mode === "apply" && !result?.previewToken) return;
+    const previewToken = result?.previewToken;
 
     setBusy(true);
     setResult(null);
@@ -31,6 +35,7 @@ export function MemberImportForm() {
       const body = new FormData();
       body.set("file", file);
       body.set("mode", mode);
+      if (previewToken) body.set("previewToken", previewToken);
       const response = await fetch("/api/admin/members/import", { method: "POST", body, cache: "no-store" });
       const data = (await response.json()) as ImportResult;
       setResult(data);
@@ -57,7 +62,7 @@ export function MemberImportForm() {
         <button type="button" disabled={busy || !file} onClick={() => submit("preview")} className="rounded-xl border border-slate-600 px-4 py-3 font-semibold hover:bg-white/5 disabled:opacity-50">
           {busy ? "処理中…" : "内容を確認"}
         </button>
-        <button type="button" disabled={busy || !file} onClick={() => submit("apply")} className="rounded-xl bg-cyan-400 px-4 py-3 font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-50">
+        <button type="button" disabled={busy || !file || !result?.previewToken} onClick={() => submit("apply")} className="rounded-xl bg-cyan-400 px-4 py-3 font-bold text-slate-950 hover:bg-cyan-300 disabled:opacity-50">
           会員情報を反映
         </button>
       </div>
@@ -65,7 +70,7 @@ export function MemberImportForm() {
       <div className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-400/[.06] p-4 text-sm leading-6 text-amber-100/90">
         <p className="font-bold">プランと反映内容</p>
         <p className="mt-1">地方競馬1,000円、中央競馬1,000円、オール1,500円の3プランを判定します。</p>
-        <p>CSVに載っている会員だけを追加・更新します。CSVにない会員の権利は変更しません。退会者は状態列に「退会」「解約」などがある場合に停止します。</p>
+        <p>CSVに載っている会員だけを追加・更新します。CSVにない会員の権利は変更しません。退会・解約・停止は最終決済月の翌月1日0:00（日本時間）に利用終了となります。期限を判定できない行がある場合は反映しません。</p>
       </div>
 
       {result?.error ? (
@@ -84,10 +89,15 @@ export function MemberImportForm() {
             {Object.entries(planNames).map(([plan, name]) => `${name} ${result.counts?.[plan as keyof typeof planNames] ?? 0}人`).join(" ／ ")}
           </p>
           <p className="mt-1 text-slate-400">
-            有効 {result.counts.active}人 ／ 一時停止 {result.counts.paused}人 ／ 退会・解約 {result.counts.cancelled}人
+            継続 {result.counts.active}人 ／ 退会・停止予定（期限後停止を含む） {result.counts.cancelled}人
           </p>
+          <p className="mt-2">手動登録の保護対象：{result.protectedMembers ?? 0}人（更新対象外）</p>
+          {result.deadlines?.map(item => <p key={item.at} className="mt-1">
+            利用終了：{new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", dateStyle: "medium", timeStyle: "short", hourCycle: "h23" }).format(new Date(item.at))} 日本時間 ／ {item.count}人
+          </p>)}
         </div>
       ) : null}
     </div>
   );
 }
+

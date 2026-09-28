@@ -1,24 +1,29 @@
-# REIN Campfire member import
+# REIN CAMPFIRE 会員取込
 
-The member import page is available at `/admin/members` after signing in with an administrator Google account.
+管理者が `/admin/members` で最新CSVを選択し、「内容を確認」でプラン別人数・停止日時・保護対象を確認してから反映します。確認結果は10分間有効です。ファイルや既存会員情報が変わった場合は再確認が必要です。
 
-## Required Vercel environment variables
+## 利用期間
 
-Set these server-side variables for the `rein-web` Vercel project:
+- 地方1,000円＝nar、中央1,000円＝jra、オール1,500円＝両方。
+- 退会・解約・休会・停止は最終決済月の翌月1日 **00:00 日本時間** まで利用可能。例：202609なら2026年10月1日00:00で終了します。取込時点で即停止しません。ただし過去の決済月で期限を過ぎていれば利用不可です。
+- 停止日はCSVの最終決済月（YYYYMM / YYYY-MM）から算出します。日時が不明なら既存の停止予定日を使い、それもなければ全体をエラーにして反映しません。
+- 同じ停止会員を再取込しても期限を延長しません。再加入した有効会員は停止予定を解除します。
+- 期限は各リクエストで判定するため月初のバッチ実行は不要です。ページ・APIとも同じ判定を使います。
 
-- `REIN_ADMIN_EMAILS`: comma, semicolon, or newline separated Google login email addresses allowed to import members.
-- `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SECRET_KEY`: a server-side Supabase secret key. Never expose either variable with a `NEXT_PUBLIC_` prefix.
+## CSV・照合
 
-Redeploy after setting the variables. The admin page is hidden from accounts outside the allowlist. The API verifies the signed Supabase claims again, checks same-origin requests, and requires the server-only database key before writing.
+UTF-8 / Shift_JIS、引用符・改行に対応。WAKEと同じ備考、メンバー特典、メンバーステータス、最終決済月を認識します。Googleメール列、または備考欄のGoogleメールを優先します。備考列がない場合のみ一般メール列を使います。異なるメールが複数ある場合はエラーになります。
 
-## Import behavior
+会員IDを優先して更新し、メール変更時はGoogle認証との紐付けを再設定します。IDがないCSVはメールをキーにするためメール変更の追跡はできません。継続した会員IDを含むCSVを使用してください。
 
-1. Download the current Campfire member list as CSV.
-2. Select it at `/admin/members` and choose **内容を確認**.
-3. Confirm the detected plan and status totals, then choose **会員情報を反映**.
+状態列・プラン・メール・重複・停止期限の不備は全件反映を中止します。CSVにない会員は変更しません。手動登録の友人・管理者は保護し、更新対象外の人数を表示します。自動生成列 normalized_email は書き込みません。CSV本体は保存しません。
 
-The parser supports UTF-8 and Shift_JIS CSV, quoted commas, and common Japanese/English column names. It matches users by normalized email and maps REIN 地方競馬, REIN 中央競馬, and REIN オールプラン to `nar`, `jra`, and `all`.
+## 設定
 
-Rows without a status column are treated as active because the upload is assumed to be Campfire's current member list. When a status column exists, recognizable active, paused, and cancelled states are mapped explicitly. Unknown statuses, unrecognized plans, invalid emails, and duplicate emails stop the whole import.
+Vercel rein-web のサーバー環境変数：
+- REIN_ADMIN_EMAILS：管理者Googleメールをカンマ・セミコロン・改行で区切る。
+- SUPABASE_SERVICE_ROLE_KEY または SUPABASE_SECRET_KEY。NEXT_PUBLIC_ を付けない。
 
-The uploaded file is parsed in memory and is not stored. Existing members omitted from the CSV are left unchanged; rows explicitly marked as cancelled are blocked immediately. Review the displayed counts before applying a file.
+設定変更後は再デプロイが必要です。APIはログイン済み署名・管理者リスト・同一オリジン・署名済み確認トークンを検証します。既存 rein_memberships テーブルとメール紐付けトリガーを使用します。
+
+実際のCAMPFIRE書き出しファイルでの最終照合は未実施です。最新CSVをプレビューし、停止日時と人数を確認してから反映してください。過去の有効CSVを再取込すると再加入として扱われるため、必ず最新の一覧を使用してください。

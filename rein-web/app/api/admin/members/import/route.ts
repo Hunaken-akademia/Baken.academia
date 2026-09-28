@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
+import { createPreviewToken, verifyPreviewToken } from "@/lib/campfire-preview.mjs";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { SUPABASE_URL } from "@/lib/supabase/config";
-import { CampfireCsvError, parseCampfireMembers } from "@/lib/campfire-members.mjs";
+import { CampfireCsvError, parseCampfireMembers, prepareCampfireImport } from "@/lib/campfire-members.mjs";
 import { isReinAdmin } from "@/lib/rein-admin";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +26,8 @@ export async function POST(request: NextRequest) {
   const email = typeof claims.email === "string" ? claims.email : "";
   if (!isReinAdmin(email)) return json({ error: "管理者権限がありません。" }, 403);
 
+  if (Number(request.headers.get("content-length") || 0) > MAX_CSV_BYTES + 65536)
+    return json({ error: "2MB以下のCSVファイルを選択してください。" }, 413);
   let form: FormData;
   try {
     form = await request.formData();
@@ -38,17 +42,14 @@ export async function POST(request: NextRequest) {
   if (mode !== "preview" && mode !== "apply") return json({ error: "操作を判定できません。" }, 400);
 
   let parsed;
+  const bytes = new Uint8Array(await file.arrayBuffer());
   try {
-    parsed = parseCampfireMembers(new Uint8Array(await file.arrayBuffer()));
+    parsed = parseCampfireMembers(bytes);
   } catch (error) {
     if (error instanceof CampfireCsvError) {
       return json({ error: error.message, issues: error.issues }, 400);
     }
     return json({ error: "CSVを解析できませんでした。" }, 400);
-  }
-
-  if (mode === "preview") {
-    return json({ mode, total: parsed.members.length, counts: parsed.counts });
   }
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
@@ -59,19 +60,37 @@ export async function POST(request: NextRequest) {
   const admin = createSupabaseAdminClient(SUPABASE_URL, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const importedAt = new Date().toISOString();
-  const records = parsed.members.map((member) => ({
-    ...member,
-    last_imported_at: importedAt,
-    updated_at: importedAt,
-  }));
-  const { error } = await admin
-    .from("rein_memberships")
-    .upsert(records, { onConflict: "normalized_email" });
-
-  if (error) {
-    return json({ error: "会員情報を反映できませんでした。列の重複やDB設定を確認してください。" }, 500);
+  try {
+    const existing = new Map<string, Record<string, unknown>>();
+    for (let offset = 0; offset < parsed.members.length; offset += 100) {
+      const batch = parsed.members.slice(offset, offset + 100);
+      const columns = "member_key,google_email,normalized_email,status,access_starts_at,access_ends_at,updated_at";
+      const results = await Promise.all([
+        admin.from("rein_memberships").select(columns).in("member_key", batch.map(m => m.member_key)),
+        admin.from("rein_memberships").select(columns).in("normalized_email", batch.map(m => m.google_email)),
+      ]);
+      for (const result of results) {
+        if (result.error) return json({ error: "既存の会員情報を確認できません。反映していません。" }, 503);
+        for (const row of result.data || []) existing.set(row.member_key, row);
+      }
+    }
+    const prepared = prepareCampfireImport(parsed.members, [...existing.values()]);
+    const snapshot = JSON.stringify([createHash("sha256").update(bytes).digest("hex"), prepared]);
+    const summary = { mode, total: parsed.members.length, counts: parsed.counts,
+      protectedMembers: prepared.protectedMembers, deadlines: prepared.deadlines };
+    if (mode === "preview") return json({ ...summary,
+      previewToken: createPreviewToken(serviceKey, claims.sub, snapshot) });
+    if (!verifyPreviewToken(form.get("previewToken"), serviceKey, claims.sub, snapshot))
+      return json({ error: "内容確認の期限切れ、または会員情報が変わりました。もう一度「内容を確認」を実行してください。" }, 409);
+    const importedAt = new Date().toISOString();
+    const records = prepared.records.map(member => ({ ...member, last_imported_at: importedAt, updated_at: importedAt }));
+    if (records.length) {
+      const { error } = await admin.from("rein_memberships").upsert(records, { onConflict: "member_key" });
+      if (error) return json({ error: "会員情報を反映できませんでした。重複やDB設定を確認してください。" }, 500);
+    }
+    return json({ ...summary, imported: records.length });
+  } catch (error) {
+    if (error instanceof CampfireCsvError) return json({ error: error.message, issues: error.issues }, 400);
+    return json({ error: "会員情報の処理に失敗しました。再度内容を確認してください。" }, 500);
   }
-
-  return json({ mode, imported: records.length, counts: parsed.counts });
 }

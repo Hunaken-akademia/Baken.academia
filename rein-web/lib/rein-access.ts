@@ -49,12 +49,15 @@ export function hasActiveReinAccess(
   membership: ReinEntitlement | null | undefined,
   now = new Date(),
 ) {
-  if (!membership || membership.status !== "active") return false;
+  if (!membership || !["nar", "jra", "all"].includes(membership.plan)) return false;
+  if (membership.status !== "active" && membership.status !== "cancelled") return false;
+  if (membership.status === "cancelled" && !membership.access_ends_at) return false;
+  if (!Number.isFinite(now.getTime())) return false;
   const starts = new Date(membership.access_starts_at);
   if (Number.isNaN(starts.getTime()) || now < starts) return false;
   if (membership.access_ends_at) {
     const ends = new Date(membership.access_ends_at);
-    if (!Number.isNaN(ends.getTime()) && now >= ends) return false;
+    if (Number.isNaN(ends.getTime()) || now >= ends || ends <= starts) return false;
   }
   return true;
 }
@@ -76,3 +79,4 @@ export function homeForReinPlan(plan: ReinPlan) {
 }
 
 export type { ReinMembership };
+
