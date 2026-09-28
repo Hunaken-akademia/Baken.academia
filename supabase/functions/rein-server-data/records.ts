@@ -23,15 +23,24 @@ export function snapshotRecord(body: any, preview: boolean, now = Date.now()) {
   return { race_id: id, race_date: date, slot: preview ? "preview" : "live", generated_at: body.prediction.generatedAt, starts_at: hasStart ? new Date(starts).toISOString() : null, is_final: complete && body.review?.isFinished === true, payload: body, journal, result, roster, prestart: authentic && body.prediction.phase === "prestart" };
 }
 
+function validGithubRepositoryClaims(claims: Record<string, unknown>) {
+  return claims.repository_id === "1376323200"
+    && claims.repository === "Hunaken-akademia/Baken.academia"
+    && claims.ref === "refs/heads/main";
+}
+
 export function validGithubCaptureClaims(claims: Record<string, unknown>) {
   const workflow = String(claims.workflow_ref);
   const event = String(claims.event_name);
-  const daily = workflow === "Hunaken-akademia/Baken.academia/.github/workflows/rein-daily-capture.yml@refs/heads/main"
+  return validGithubRepositoryClaims(claims)
+    && workflow === "Hunaken-akademia/Baken.academia/.github/workflows/rein-daily-capture.yml@refs/heads/main"
     && ["schedule", "workflow_dispatch", "push"].includes(event);
-  const narAnalysis = workflow === "Hunaken-akademia/Baken.academia/.github/workflows/nar-partial-analysis.yml@refs/heads/main"
+}
+
+export function validGithubNarAnalysisClaims(claims: Record<string, unknown>) {
+  const workflow = String(claims.workflow_ref);
+  const event = String(claims.event_name);
+  return validGithubRepositoryClaims(claims)
+    && workflow === "Hunaken-akademia/Baken.academia/.github/workflows/nar-partial-analysis.yml@refs/heads/main"
     && ["schedule", "workflow_dispatch", "push", "workflow_run"].includes(event);
-  return claims.repository_id === "1376323200"
-    && claims.repository === "Hunaken-akademia/Baken.academia"
-    && claims.ref === "refs/heads/main"
-    && (daily || narAnalysis);
 }
