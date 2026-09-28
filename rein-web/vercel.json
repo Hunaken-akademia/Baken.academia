@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/rein-live",
       "schedule": "*/10 23,0-8 * * *"
+    },
+    {
+      "path": "/api/cron/rein-live?area=nar",
+      "schedule": "5,15,25,35,45,55 23,0-12 * * *"
     }
   ],
   "functions": {

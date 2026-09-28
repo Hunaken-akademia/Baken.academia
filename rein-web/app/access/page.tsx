@@ -26,8 +26,8 @@ function messageFor(membership: ReinMembership | null, now: Date) {
   const starts = new Date(membership.access_starts_at);
   if (now < starts) {
     return {
-      title: "REINは10月1日公開予定です",
-      body: "Google認証と会員照合は完了しています。公開日時以降、このアカウントでそのまま利用できます。",
+      title: "このアカウントの利用開始前です",
+      body: `Google認証と会員照合は完了しています。会員情報の利用開始日時は${starts.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}です。`,
     };
   }
   if (membership.access_ends_at && now >= new Date(membership.access_ends_at)) {
@@ -79,7 +79,7 @@ export default async function AccessPage() {
           <p className="mt-3 leading-7 text-slate-300">{message.body}</p>
 
           <div className="mt-6 rounded-2xl border border-slate-700 bg-black/15 p-4 text-sm text-slate-400">
-            <p>公開予定：2026年10月1日</p>
+            <p>中央・地方とも会員向け先行公開中。会員情報の利用期間・プランに従って表示します。</p>
             <p className="mt-1">CAMPFIRE特典：初月無料（参加した最初の月の参加費が無料）</p>
           </div>
 

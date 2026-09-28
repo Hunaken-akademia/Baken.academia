@@ -1,0 +1,68 @@
+import { getCache } from "@vercel/functions";
+import { fetchSource } from "./source-fetch";
+import { serverData, storedSnapshot, saveSnapshot, claimCapture, releaseCapture } from "./server-snapshots";
+import { parseNarCard, parseNarResult, parseNarSchedule, narVenueCodes, narRaceKey, narUrl, type NarHorse } from "./nar-source";
+import { loadNarRuntime, narRank } from "./nar-model";
+import { raceProgress } from "./race-progress";
+import { selectPicks } from "./marks";
+
+export const narCache = getCache({namespace:"rein-nar-live-v1"});
+export async function refreshNarSchedule(date:string) {
+  const lease=await claimCapture(`race:nar-schedule:${date}`,120);
+  if(!lease.acquired || !lease.token) return null;
+  try {
+    const index=await fetchSource(narUrl("TodayRaceInfoTop",date),"地方開催一覧");
+    const codes=narVenueCodes(index,date),venues=[];
+    for (const code of codes) {
+      const html=await fetchSource(narUrl("RaceList",date,code),"地方レース一覧");
+      const venue=parseNarSchedule(html,date,code);
+      const isToday = date===new Date(Date.now()+9*3600_000).toISOString().slice(0,10);
+      venues.push(isToday?{...venue,...raceProgress(venue.races)}:venue);
+    }
+    const payload={date,dateLabel:new Date(`${date}T12:00:00+09:00`).toLocaleDateString("ja-JP",{timeZone:"Asia/Tokyo",month:"long",day:"numeric",weekday:"short"}),updatedAt:new Date().toISOString(),venues,league:"nar"};
+    await serverData("save-schedule",{date,league:"nar",payload});
+    await narCache.set(`schedule:${date}`,JSON.stringify(payload),{ttl:600}).catch(()=>{});
+    return payload;
+  } finally {await releaseCapture(`race:nar-schedule:${date}`,lease.token).catch(()=>{});}
+}
+
+export async function refreshNarRace(raceId:string, preview=false) {
+  const key=narRaceKey(raceId);if(!key)throw new Error("Invalid NAR race");
+  const lock=`race:nar:${raceId}:${preview?"preview":"live"}`;
+  const lease=await claimCapture(lock,150);if(!lease.acquired||!lease.token)return null;
+  try {
+    const html=await fetchSource(narUrl("DebaTable",key.date,key.code,key.number),"地方出走表");
+    const card=parseNarCard(html,raceId), fetchedAt=new Date().toISOString();
+    const after=Date.now()>=card.race.startsAt;
+    const result=after&&!preview?parseNarResult(await fetchSource(narUrl("RaceMarkTable",key.date,key.code,key.number),"地方結果",true),raceId):null;
+    if(result?.finishers.some(h=>!card.horses.some(c=>c.number===h.number))) throw new Error("地方結果と出走表の馬番が一致しません");
+    if(result?.scratched.length){for(const h of card.horses.filter(h=>result.scratched.includes(h.number)))card.scratched.push({number:h.number,name:h.name});card.horses=card.horses.filter(h=>!result.scratched.includes(h.number));}
+    // Results annotate the immutable prestart forecast. Never re-score it using
+    // final market values or a newly trained model after the start.
+    const prior=after&&!preview?await storedSnapshot(raceId,"prestart").catch(()=>({snapshot:null})):null;
+    if(prior?.snapshot && prior.snapshot.payload.horses.map((h:NarHorse)=>h.number).sort().join()===card.horses.map(h=>h.number).sort().join()) {
+      const body={...prior.snapshot.payload,review:result??undefined,prediction:{...prior.snapshot.payload.prediction,phase:result?.isFinished?"final":"poststart",source:"prestart"},capture:{complete:true},race:{...prior.snapshot.payload.race,updated:new Date().toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"})}};
+      await saveSnapshot(body,false);
+      await narCache.set(`race:${raceId}:live`,JSON.stringify(body),{ttl:result?.isFinished?86400:300}).catch(()=>{});
+      return body;
+    }
+    const held:string[]=[], warnings:string[]=[];
+    const runtime=await loadNarRuntime().catch(e=>{held.push(e.message);return null;});
+    let scored:ReturnType<typeof narRank>|null=null;
+    if(runtime) {try{scored=narRank(runtime,card.horses,card.context);}catch(e){held.push(e instanceof Error?e.message:"地方評価を保留しています");}}
+    const horses=scored??card.horses.map(h=>({...h,score:0,mark:"",verdict:"履歴モデル待ち",positives:[] as string[],cautions:[] as string[]}));
+    const leaders=card.horses.filter(h=>h.earlyPosition!==null&&h.earlyPosition<=3).map(h=>h.number);
+    const pace=key.code==="03"?{label:"ばんえい：平地ペース対象外",detail:"障害越えと馬場水分の影響が大きいため、平地の隊列・ペースは適用しません。",leaders:[]}:{label:leaders.length>=4?"先行候補多め":leaders.length<=1?"先行候補少なめ":"先行候補は平均的",detail:"近走の通過順からの参考分類。地方でのペース精度は未検証です。",leaders};
+    warnings.push("地方版は取得済みデータによる暫定評価です。％は未校正の評価シェアで、的中確率ではありません。補正は追加検証後に改訂します。");
+    if(after)warnings.push("発走前の保存予想がないため、参考再計算です。的中率の集計には含めません。");
+    const model=runtime?{...runtime.profile.meta,version:`${runtime.model.version}:${runtime.sha.slice(0,12)}`,probabilityKind:"ranking-share",strategy:"地方専用・当日人気とオッズは評価に不使用",overallPolicy:"1〜3着の相対順位を均等合成",markPolicy:"1着適性順。市場モデル未検証のため穴の印は保留",snapshotPolicy:"サーバーで一括保存",provisional:true,validation:runtime.model.comparison,roleModes:Object.fromEntries(Object.entries(runtime.model.roles).map(([k,v])=>[k,v.mode]))}:undefined;
+    const body={...card,race:{...card.race,updated:new Date(fetchedAt).toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"}),dataTimes:{card:fetchedAt,odds:card.horses.some(h=>h.odds!==null)?fetchedAt:null}},horses,model,pace,warnings,
+      prediction:{phase:preview?"preview":result?.isFinished?"final":after?"poststart":"prestart",source:after?"rebuilt":"live",generatedAt:fetchedAt,label:preview?"前日参考":after?"発走後・参考再計算":"発走前・地方暫定"},
+      evaluation:{roleModel:scored?"ready":"unavailable",overall:scored?"ready":"held",tickets:"held",held},capture:{complete:!!scored},
+      confidence:null,picks:selectPicks(horses,{roleModelReady:!!scored,marketReady:false}),tickets:[],review:result??undefined,
+    };
+    await saveSnapshot(body,preview);
+    await narCache.set(`race:${raceId}:${preview?"preview":"live"}`,JSON.stringify(body),{ttl:result?.isFinished&&scored?86400:300}).catch(()=>{});
+    return body;
+  } finally {await releaseCapture(lock,lease.token).catch(()=>{});}
+}

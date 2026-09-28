@@ -9,7 +9,7 @@ const GH_ISSUER = "https://token.actions.githubusercontent.com";
 const GH_JWKS = createRemoteJWKSet(new URL(GH_ISSUER + "/.well-known/jwks"));
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { autoRefreshToken: false, persistSession: false } });
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
-let summaryCache: { value: unknown; until: number } | undefined;
+const summaryCache = new Map<string,{ value: unknown; until: number }>();
 
 type Identity = "production" | "preview" | "github-capture" | "github-nar-analysis";
 
@@ -103,10 +103,12 @@ Deno.serve(async req => {
 
   if (action === "nar-analysis") {
    const analysis = checked(await admin.from("rein_nar_analysis_snapshots").select("report,updated_at").eq("id",true).maybeSingle());
-   return json({analysis});
+   const active = checked(await admin.from("rein_nar_model_releases").select("report,activated_at").eq("id",true).maybeSingle());
+   return json({analysis,active});
   }
   if (action === "nar-profile") {
-   const analysis = checked(await admin.from("rein_nar_analysis_snapshots").select("report,updated_at").eq("id",true).maybeSingle());
+   const release = checked(await admin.from("rein_nar_model_releases").select("report,activated_at").eq("id",true).maybeSingle());
+   const analysis = release ? {report:release.report,updated_at:release.activated_at} : null;
    const sha = analysis?.report?.profileSha;
    if (!sha || !/^[a-f0-9]{64}$/.test(sha)) return json({analysis,signed_url:null});
    const download = checked(await admin.storage.from("baken-archive").createSignedUrl(`nar/profiles/${sha}.json.gz`,600));
@@ -115,7 +117,7 @@ Deno.serve(async req => {
   if (action === "save") {
    const record = snapshotRecord(b.payload,b.preview === true);
    const saved = checked(await admin.rpc("rein_store_race_snapshot",{r:record}));
-   summaryCache = undefined;
+   summaryCache.clear();
    return json({saved});
   }
   if (action === "read") {
@@ -130,21 +132,25 @@ Deno.serve(async req => {
   }
   if (action === "schedule" || action === "save-schedule") {
    if (!dateValid(b.date)) return json({error:"Invalid date"},400);
-   if (action === "schedule") return json({schedule:checked(await admin.from("rein_schedule_snapshots").select("payload,generated_at").eq("race_date",b.date).maybeSingle())});
+   const league = b.league ?? "jra";
+   if (!["jra","nar"].includes(league)) return json({error:"Invalid league"},400);
+   if (action === "schedule") return json({schedule:checked(await admin.from("rein_schedule_snapshots").select("payload,generated_at").eq("race_date",b.date).eq("league",league).maybeSingle())});
    if (!Array.isArray(b.payload?.venues)||b.payload.venues.some((v:any)=>!Array.isArray(v.races)||v.races.some((r:any)=>!raceIdValid(r.raceId)))) return json({error:"Invalid schedule"},400);
-   checked(await admin.from("rein_schedule_snapshots").upsert({race_date:b.date,payload:b.payload,generated_at:new Date().toISOString()}));
+   checked(await admin.from("rein_schedule_snapshots").upsert({race_date:b.date,league,payload:b.payload,generated_at:new Date().toISOString()}));
    return json({saved:true});
   }
   if (action === "history") {
    if (!raceIdValid(b.raceId)) return json({error:"Invalid race"},400);
+   const league=b.league??"jra";
+   if(!["jra","nar"].includes(league)||(league==="nar")!==(b.raceId.length===12))return json({error:"Invalid league"},400);
    const [rows,outcome] = await Promise.all([
     admin.from("rein_prediction_history").select("entry").eq("race_id",b.raceId).order("generated_at").limit(1000),
     admin.from("rein_race_outcomes").select("roster,finishers").eq("race_id",b.raceId).maybeSingle()
    ]);
    const result = checked(outcome);
    const entries = checked(rows).map((r:any)=>({...r.entry,...(result?.finishers && result.roster===r.entry.roster?{finishers:result.finishers}:{})}));
-   if (!summaryCache || summaryCache.until < Date.now()) summaryCache = {value:checked(await admin.rpc("rein_shared_journal_summary")),until:Date.now()+300_000};
-   return json({entries,scope:"server",...(summaryCache.value as object)});
+   if (!summaryCache.has(league) || summaryCache.get(league)!.until < Date.now()) summaryCache.set(league,{value:checked(await admin.rpc("rein_area_journal_summary",{p_league:league})),until:Date.now()+300_000});
+   return json({entries,scope:"server",league,...(summaryCache.get(league)!.value as object)});
   }
   if (action === "claim") {
    if (typeof b.key!=="string"||!(/^(?:cron:|race:)/.test(b.key))) return json({error:"Invalid key"},400);

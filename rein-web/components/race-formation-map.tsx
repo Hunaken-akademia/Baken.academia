@@ -6,17 +6,18 @@ import { CORNER_AUDIT_MAE, CORNER_MODEL_VERSION, courseStages, horseSequences, p
 const frameColors = ["#94a3b8", "#f8fafc", "#171717", "#dc433c", "#3778dc", "#f4d641", "#329249", "#ec9a30", "#d94c90"];
 const styleOrder: Record<string, number> = { "逃げ": 1, "先行": 2, "好位": 3, "差し": 4, "追込": 5 };
 
-export function RaceFormationMap({ horses, title, course, raceId, pace }: {
-  horses: MapHorse[]; title: string; course: string; raceId: string; pace: string;
+export function RaceFormationMap({ horses, title, course, raceId, pace, league = "jra" }: {
+  horses: MapHorse[]; title: string; course: string; raceId: string; pace: string; league?: "jra" | "nar";
 }) {
   const [mode, setMode] = useState("ai0");
   const [selected, setSelected] = useState<number | null>(null);
-  const stages = courseStages(title, course);
+  const nar = league === "nar", banei = nar && /ばんえい/.test(course);
+  const stages = nar ? banei ? null : [3,4] : courseStages(title, course);
   const year = raceId.length === 10 ? 2000 + Number(raceId.slice(0, 2)) : Number(raceId.slice(0, 4));
   const eligible = year >= 2025 && !!stages?.length;
   const options = [
     { id: "style", label: "脚質" },
-    ...(eligible ? [{ id: "ai0", label: "AI序盤" }, ...stages.map((n) => ({ id: `ai${n}`, label: `AI${n}角` }))] : []),
+    ...(eligible ? [{ id: "ai0", label: nar ? "暫定序盤" : "AI序盤" }, ...stages.map((n) => ({ id: `ai${n}`, label: `${nar ? "暫定" : "AI"}${n}角` }))] : []),
     ...(stages?.length ? [{ id: "past3", label: "前走3角" }, { id: "past4", label: "前走4角" }] : []),
   ];
   const active = options.some((item) => item.id === mode) ? mode : "style";
@@ -25,7 +26,7 @@ export function RaceFormationMap({ horses, title, course, raceId, pace }: {
   const corner = ai ? Number(active.slice(2)) : past ? Number(active.slice(4)) : 0;
 
   const projected = horses.map((horse) => {
-    const estimate = ai ? predictCorner(horse, corner, horses.length, course) : null;
+    const estimate = ai ? nar ? narCorner(horse,corner,horses.length) : predictCorner(horse, corner, horses.length, course) : null;
     const prior = past ? stagePosition(horseSequences(horse)[0] ?? [], corner) : null;
     const value = ai ? estimate?.position ?? null : past ? prior : styleOrder[horse.style] ?? null;
     return { horse, value, estimate };
@@ -43,7 +44,7 @@ export function RaceFormationMap({ horses, title, course, raceId, pace }: {
       <div className="p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-xl font-bold">隊列マップ</h2>
-          <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-200">{ai ? "AI位置取り予測 β" : past ? "前走の通過順位" : "近走の脚質傾向"}</span>
+          <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-200">{ai ? nar ? "地方・暫定位置取り" : "AI位置取り予測 β" : past ? "前走の通過順位" : "近走の脚質傾向"}</span>
         </div>
         <p className="mt-2 text-sm text-slate-300">ペース想定：{pace}</p>
         <div role="group" aria-label="隊列マップの場面" className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4" data-testid="formation-controls">
@@ -88,7 +89,7 @@ export function RaceFormationMap({ horses, title, course, raceId, pace }: {
           <div className="rounded-xl border border-slate-700 bg-black/10 p-4" aria-live="polite">
             {current ? <>
               <p className="font-bold">{current.horse.number}　{current.horse.name}</p>
-              <p className="mt-2 text-sm text-cyan-200">{current.estimate ? `推定 ${current.estimate.position.toFixed(1)}番手 / 目安 ${current.estimate.low}〜${current.estimate.high}番手` : past ? current.value === null ? "該当コーナーの記録なし" : `前走 ${current.value}番手` : `近走の脚質：${current.horse.style}`}</p>
+              <p className="mt-2 text-sm text-cyan-200">{current.estimate ? `推定 ${current.estimate.position.toFixed(1)}番手 / ${nar ? "過去の範囲" : "目安"} ${current.estimate.low}〜${current.estimate.high}番手` : past ? current.value === null ? "該当コーナーの記録なし" : `前走 ${current.value}番手` : `近走の脚質：${current.horse.style}`}</p>
               <p className="mt-2 break-words text-xs leading-5 text-slate-400">近走通過順（新しい順）：{horseSequences(current.horse).map((s) => s.join("-")).join(" / ") || "未取得"}</p>
               {current.estimate && <p className="mt-1 text-xs text-slate-400">この地点の履歴 {current.estimate.samples}走。履歴が少ない馬は参考度が下がります。</p>}
             </> : <><p className="font-semibold">位置取りの根拠を見る</p><p className="mt-2 text-sm leading-6 text-slate-400">馬番をタップすると、推定番手と近走の通過順を確認できます。</p></>}
@@ -97,17 +98,30 @@ export function RaceFormationMap({ horses, title, course, raceId, pace }: {
           <details className="rounded-xl border border-slate-700 p-4 text-sm">
             <summary className="cursor-pointer font-semibold">予測の見方・検証結果</summary>
             <div className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
+              {nar ? <>
+                <p>地方の位置取りは近5走の当該地点を新しい順に重み付けした暫定推定です。中央の学習済みコーナーモデルや検証誤差は流用していません。</p>
+                <p>範囲は過去の通過順位の最小〜最大で、予測区間・的中確率ではありません。内外の進路、馬身差、想定タイムは予測対象外です。</p>
+                <p>現段階は序盤・3角・4角のみ。1・2角は地方のコース別通過地点を検証してから追加します。ばんえいに平地の隊列予測は適用しません。</p>
+              </> : <>
               <p>AIは2019〜2024年の過去データで学習した位置取りモデルです。近走通過順・頭数・距離・芝ダート・枠から地点別に推定します。当日オッズ・人気・今回の着順結果は使いません。</p>
               <p>2026年データの4角検証では平均誤差 {CORNER_AUDIT_MAE.toFixed(2)}番手。目安幅は2025年の検証誤差から算出したもので、各馬に同じ確率を保証するものではありません。</p>
               <p>序盤は最初の記録地点の予測で、発馬直後ではありません。1・2角を通らないコースでは該当ボタンを出しません。直線・障害・未登録コースではAIコーナー予測を保留します。</p>
               <p>内外の進路・馬身差・想定タイムはまだ予測対象外です。前走表示は各馬の別レースの通過順位を比較する参考図です。</p>
               <p>総合評価・1〜3着適性・買い目は変更していません。{legacy ? "一部は既存保存データの通過順を使用しています。" : ""}</p>
               <p>モデル：{CORNER_MODEL_VERSION} / 検証期間：2026年1月〜9月13日</p>
+              </>}
             </div>
           </details>
-          {!eligible && <p className="text-xs leading-5 text-amber-200">このコースまたは日付はAI予測対象外のため、脚質を表示しています。</p>}
+          {!eligible && <p className="text-xs leading-5 text-amber-200">{banei ? "ばんえいにコーナーはないため、平地の隊列図は表示しません。" : "このコースまたは日付はAI予測対象外のため、脚質を表示しています。"}</p>}
         </div>
       </div>
     </section>
   );
+}
+
+function narCorner(horse:MapHorse,stage:number,field:number) {
+  const observations=horseSequences(horse).flatMap((sequence,i)=>{const position=stagePosition(sequence,stage);return position===null?[]:[{position,weight:5-i}];});
+  if(!observations.length)return null;
+  const position=Math.max(1,Math.min(field,observations.reduce((s,v)=>s+v.position*v.weight,0)/observations.reduce((s,v)=>s+v.weight,0)));
+  return {position,samples:observations.length,low:Math.min(...observations.map(v=>v.position)),high:Math.max(...observations.map(v=>v.position))};
 }

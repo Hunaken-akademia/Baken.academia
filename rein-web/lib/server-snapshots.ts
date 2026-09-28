@@ -20,11 +20,11 @@ export async function durableMetas(date: string) {
   const { snapshots } = await serverData<{ snapshots: Array<Omit<StoredSnapshot,"payload"> & { race_id: string }> }>("metas", { date });
   return new Map(snapshots.map(s => [`${s.slot}:${s.race_id}`, { generatedAt: s.generated_at, startsAt: s.starts_at ? Date.parse(s.starts_at) : null, final: s.is_final, preview: s.slot === "preview" } satisfies SnapshotMeta]));
 }
-export async function raceHistory(raceId: string) {
-  const key = `race:${raceId}`;
+export async function raceHistory(raceId: string, league: "jra" | "nar" = "jra") {
+  const key = `${league}:race:${raceId}`;
   const cached = await historyCache.get(key).catch(() => null);
   if (cached && typeof cached === "object") return cached as SharedJournal;
-  const result = await serverData<SharedJournal>("history", { raceId });
+  const result = await serverData<SharedJournal>("history", { raceId, league });
   await historyCache.set(key, result, { ttl: 60 }).catch(() => {});
   return result;
 }

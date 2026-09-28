@@ -56,7 +56,7 @@ export default async function ReinHome() {
           <Link href="/nar" className="group rounded-3xl border border-slate-700 bg-[#0c192a] p-6 transition hover:-translate-y-0.5 hover:border-amber-400/60">
             <p className="text-xs font-semibold tracking-widest text-amber-300">NAR</p>
             <h2 className="mt-2 text-2xl font-black">地方競馬</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-400">地方競馬向けのREIN予想・着順適性・買い目を利用します。</p>
+            <p className="mt-3 text-sm leading-6 text-slate-400">地方専用の暫定評価・着順適性・隊列・保存履歴を確認できます。取得済みデータで先行公開中です。</p>
             <p className="mt-6 font-semibold text-amber-300">地方競馬を開く →</p>
           </Link>
         </div>

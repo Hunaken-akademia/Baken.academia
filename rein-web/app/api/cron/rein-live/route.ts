@@ -21,11 +21,11 @@ const FUNCTION_BUDGET_MS = 285_000;
 // (6 runs an hour x 12 races).
 const MAX_BACKLOG_JOBS = 12;
 
-async function loadRaces(origin: string, secret: string, day: "today" | "tomorrow") {
-  const response = await fetch(`${origin}/api/races${day === "tomorrow" ? "?day=tomorrow" : ""}`, {
+async function loadRaces(origin: string, secret: string, day: "today" | "tomorrow", league: "jra" | "nar" = "jra") {
+  const response = await fetch(`${origin}${league === "nar" ? "/api/nar" : "/api"}/races${day === "tomorrow" ? "?day=tomorrow" : ""}`, {
     cache: "no-store",
     headers: { authorization: `Bearer ${secret}` },
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(league === "nar" ? 100_000 : 30_000),
   });
   if (!response.ok) throw new Error(`schedule:${day}:${response.status}`);
   const schedule = (await response.json()) as { venues?: RaceVenue[] };
@@ -46,19 +46,20 @@ export async function GET(request: NextRequest) {
     : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : request.nextUrl.origin;
 
   const requested = request.nextUrl.searchParams.get("date");
+  const league = request.nextUrl.searchParams.get("area") === "nar" ? "nar" : "jra";
   const targetDate = requested ?? dateJst();
   if (![dateJst(), dateJst(-1)].includes(targetDate)) return NextResponse.json({error:"Invalid capture date"},{status:400});
-  const lockKey = `cron:${targetDate}`;
+  const lockKey = `cron:${league}:${targetDate}`;
   const lease = await claimCapture(lockKey,300).catch(() => null);
   if (!lease?.acquired || !lease.token) return NextResponse.json({ok:true,deferred:true,reason:"capture-in-progress"},{status:202});
   try {
-    const stored = targetDate !== dateJst() ? await serverData<{schedule:{payload:{venues:RaceVenue[]}}|null}>("schedule",{date:targetDate}) : null;
+    const stored = targetDate !== dateJst() ? await serverData<{schedule:{payload:{venues:RaceVenue[]}}|null}>("schedule",{date:targetDate,league}) : null;
     if (targetDate !== dateJst() && !stored?.schedule) return NextResponse.json({ok:false,error:"No saved schedule for requested date"},{status:404});
-    const todaysRaces = stored ? (stored.schedule?.payload.venues ?? []).flatMap(v=>(v.races??[]).map(r=>({...r,preview:false}))) : await loadRaces(origin, secret, "today");
+    const todaysRaces = stored ? (stored.schedule?.payload.venues ?? []).flatMap(v=>(v.races??[]).map(r=>({...r,preview:false}))) : await loadRaces(origin, secret, "today", league);
     // Tomorrow's card is optional work; a failure there must not stop today's refresh.
     const today = todaysRaces.map(r=>({...r,date:targetDate}));
     const localHour = new Date(Date.now()+9*3600_000).getUTCHours();
-    const tomorrow = localHour >= 16 && !requested ? await loadRaces(origin, secret, "tomorrow").catch((error) => {
+    const tomorrow = localHour >= 16 && !requested ? await loadRaces(origin, secret, "tomorrow", league).catch((error) => {
       console.error("REIN precompute: tomorrow schedule unavailable", error instanceof Error ? error.message : "unknown");
       return [] as PrecomputeRace[];
     }) : [];
@@ -69,12 +70,12 @@ export async function GET(request: NextRequest) {
     const near = planned.filter((job) => job.reason === "near-start");
     const jobs = [...near, ...planned.filter((job) => job.reason !== "near-start").slice(0, MAX_BACKLOG_JOBS)];
 
-    const results = await mapWithConcurrency(jobs, 3, async (job) => {
+    const results = await mapWithConcurrency(jobs, league === "nar" ? 2 : 3, async (job) => {
       const remaining = START_BUDGET_MS - (Date.now() - startedAt);
       if (remaining <= 0) return { raceId: job.raceId, preview: job.preview, reason: job.reason, ok: false, complete: false, status: -1 };
       try {
         const response = await fetch(
-          `${origin}/api/analyze?raceId=${encodeURIComponent(job.raceId)}&refresh=1${job.preview ? "&preview=1" : ""}`,
+          `${origin}${league === "nar" ? "/api/nar" : "/api"}/analyze?raceId=${encodeURIComponent(job.raceId)}&refresh=1${job.preview ? "&preview=1" : ""}`,
           {
             cache: "no-store",
             headers: { authorization: `Bearer ${secret}` },
@@ -95,6 +96,7 @@ export async function GET(request: NextRequest) {
     });
 
     const summary = {
+      league,
       checkedAt: new Date().toISOString(),
       date: targetDate,
       planned: planned.length,

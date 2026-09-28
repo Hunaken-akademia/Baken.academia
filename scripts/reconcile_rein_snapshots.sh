@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 : "${CAPTURE_DATE:?CAPTURE_DATE is required}"
+capture_area="${CAPTURE_AREA:-jra}"
+[[ "${capture_area}" == "jra" || "${capture_area}" == "nar" ]]
 # Only yesterday/today have an active schedule in the live app. Older manual
 # recoveries still archive raw data, without generating retrospective forecasts.
 today="$(TZ=Asia/Tokyo date +%F)"
@@ -9,9 +11,9 @@ if [[ "${CAPTURE_DATE}" != "${today}" && "${CAPTURE_DATE}" != "${yesterday}" ]];
 for attempt in {1..8}; do
   oidc_token="$(curl --fail --silent --show-error --retry 3 -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=rein-live-capture-v1" | jq -er '.value')"
   response_file="$(mktemp)"
-  status="$(curl --silent --show-error --max-time 300 --retry 2 --output "${response_file}" --write-out '%{http_code}' -H "Authorization: Bearer ${oidc_token}" "https://rein-web.vercel.app/api/cron/rein-live?date=${CAPTURE_DATE}")"
+  status="$(curl --silent --show-error --max-time 300 --retry 2 --output "${response_file}" --write-out '%{http_code}' -H "Authorization: Bearer ${oidc_token}" "https://rein-web.vercel.app/api/cron/rein-live?date=${CAPTURE_DATE}&area=${capture_area}")"
   # Logs contain counts only, never signed URLs, cookies or identity tokens.
-  jq '{ok,date,planned,attempted,updated,held,incomplete,failed,deferred,remaining,error}' "${response_file}"
+  jq '{ok,league,date,planned,attempted,updated,held,incomplete,failed,deferred,remaining,error}' "${response_file}"
   if [[ "${status}" == "404" ]]; then
     echo '::warning::No saved schedule for this date; raw capture remains independent.'
     rm -f "${response_file}"; exit 0
@@ -23,6 +25,11 @@ for attempt in {1..8}; do
     rm -f "${response_file}"; sleep 30; continue
   fi
   [[ "${status}" == "200" ]]
+  # During rollout the old endpoint may ignore area=nar. Never mistake JRA work
+  # for successful NAR warming; wait for the deployed league-aware endpoint.
+  if [[ "$(jq -r '.league // ""' "${response_file}")" != "${capture_area}" ]]; then
+    rm -f "${response_file}"; sleep 30; continue
+  fi
   remaining="$(jq -er '.remaining' "${response_file}")"
   updated="$(jq -er '.updated' "${response_file}")"
   ok="$(jq -r '.ok' "${response_file}")"
