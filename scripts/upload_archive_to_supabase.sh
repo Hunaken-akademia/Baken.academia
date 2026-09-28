@@ -20,7 +20,7 @@ refresh_oidc_token() {
     return
   fi
 
-  token_response="$(curl --fail-with-body --silent --show-error --retry 3     -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}"     "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${OIDC_AUDIENCE}")"
+  token_response="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 30     -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}"     "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${OIDC_AUDIENCE}")"
   OIDC_TOKEN="$(jq -er '.value' <<<"${token_response}")"
   OIDC_REFRESHED_AT="${now}"
 }
@@ -37,7 +37,7 @@ broker_call() {
     payload="$(jq -nc --arg action "${action}" '{action: $action}')"
   fi
 
-  BROKER_RESPONSE="$(curl --fail-with-body --silent --show-error --retry 3     -X POST "${SUPABASE_BROKER_URL}"     -H "Authorization: Bearer ${OIDC_TOKEN}"     -H "Content-Type: application/json"     --data "${payload}")"
+  BROKER_RESPONSE="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 30     -X POST "${SUPABASE_BROKER_URL}"     -H "Authorization: Bearer ${OIDC_TOKEN}"     -H "Content-Type: application/json"     --data "${payload}")"
 }
 
 upload_signed() {
@@ -48,7 +48,7 @@ upload_signed() {
 
   broker_call "sign-upload" "${path}"
   signed_url="$(jq -er '.signed_url' <<<"${BROKER_RESPONSE}")"
-  curl --fail-with-body --silent --show-error --retry 3     -X PUT "${signed_url}"     -H "Content-Type: ${content_type}"     -H "Cache-Control: max-age=31536000"     -H "x-upsert: true"     --data-binary "@${file}" >/dev/null
+  curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 30     -X PUT "${signed_url}"     -H "Content-Type: ${content_type}"     -H "Cache-Control: max-age=31536000"     -H "x-upsert: true"     --data-binary "@${file}" >/dev/null
 }
 
 download_signed() {
@@ -58,7 +58,7 @@ download_signed() {
 
   broker_call "sign-download" "${path}"
   signed_url="$(jq -er '.signed_url' <<<"${BROKER_RESPONSE}")"
-  curl --fail-with-body --silent --show-error --retry 3     "${signed_url}" --output "${output}"
+  curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 30     "${signed_url}" --output "${output}"
 }
 
 test -s "${ARCHIVE_FILE}"
