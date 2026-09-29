@@ -696,7 +696,7 @@ function courseGuide(race: Analysis["race"]) {
     venue: race.title.split(" ")[0],
     venueTrait: race.course.startsWith("ばんえい") ? "ばんえいは平地競走とは別の競技条件です。平地のペース・コーナー補正は使用しません。" : "地方の競馬場別履歴を使用。場コードで区別し、中央のコース補正は適用しません。",
     distanceTrait: `今回の距離：${race.course}。取得済みの同距離帯の履歴を比較します。`,
-    layout: `馬場：${race.condition || "未発表"}。条件別の細かな重み最適化は追加検証後に更新します。`,
+    layout: `馬場：${race.condition || "未発表"}。`,
   };
   const venue = Object.keys(venueTraits).find((name) => race.title.includes(name));
   const distance = +(race.course.match(/(\d{3,4})m/)?.[1] || 0);
@@ -766,14 +766,14 @@ function RaceConfidenceCard({ confidence, nar = false, reference }: { confidence
               <p className="mt-1 font-bold">
                 指数占有率 {confidence.sharePercent.toFixed(1)}%
               </p>
-              <p className="mt-1 text-sm text-slate-300">{confidence.detail}</p>
-              <p className="mt-2 text-[11px] leading-5 text-slate-500">{confidence.note}</p>
+              <p className="mt-1 text-sm text-slate-300">{"REINの参考評価です。"}</p>
+              <p className="mt-2 text-[11px] leading-5 text-slate-500">{"的中や利益を保証するものではありません。"}</p>
             </>
           ) : (
             <>
-              <p className="mt-1 font-bold text-slate-300">{nar ? reference ? reference.confidenceStatus==="adopted"?"算出対象外・評価不足":"検証済み・改善基準未達" : "この保存予想は検証反映前" : "算出待ち"}</p>
+              <p className="mt-1 font-bold text-slate-300">{nar ? reference ? reference.confidenceStatus==="adopted"?"算出対象外・評価不足":"評価保留" : "この保存予想は検証反映前" : "算出待ち"}</p>
               <p className="mt-1 text-sm text-slate-500">
-                {nar ? reference ? "地方独自の監査結果に基づき表示。5頭以下・評価不足、または区分ごとの実績が安定しない場合は判定しません。" : "過去の発走前予想は書き換えません。新しい検証は反映後の保存予想から適用します。" : "人気・オッズと市場差評価がそろうと表示します。"}
+                {nar ? reference ? "参考情報が不足している場合は判定を保留します。" : "過去の発走前予想は書き換えません。新しい検証は反映後の保存予想から適用します。" : "人気・オッズと市場差評価がそろうと表示します。"}
               </p>
             </>
           )}
@@ -990,10 +990,10 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
               <div>
                 <p className="text-xs text-slate-400">{data.race.league==="nar"?"人気馬の慎重評価（参考）":"危険人気馬"}</p>
                 <p className="font-bold">
-                  {data.race.league === "nar" ? !data.narReference ? "この保存予想は検証反映前" : data.narReference.danger.status==="market-missing" ? "全頭の人気待ち" : data.narReference.danger.status==="held" ? "評価保留" : data.narReference.danger.status!=="adopted" ? "検証済み・採用見送り" : data.narReference.danger.numbers.length ? data.narReference.danger.numbers.map(n=>`${n} ${data.horses.find(h=>h.number===n)?.name??""}`).join("・") : "該当なし" : !rankingReady ? "評価保留" : danger ? `${danger.number} ${danger.name}` : "該当なし"}
+                  {data.race.league === "nar" ? !data.narReference ? "この保存予想は検証反映前" : data.narReference.danger.status==="market-missing" ? "全頭の人気待ち" : data.narReference.danger.status==="held" ? "評価保留" : data.narReference.danger.status!=="adopted" ? "該当なし" : data.narReference.danger.numbers.length ? data.narReference.danger.numbers.map(n=>`${n} ${data.horses.find(h=>h.number===n)?.name??""}`).join("・") : "該当なし" : !rankingReady ? "評価保留" : danger ? `${danger.number} ${danger.name}` : "該当なし"}
                 </p>
                 <p className="mt-1 text-sm text-slate-400">
-                  {data.race.league === "nar" ? data.narReference?.danger.detail??"中央の判定は流用せず、発走前の保存予想を維持しています。" : !rankingReady ? "総合評価の取得後に表示します" : danger?.cautions.join("・") || "人気と評価が一致"}
+                  {!rankingReady ? "評価の取得後に表示します" : "REINの参考評価です。"}
                 </p>
               </div>
             </CardContent>
@@ -1019,20 +1019,11 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           </div>
           <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
             <p className="text-xs font-semibold text-violet-300">今回の条件</p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="courseGoing")?.detail??data.jraReference?.conditions.find(c=>c.kind==="courseGoing")?.detail??guide.layout}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{`馬場：${data.race.condition || "未発表"}` }</p>
           </div>
         </div>
-        {data.narReference && <details className="mt-4 rounded-xl border border-slate-700 p-3 text-sm">
-          <summary className="cursor-pointer font-semibold text-cyan-200">地方の補正検証・採用／見送り結果</summary>
-          <p className="mt-2 text-xs text-slate-400">監査期間：{data.narReference.auditPeriod}。選択期間は2025年。</p>
-          {data.narReference.ranking.map(r=><p key={r.role} className="mt-2 leading-6 text-slate-300">{r.role}着適性：{r.detail}</p>)}
-          <p className="mt-3 text-xs leading-5 text-slate-500">{data.narReference.note}</p>
-        </details>}
-        {data.jraReference && <details className="mt-4 rounded-xl border border-slate-700 p-3 text-sm">
-          <summary className="cursor-pointer font-semibold text-cyan-200">JRAの条件検証・採用／見送り結果</summary>
-          <p className="mt-2 leading-6 text-slate-300">{data.jraReference.validation.summary}</p>
-          <p className="mt-2 text-xs leading-5 text-slate-500">{data.jraReference.validation.note}</p>
-        </details>}
+
+
       </section>
       {data.jraReference?.graded && <section className="mb-5 min-w-0 rounded-2xl border border-amber-400/25 bg-gradient-to-br from-[#151d2b] to-[#0c192a] p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1087,11 +1078,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
         </TabsList>
         <TabsContent value="ranking">
           <p className="mb-3 text-xs leading-5 text-slate-500">
-            {data.race.league === "nar" && rankingReady
-              ? "総合順位は1〜3着適性のレース内順位を均等に合成した評価です。ptはレース内の比較用で、勝率ではありません。当日人気・オッズは総合点に加えていません。"
-              : rankingReady
-              ? "順位は総合順位（上位4頭＝市場差式、5位以下＝従来の総合評価順）。ptは従来方式の総合評価点で、上限98のため上位馬は同点になることがあり、上位4頭の並びとは一致しません。"
-              : "総合順位は保留中のため、馬番順で表示しています。"}
+            {rankingReady ? "順位と評価点はレース内の比較用です。評価点は勝率ではありません。" : "総合順位は保留中のため、馬番順で表示しています。"}
           </p>
           <div className="overflow-hidden rounded-2xl border border-slate-700 bg-[#0c192a]">
             {listHorses.map((horse, index) => {
@@ -1382,7 +1369,7 @@ function RaceShapeReference({ data }: { data: Analysis }) {
           <h2 className="text-lg font-bold text-white">人気帯とREINの評価差</h2>
           <Badge className="bg-amber-300/10 text-amber-200">1着評価・参考</Badge>
         </div>
-        <p className="mt-2 text-xs leading-5 text-slate-400">人気帯ごとに、REINの1着モデル評価の全頭内シェアと、単勝オッズの逆数から求めた市場シェアを比較します。</p>
+        <p className="mt-2 text-xs leading-5 text-slate-400">人気帯ごとの市場評価とREIN評価を比較します。</p>
         {marketReady && modelTotal > 0 && marketTotal > 0 ? (
           <div className="mt-4 space-y-3">
             {bands.filter((band) => band.horses.length).map((band) => {
@@ -1453,7 +1440,7 @@ function ConditionReferenceRankings({ data }: { data: Analysis }) {
         <Badge className="bg-violet-300/10 text-violet-200">参考情報</Badge>
       </div>
       <p className="mb-4 text-xs leading-5 text-slate-400">
-        {data.race.title} ・ {data.race.course} ・ 馬場 {data.race.condition}。{data.race.league === "nar" ? "履歴の3着内率（少数補正あり）を出走馬平均との差で比較。数値はポイント差で、追加の得点補正ではありません。" : "項目別の履歴評価と今回の展開補正を個別に表示します。総合順位・着順適性・買い目には反映しません。"}
+        {data.race.title} ・ {data.race.course} ・ 馬場 {data.race.condition}。{data.race.league === "nar" ? "過去成績の参考評価です。" : "項目別の履歴評価と今回の展開補正を個別に表示します。総合順位・着順適性・買い目には反映しません。"}
       </p>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {historicalRows.map((category) => (
@@ -2156,7 +2143,7 @@ function MarketReinPanel({ horse, horses }: { horse: Horse; horses: Horse[] }) {
           </div>
         })}
       </div>
-      <p className="mt-2 text-[11px] leading-5 text-slate-500">矢印は今回のモデル評価への影響を示します（↑押し上げ・↓押し下げ）。値の大小ではありません。各着順適性の順位を出したモデルと同じモデルから算出しています。</p>
+      <p className="mt-2 text-[11px] leading-5 text-slate-500">矢印は今回のモデル評価への影響を示します（↑押し上げ・↓押し下げ）。値の大小ではありません。</p>
       <div className="mt-3 rounded-lg bg-black/15 px-3 py-2">
         <p className="text-xs font-semibold text-slate-300">履歴の参考材料</p>
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
@@ -2348,7 +2335,7 @@ function HistoryFactorCard({ item, relativeReference = false }: { item: HistoryF
         <div><p className="text-[10px] text-slate-500">平均着順</p><p className="mt-0.5 text-sm font-bold">{item.averageFinish ?? "－"}着</p></div>
       </div>
       <div className="mt-3 flex items-center justify-between border-t border-slate-800 pt-2 text-xs">
-        <span className="text-slate-500">{relativeReference ? "平滑化3着内率の出走馬平均との差" : "総合点への補正"}</span>
+        <span className="text-slate-500">{relativeReference ? "履歴の参考評価" : "参考評価"}</span>
         <span className={item.impact >= 0 ? "font-bold text-cyan-300" : "font-bold text-rose-300"}>{signed}{relativeReference ? "pt" : ""}</span>
       </div>
     </div>
@@ -2461,7 +2448,7 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
   if (!picks || picks.status !== "ready") {
     return (
       <p className="mt-5 rounded-xl border border-dashed border-slate-600 p-3 text-sm text-slate-400">
-        {picks?.reason ?? "印の選定を保留しています"}
+        {"評価を保留しています"}
       </p>
     );
   }
@@ -2524,8 +2511,7 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
         })}
       </div>
       <p className="mt-2 text-[11px] leading-5 text-slate-500">
-        本命・対抗は1着適性ランキングの1位・2位。{data.race.league==="nar" ? data.narReference?.longshot.rule??"地方の穴候補は検証反映後の保存予想から適用します。" : "穴候補は1着適性3〜6位のうち、4番人気以下で1着評価が市場評価を上回る馬です。"}
-        {picks.longshotReason ? `（${picks.longshotReason}）` : ""}
+        本命・対抗・穴候補はREINの参考評価です。
       </p>
       <section className="mt-4 rounded-2xl border border-rose-400/25 bg-rose-400/[.04] p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2578,7 +2564,7 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
                     <p className="text-xs font-semibold text-slate-300">1着適性モデルが参照した要因</p>
                     {reasonViews(horse.roleReasons?.first, 3).map((reason, i) => <p key={i} className={`mt-1 break-words text-xs leading-5 ${reason.direction === "up" ? "text-cyan-200" : "text-rose-300"}`}>{reason.direction === "up" ? "↑" : "↓"} {reason.label}</p>)}
                     {!horse.roleReasons?.first?.length && <p className="mt-1 text-xs text-slate-500">要因データは未取得です。</p>}
-                    <p className="mt-2 text-[11px] leading-5 text-slate-500">{data.race.league==="nar"?"地方の履歴要因は同一レース内の参考比較です。穴候補の条件は1着適性順位と人気順位の差で、期待値ではありません。":"矢印はモデル評価への影響です。穴候補の選定条件は上記の適性順位と市場差です。"}</p>
+                    <p className="mt-2 text-[11px] leading-5 text-slate-500">参考情報としてご確認ください。</p>
                   </div>
                 </button>
               );
@@ -2592,7 +2578,7 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
           </p>
         )}
         <p className="mt-3 text-[11px] leading-5 text-slate-500">
-          {data.race.league==="nar" ? data.narReference ? `${data.narReference.longshot.rule} ${data.narReference.longshot.detail}` : "この保存予想は地方の条件別検証反映前です。" : "選定条件：4番人気以下、1着適性3〜6位、REIN市場モデル評価が市場評価を上回る馬。"}候補一覧は評価確認用で、買い目や総合順位は変更しません。
+          候補一覧は参考評価です。的中や利益を保証するものではありません。
         </p>
       </section>
     </>
