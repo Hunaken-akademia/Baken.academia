@@ -10,6 +10,7 @@ on:
       - scripts/download_jra_normalized_from_supabase.sh
       - scripts/jra_roi_analysis.py
       - scripts/jra_venue_feature_analysis.py
+      - scripts/jra_condition_reference.py
 
 permissions:
   contents: read
@@ -40,7 +41,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Validate analysis scripts
-        run: python -m py_compile scripts/jra_roi_analysis.py scripts/jra_venue_feature_analysis.py
+        run: python -m py_compile scripts/jra_roi_analysis.py scripts/jra_venue_feature_analysis.py scripts/jra_condition_reference.py
       - name: Download durable JRA history from Supabase
         run: |
           mkdir -p .dataset
@@ -70,7 +71,11 @@ jobs:
         run: python scripts/jra_roi_analysis.py
       - name: Venue and candidate-feature analysis
         if: matrix.lane == 'venue'
-        run: python scripts/jra_venue_feature_analysis.py
+        run: |
+          python scripts/jra_venue_feature_analysis.py
+          python scripts/jra_condition_reference.py \
+            --input data/raw/jra/races-2019-2026.parquet \
+            --output reports/jra-venue-features-v2/jra-condition-reference.json
       - name: Upload ROI report
         if: matrix.lane == 'roi'
         uses: actions/upload-artifact@v4
