@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       if (remaining <= 0) return { raceId: job.raceId, preview: job.preview, reason: job.reason, ok: false, complete: false, status: -1 };
       try {
         const response = await fetch(
-          `${origin}${league === "nar" ? "/api/nar" : "/api"}/analyze?raceId=${encodeURIComponent(job.raceId)}&refresh=1${job.preview ? "&preview=1" : ""}`,
+          `${origin}${league === "nar" ? "/api/nar" : "/api"}/analyze?raceId=${encodeURIComponent(job.raceId)}&refresh=1${job.preview ? "&preview=1" : ""}${expectedRelease ? `&release=${encodeURIComponent(expectedRelease)}` : ""}`,
           {
             cache: "no-store",
             headers: { authorization: `Bearer ${secret}` },

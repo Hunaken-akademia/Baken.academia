@@ -28,7 +28,7 @@ export async function GET(request:NextRequest) {
     const {schedule}=await serverData<{schedule:{payload:{venues:Array<{races:Array<{raceId:string}>}>}}|null}>("schedule",{date:key.date,league:"nar"});
     if(!schedule?.payload.venues.some(v=>v.races.some(r=>r.raceId===id)))return NextResponse.json({error:"対象レースの開催情報は未取得です。開催一覧を更新してください。"},{status:404,headers});
     if(!internal){waitUntil(refreshNarRace(id,preview).catch(()=>null));return NextResponse.json({status:"preparing"},{status:202,headers});}
-    const body=await refreshNarRace(id,preview);
+    const body=await refreshNarRace(id,preview,request.nextUrl.searchParams.get("release")??undefined);
     if(!body)return NextResponse.json({status:"preparing"},{status:202,headers});
     return NextResponse.json(body,{headers:{...headers,"x-rein-persisted":"1","x-rein-fallback":body.capture.complete?"0":"1"}});
   }catch(e){console.error("NAR analysis",e instanceof Error?e.message:"unknown");return NextResponse.json({error:"地方レースの保存データを取得できませんでした。"},{status:503,headers});}
