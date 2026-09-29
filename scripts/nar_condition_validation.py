@@ -205,9 +205,10 @@ def run(input_file, output_dir):
         baseline = predict(base, features)
         base_selection = audit(data.loc[select], baseline[select], target)
         base_audit = audit(data.loc[test], baseline[test], target)
-        candidates, score_cache = {}, {}
+        candidates, score_cache, tested_keys = {}, {}, {}
         for kind in ("course", "courseDistance", "courseGoing"):
             models = local_models(data, features, y, train, kind, base)
+            tested_keys[kind] = set(models)
             scores = conditioned_predict(data, features, base, models, kind)
             candidates[kind] = {"groups": len(models), "selection": audit(data.loc[select], scores[select], target),
                                 "audit": audit(data.loc[test], scores[test], target)}
@@ -236,6 +237,8 @@ def run(input_file, output_dir):
             all_mask = np.ones(len(data), dtype=bool)
             fitted = fit(features, y)
             models = local_models(data, features, y, all_mask, best, fitted)
+            # Refit must not activate a newly large cell absent from the audit.
+            models = {key: model for key, model in models.items() if key in tested_keys[best]}
             roles[str(target)] = {"kind": best, "models": {k: serial(v) for k, v in models.items()}}
             # Publish the matching global fallback rather than silently mixing fits.
             report["live_model"]["roles"][str(target)] = {"mode": "hybrid", **serial(fitted)}

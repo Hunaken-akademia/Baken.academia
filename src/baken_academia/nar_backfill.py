@@ -172,6 +172,12 @@ def parse_result_page(payload: bytes, source_url: str) -> list[dict[str, object]
     weather_match = re.search(r"天候[：:]\s*([^\s]+)", conditions)
     going_match = re.search(r"馬場[：:]\s*([^\s]+)", conditions)
     payout_json = json.dumps(_payouts(doc), ensure_ascii=False)
+    passages = []
+    for passage in doc.xpath(f"//section[{_has_class('cornerPassTable')}]//tr"):
+        cells = passage.xpath("./td")
+        if len(cells) == 2:
+            passages.append({"label": _text(cells[0]), "order": _text(cells[1])})
+    passage_json = json.dumps(passages, ensure_ascii=False)
     rows = []
     table = _first(doc, f"//section[{_has_class('gradeTable')}]/table")
     if table is None:
@@ -213,6 +219,9 @@ def parse_result_page(payload: bytes, source_url: str) -> list[dict[str, object]
             "margin": _text(_cell(runner, "l")) or None,
             "last_3f": _float(_text(_cell(runner, "m"))),
             "corner_positions": _text(_cell(runner, "n")) or None,
+            # Today's per-horse cells can be blank even after the whole-field
+            # table is published. Preserve the provider's grouped order too.
+            "corner_passages": passage_json,
             "popularity": _int(_text(_cell(runner, "o"))),
             "win_odds": _float(_text(_cell(runner, "p"))),
             "payouts": payout_json, "source": "NAR地方競馬情報サイト", "source_url": source_url,

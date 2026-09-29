@@ -3,14 +3,19 @@ import { gunzipSync } from "node:zlib";
 import { serverData } from "./server-snapshots";
 import type { HistoryBundle } from "./history";
 import type { NarHorse } from "./nar-source";
+import { narConditionKey, type NarConditionValidation } from "./nar-validation";
 
-export type NarModel = {status:string;version:string;features:string[];roles:Record<string,{mode:"absolute"|"relative"|"hybrid";intercept:number;coef:number[]}>;comparison:Record<string,Record<string,{audit2026:Record<string,{races:number;hits:number;rate:number|null}>}>>;note:string;release?:{id:string;validatedRanking:boolean;selectionYear:number;auditThrough:string}};
+export type NarModel = {status:string;version:string;features:string[];roles:Record<string,{mode:"absolute"|"relative"|"hybrid";intercept:number;coef:number[]}>;conditionalRoles?:Record<string,{kind:"course"|"courseDistance"|"courseGoing";models:Record<string,{intercept:number;coef:number[]}>}>;conditionValidation?:NarConditionValidation;comparison:Record<string,Record<string,{audit2026:Record<string,{races:number;hits:number;rate:number|null}>}>>;note:string;release?:{id:string;validatedRanking:boolean;selectionYear:number;auditThrough:string}};
 export type NarRuntime = {profile:HistoryBundle;model:NarModel;sha:string;updatedAt:string};
 export function validateNarModel(model:NarModel) {
   if(model?.version!=="nar-history-ranker-v1" || model.features?.length!==28) throw new Error("地方モデルの形式を確認できません");
   for(const target of ["1","2","3"]) {
     const role=model.roles?.[target];
     if(!role || !["absolute","relative","hybrid"].includes(role.mode) || !Number.isFinite(role.intercept) || role.coef?.length!==(role.mode==="hybrid"?56:28) || !role.coef.every(Number.isFinite)) throw new Error("地方モデルの係数を確認できません");
+  }
+  for(const [target, conditional] of Object.entries(model.conditionalRoles??{})) {
+    if(!["1","2","3"].includes(target)||model.roles[target].mode!=="hybrid"||!["course","courseDistance","courseGoing"].includes(conditional.kind))throw new Error("地方条件別モデルの形式を確認できません");
+    for(const local of Object.values(conditional.models))if(!Number.isFinite(local.intercept)||local.coef?.length!==56||!local.coef.every(Number.isFinite))throw new Error("地方条件別モデルの係数を確認できません");
   }
 }
 let cached:{until:number;value:Promise<NarRuntime>}|undefined;
@@ -46,7 +51,7 @@ export function narHistoryInputs(profile:HistoryBundle,horse:NarHorse,context:{r
   });
   return {values,factors,samples:rates[0]?.n??0};
 }
-export function narRank(runtime:NarRuntime,horses:NarHorse[],context:{racecourse:string;surface:string;distanceM:number;date:string}) {
+export function narRank(runtime:NarRuntime,horses:NarHorse[],context:{racecourse:string;surface:string;distanceM:number;date:string;going?:string}) {
   // A rolling aggregate must never be used to reconstruct a date inside its own
   // training period. Historical reviews use authentic stored prestart snapshots.
   if(runtime.profile.meta.dateTo>=context.date) throw new Error("この日付は学習期間内のため、予測の再構築は行いません");
@@ -55,7 +60,10 @@ export function narRank(runtime:NarRuntime,horses:NarHorse[],context:{racecourse
   const means=Array.from({length:width},(_,j)=>rows.reduce((s,r)=>s+r.values[j],0)/n);
   const stds=means.map((m,j)=>Math.max(.01,Math.sqrt(rows.reduce((s,r)=>s+(r.values[j]-m)**2,0)/Math.max(n-1,1))));
   const scores=[1,2,3].map(target=>{
-    const model=runtime.model.roles[String(target)];
+    const global=runtime.model.roles[String(target)];
+    const conditional=runtime.model.conditionalRoles?.[String(target)];
+    const local=conditional?.models[narConditionKey(context,conditional.kind)];
+    const model=local?{mode:"hybrid" as const,...local}:global;
     return rows.map(row=>{
       const relative=row.values.map((v,j)=>(v-means[j])/stds[j]);
       const features=model.mode==="absolute"?row.values:model.mode==="relative"?relative:[...row.values,...relative];

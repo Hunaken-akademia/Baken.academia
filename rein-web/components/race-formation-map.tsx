@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CORNER_AUDIT_MAE, CORNER_MODEL_VERSION, courseStages, horseSequences, predictCorner, stagePosition, type MapHorse } from "@/lib/corner-reference";
+import narCornerAudit from "@/lib/nar-corner-audit.json";
 
 const frameColors = ["#94a3b8", "#f8fafc", "#171717", "#dc433c", "#3778dc", "#f4d641", "#329249", "#ec9a30", "#d94c90"];
 const styleOrder: Record<string, number> = { "逃げ": 1, "先行": 2, "好位": 3, "差し": 4, "追込": 5 };
@@ -34,6 +35,7 @@ export function RaceFormationMap({ horses, title, course, raceId, pace, league =
   const visible = projected.filter((p) => p.value !== null).sort((a,b) => a.value! - b.value! || a.horse.number-b.horse.number);
   const unknown = projected.filter((p) => p.value === null);
   const current = projected.find((p) => p.horse.number === selected);
+  const localAudit = nar ? narCornerAudit.byVenue.find(row=>row.venue===title.split(" ")[0]&&row.stage===corner) : undefined;
   const tops = [...horses].filter((h) => (h.firstSuitability ?? 0) > 0).sort((a,b) => (b.firstSuitability ?? 0)-(a.firstSuitability ?? 0)).slice(0,3).map((h) => h.number);
   const modeLabel = options.find((item) => item.id === active)?.label;
   const legacy = horses.some((h) => h.mapPositions === undefined);
@@ -46,7 +48,7 @@ export function RaceFormationMap({ horses, title, course, raceId, pace, league =
           <h2 className="text-xl font-bold">隊列マップ</h2>
           <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-200">{ai ? nar ? "地方・暫定位置取り" : "AI位置取り予測 β" : past ? "前走の通過順位" : "近走の脚質傾向"}</span>
         </div>
-        <p className="mt-2 text-sm text-slate-300">ペース想定：{pace}</p>
+        <p className="mt-2 text-sm text-slate-300">{nar?"先行構成":"ペース想定"}：{pace}</p>
         <div role="group" aria-label="隊列マップの場面" className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4" data-testid="formation-controls">
           {options.map((option) => <button key={option.id} type="button" aria-pressed={active === option.id} onClick={() => { setMode(option.id); setSelected(null); }} className={`min-h-11 rounded-lg border px-2 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${active === option.id ? "border-cyan-300 bg-cyan-300 text-[#071220]" : "border-slate-700 bg-[#101f32] text-slate-300 hover:border-slate-500 hover:text-white"}`}>{option.label}</button>)}
         </div>
@@ -100,6 +102,8 @@ export function RaceFormationMap({ horses, title, course, raceId, pace, league =
             <div className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
               {nar ? <>
                 <p>地方の位置取りは近5走の当該地点を新しい順に重み付けした暫定推定です。中央の学習済みコーナーモデルや検証誤差は流用していません。</p>
+                <p>発走前保存データを{narCornerAudit.period}の実結果と照合。4角は{narCornerAudit.overall["4"].races}レース・{narCornerAudit.overall["4"].horses}頭で平均誤差{narCornerAudit.overall["4"].mae.toFixed(2)}番手（前走順位のみの場合{narCornerAudit.overall["4"].previousMae.toFixed(2)}番手）。2日間の限定検証で、補正を確定するには不十分です。</p>
+                {localAudit&&<p>この場・この地点：{localAudit.races}レース・{localAudit.horses}頭、平均誤差{localAudit.mae.toFixed(2)}番手。当日の全馬通過順が集団表記の馬は、順位を断定できないため照合対象外です。</p>}
                 <p>範囲は過去の通過順位の最小〜最大で、予測区間・的中確率ではありません。内外の進路、馬身差、想定タイムは予測対象外です。</p>
                 <p>現段階は序盤・3角・4角のみ。1・2角は地方のコース別通過地点を検証してから追加します。ばんえいに平地の隊列予測は適用しません。</p>
               </> : <>

@@ -1,0 +1,184 @@
+{
+  "version": "nar-prestart-corner-audit-v1",
+  "period": "2026-09-28–2026-09-29",
+  "status": "limited-forward-audit",
+  "note": "サーバーに発走前保存された近走通過順だけを使用。当日の個別通過順が空欄の場合は全馬通過順の単独馬のみ照合し、括弧内の集団は順位不確定のため除外。2日間の限定監査で、場別補正の確定・1〜2角・内外・馬身差・ペースの精度保証には使わない。",
+  "overall": {
+    "0": {
+      "races": 94,
+      "horses": 701,
+      "mae": 2.3713,
+      "previousMae": 2.5178,
+      "bias": 0.1434,
+      "within2": 0.5392
+    },
+    "3": {
+      "races": 93,
+      "horses": 694,
+      "mae": 2.4802,
+      "previousMae": 2.5303,
+      "bias": 0.206,
+      "within2": 0.5259
+    },
+    "4": {
+      "races": 93,
+      "horses": 721,
+      "mae": 2.5951,
+      "previousMae": 2.6949,
+      "bias": 0.2734,
+      "within2": 0.5118
+    }
+  },
+  "byVenue": [
+    {
+      "venue": "名古屋",
+      "stage": 0,
+      "races": 12,
+      "horses": 95,
+      "mae": 2.3776,
+      "previousMae": 2.5368,
+      "bias": 0.7574,
+      "within2": 0.5579
+    },
+    {
+      "venue": "名古屋",
+      "stage": 3,
+      "races": 11,
+      "horses": 89,
+      "mae": 2.7324,
+      "previousMae": 2.9101,
+      "bias": 1.2154,
+      "within2": 0.5169
+    },
+    {
+      "venue": "名古屋",
+      "stage": 4,
+      "races": 12,
+      "horses": 108,
+      "mae": 2.9629,
+      "previousMae": 3.463,
+      "bias": 1.2707,
+      "within2": 0.463
+    },
+    {
+      "venue": "水沢",
+      "stage": 0,
+      "races": 24,
+      "horses": 211,
+      "mae": 2.474,
+      "previousMae": 2.5592,
+      "bias": 0.4493,
+      "within2": 0.5118
+    },
+    {
+      "venue": "水沢",
+      "stage": 3,
+      "races": 24,
+      "horses": 218,
+      "mae": 2.5782,
+      "previousMae": 2.5,
+      "bias": 0.4221,
+      "within2": 0.4862
+    },
+    {
+      "venue": "水沢",
+      "stage": 4,
+      "races": 24,
+      "horses": 226,
+      "mae": 2.6792,
+      "previousMae": 2.531,
+      "bias": 0.4295,
+      "within2": 0.5
+    },
+    {
+      "venue": "船橋",
+      "stage": 0,
+      "races": 24,
+      "horses": 205,
+      "mae": 2.5682,
+      "previousMae": 2.8049,
+      "bias": -0.4945,
+      "within2": 0.4732
+    },
+    {
+      "venue": "船橋",
+      "stage": 3,
+      "races": 24,
+      "horses": 202,
+      "mae": 2.6353,
+      "previousMae": 2.8119,
+      "bias": -0.7567,
+      "within2": 0.4703
+    },
+    {
+      "venue": "船橋",
+      "stage": 4,
+      "races": 24,
+      "horses": 204,
+      "mae": 2.6982,
+      "previousMae": 2.9902,
+      "bias": -0.6613,
+      "within2": 0.4706
+    },
+    {
+      "venue": "金沢",
+      "stage": 0,
+      "races": 22,
+      "horses": 141,
+      "mae": 2.0921,
+      "previousMae": 2.2057,
+      "bias": 0.5506,
+      "within2": 0.5957
+    },
+    {
+      "venue": "金沢",
+      "stage": 3,
+      "races": 22,
+      "horses": 134,
+      "mae": 2.122,
+      "previousMae": 2.1194,
+      "bias": 0.9817,
+      "within2": 0.6045
+    },
+    {
+      "venue": "金沢",
+      "stage": 4,
+      "races": 22,
+      "horses": 136,
+      "mae": 2.156,
+      "previousMae": 2.0809,
+      "bias": 1.0223,
+      "within2": 0.6103
+    },
+    {
+      "venue": "門別",
+      "stage": 0,
+      "races": 12,
+      "horses": 49,
+      "mae": 1.897,
+      "previousMae": 2,
+      "bias": -0.8671,
+      "within2": 0.7347
+    },
+    {
+      "venue": "門別",
+      "stage": 3,
+      "races": 12,
+      "horses": 51,
+      "mae": 1.9476,
+      "previousMae": 1.9608,
+      "bias": -0.7045,
+      "within2": 0.7255
+    },
+    {
+      "venue": "門別",
+      "stage": 4,
+      "races": 11,
+      "horses": 47,
+      "mae": 2.1677,
+      "previousMae": 2.2128,
+      "bias": -0.8784,
+      "within2": 0.5745
+    }
+  ]
+}
