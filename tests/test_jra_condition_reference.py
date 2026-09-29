@@ -11,7 +11,10 @@ def test_grade_name_and_corner_parsing_are_strict_enough():
     assert grade_from_row(pd.Series({"race_class": "ＧⅢ"})) == "G3"
     assert grade_from_row(pd.Series({"race_category": "G1"})) == "G1"
     assert grade_from_row(pd.Series({"race_class": "3勝クラス"})) is None
-    assert race_name_key("第60回 スプリンターズステークス（GⅠ）") == "スプリンターズステークス"
+    assert race_name_key("第60回 スプリンターズステークス（GⅠ）") == "スプリンターズS"
+    assert race_name_key("スプリンターズステークス") == race_name_key("スプリンターズS")
+    assert race_name_key("東京優駿（日本ダービー）") == race_name_key("東京優駿")
+    assert race_name_key("アメリカジョッキークラブカップ") == race_name_key("AJCC")
     assert runner_first_corner(json.dumps(["3", "3", "2"])) == 3
     assert runner_first_corner("not-json") is None
 
