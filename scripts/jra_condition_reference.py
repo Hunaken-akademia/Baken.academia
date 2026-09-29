@@ -105,8 +105,9 @@ def official_grade_schedule(directory: Path) -> dict[str, tuple[str, str]]:
             token = normalized_text(grade_match.group(1)).upper()
             number = token if token in "123" else str(len(token))
             date = f"{year:04d}-{int(date_match.group(1)):02d}-{int(date_match.group(2)):02d}"
-            key = f"{date}|{venue}|{surface}|{int(distance_match.group(1).replace(',', ''))}"
-            result[key] = (f"G{number}", normalized_text(grade_match.group(2)))
+            official_name = normalized_text(grade_match.group(2))
+            key = f"{date}|{venue}|{surface}|{int(distance_match.group(1).replace(',', ''))}|{race_name_key(official_name)}"
+            result[key] = (f"G{number}", official_name)
     return result
 
 
@@ -123,7 +124,10 @@ def summarize_races(raw: pd.DataFrame, grade_schedule: dict[str, tuple[str, str]
         winners = group.loc[group["finish_position"].eq(1)]
         placed = group.loc[group["finish_position"].between(1, 3)]
         first = group.iloc[0]
-        schedule_key = f"{first['race_date'].date()}|{normalized_text(first['racecourse'])}|{normalized_text(first['surface'])}|{int(first['distance_m'])}"
+        schedule_key = (
+            f"{first['race_date'].date()}|{normalized_text(first['racecourse'])}|"
+            f"{normalized_text(first['surface'])}|{int(first['distance_m'])}|{race_name_key(first.get('race_name'))}"
+        )
         official = (grade_schedule or {}).get(schedule_key)
         rows.append({
             "race_id": str(race_id), "race_date": first["race_date"], "race_year": int(first["race_year"]),
