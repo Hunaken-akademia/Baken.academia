@@ -29,6 +29,7 @@ import { MarketRankMap } from "@/components/market-rank-map";
 import { PredictionDataStatus } from "@/components/prediction-data-status";
 import { ReinCloudProvider } from "@/components/rein-cloud-provider";
 import type { NarReference } from "@/lib/nar-validation";
+import type { JraRaceReference } from "@/lib/jra-reference";
 
 type HistoryFactor = {
   label: string;
@@ -107,6 +108,7 @@ type RaceConfidence = {
 };
 type Analysis = {
   narReference?: NarReference | null;
+  jraReference?: JraRaceReference | null;
   warnings?: string[];
   race: {
     league?: "jra" | "nar";
@@ -1009,15 +1011,15 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
         <div className="mt-4 grid gap-2 md:grid-cols-3">
           <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
             <p className="text-xs font-semibold text-amber-300">競馬場</p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="course")?.detail??guide.venueTrait}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="course")?.detail??data.jraReference?.conditions.find(c=>c.kind==="course")?.detail??guide.venueTrait}</p>
           </div>
           <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
             <p className="text-xs font-semibold text-emerald-300">距離</p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="courseDistance")?.detail??guide.distanceTrait}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="courseDistance")?.detail??data.jraReference?.conditions.find(c=>c.kind==="courseDistance")?.detail??guide.distanceTrait}</p>
           </div>
           <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
             <p className="text-xs font-semibold text-violet-300">今回の条件</p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="courseGoing")?.detail??guide.layout}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="courseGoing")?.detail??data.jraReference?.conditions.find(c=>c.kind==="courseGoing")?.detail??guide.layout}</p>
           </div>
         </div>
         {data.narReference && <details className="mt-4 rounded-xl border border-slate-700 p-3 text-sm">
@@ -1026,7 +1028,43 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           {data.narReference.ranking.map(r=><p key={r.role} className="mt-2 leading-6 text-slate-300">{r.role}着適性：{r.detail}</p>)}
           <p className="mt-3 text-xs leading-5 text-slate-500">{data.narReference.note}</p>
         </details>}
+        {data.jraReference && <details className="mt-4 rounded-xl border border-slate-700 p-3 text-sm">
+          <summary className="cursor-pointer font-semibold text-cyan-200">JRAの条件検証・採用／見送り結果</summary>
+          <p className="mt-2 leading-6 text-slate-300">{data.jraReference.validation.summary}</p>
+          <p className="mt-2 text-xs leading-5 text-slate-500">{data.jraReference.validation.note}</p>
+        </details>}
       </section>
+      {data.jraReference?.graded && <section className="mb-5 min-w-0 rounded-2xl border border-amber-400/25 bg-gradient-to-br from-[#151d2b] to-[#0c192a] p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold tracking-widest text-amber-300">定例重賞・過去傾向</p>
+            <h2 className="mt-1 break-words text-lg font-bold">{data.jraReference.graded.grade}・{data.jraReference.graded.name}</h2>
+          </div>
+          <Badge className="bg-amber-400/10 text-amber-200">当年を除く直近{data.jraReference.graded.editions}回</Badge>
+        </div>
+        <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {[
+            ["1番人気の勝利",data.jraReference.graded.favoriteWinRate],
+            ["1〜3番人気の勝利",data.jraReference.graded.top3PopularityWinRate],
+            ["6番人気以下の勝利",data.jraReference.graded.sixPlusWinRate],
+            ["10番人気以下が3着内",data.jraReference.graded.tenPlusPlacedRate],
+            ["1〜4枠の勝利",data.jraReference.graded.innerGateWinRate],
+          ].map(([label,value])=><div key={String(label)} className="min-w-0 rounded-xl border border-slate-800 bg-black/15 p-3">
+            <p className="text-xs text-slate-400">{String(label)}</p><p className="mt-1 text-xl font-bold text-white">{typeof value==="number"?`${(value*100).toFixed(1)}%`:"母数不足"}</p>
+          </div>)}
+        </div>
+        <p className="mt-3 text-sm leading-6 text-slate-300">勝ち馬が最初の通過地点で3番手以内：{typeof data.jraReference.graded.frontWinRate==="number"?`${(data.jraReference.graded.frontWinRate*100).toFixed(1)}%（通過順あり${data.jraReference.graded.frontSamples}回）`:"母数不足"}。</p>
+        {(data.jraReference.graded.venueChanges||data.jraReference.graded.courseChanges)&&<p className="mt-1 text-xs leading-5 text-amber-200">開催場・距離の変更年を含みます。各年の条件は下の一覧に併記しています。</p>}
+        <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {data.jraReference.graded.recent.map(edition=><div key={edition.date} className="min-w-0 rounded-xl border border-slate-800 bg-[#0b1727] p-3 text-xs leading-5">
+            <p className="font-bold text-slate-100">{edition.year}年・{edition.venue}</p>
+            <p className="text-slate-400">{edition.surface}{edition.distanceM}m・{edition.going}</p>
+            <p className="mt-1 text-slate-300">勝ち馬 {edition.winnerPopularity?`${edition.winnerPopularity}番人気`:"人気不明"}</p>
+            <p className="break-words text-slate-500">3着内人気 {edition.placedPopularities.length?edition.placedPopularities.join("・"):"不明"}</p>
+          </div>)}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-slate-500">{data.jraReference.graded.yearFrom}〜{data.jraReference.graded.yearTo}年から集計。当年結果は含めません。過去傾向であり、今回の的中確率や買い推奨ではありません。</p>
+      </section>}
       <RaceIntelligence data={data} insights={insights} />
       <RaceFormationMap key={data.race.raceId} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
       <RaceShapeReference data={data} />
