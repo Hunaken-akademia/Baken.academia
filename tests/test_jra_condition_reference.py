@@ -54,6 +54,20 @@ def test_official_schedule_recovers_image_only_grades(tmp_path):
     assert schedule["2026-09-30|中山|芝|1200|テスト記念"] == ("G3", "テスト記念")
 
 
+def test_official_schedule_fuzzy_match_keeps_unrelated_same_condition_ungraded():
+    schedule = {"2026-05-31|東京|芝|2400|東京優駿日本ダービー": ("G1", "東京優駿（日本ダービー）")}
+    rows = []
+    for race_id, name in (("grade", "東京優駿"), ("ordinary", "青嵐賞")):
+        for number in (1, 2, 3):
+            rows.append({"race_id": race_id, "race_date": "2026-05-31", "racecourse": "東京", "race_name": name,
+                         "race_class": "", "race_category": "", "surface": "芝", "distance_m": 2400, "going": "良",
+                         "horse_id": f"{race_id}-{number}", "horse_number": number, "gate": number,
+                         "popularity": number, "finish_position": number, "corner_positions": json.dumps([str(number)])})
+    races = __import__("scripts.jra_condition_reference", fromlist=["summarize_races"]).summarize_races(pd.DataFrame(rows), schedule)
+    assert races.set_index("race_id").loc["grade", "grade"] == "G1"
+    assert pd.isna(races.set_index("race_id").loc["ordinary", "grade"])
+
+
 def test_graded_history_rejects_duplicate_same_year_titles():
     rows = []
     for year in range(2021, 2027):
