@@ -13,7 +13,8 @@ on:
       - scripts/nar_condition_validation.py
       - reports/nar-current-release-model-20260928.json
   schedule:
-    - cron: "17 */6 * * *"
+    # Monday 04:17 JST; daily archives and live snapshots remain independent.
+    - cron: "17 19 * * 0"
   workflow_run:
     workflows: ["NAR licensed eight-year backfill with all final odds", "NAR licensed eight-year results backfill"]
     types: [completed]
@@ -30,6 +31,7 @@ concurrency:
 
 jobs:
   analyze:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -192,4 +194,4 @@ jobs:
           name: nar-partial-analysis-v2
           path: artifacts/nar-partial-analysis
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 14
