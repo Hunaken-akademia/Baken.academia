@@ -14,7 +14,9 @@ def test_grade_name_and_corner_parsing_are_strict_enough():
     assert race_name_key("第60回 スプリンターズステークス（GⅠ）") == "スプリンターズS"
     assert race_name_key("スプリンターズステークス") == race_name_key("スプリンターズS")
     assert race_name_key("東京優駿（日本ダービー）") == race_name_key("東京優駿")
+    assert race_name_key("日本ダービー") == race_name_key("東京優駿")
     assert race_name_key("優駿牝馬（オークス）") == race_name_key("優駿牝馬")
+    assert race_name_key("オークス") == race_name_key("優駿牝馬")
     assert race_name_key("天皇賞（春）") != race_name_key("天皇賞（秋）")
     assert race_name_key("アメリカジョッキークラブカップ") == race_name_key("AJCC")
     assert runner_first_corner(json.dumps(["3", "3", "2"])) == 3
