@@ -22,6 +22,8 @@ import {
 import { selectPicks } from "@/lib/marks";
 import { buildRaceConfidence, type RaceConfidence } from "@/lib/race-confidence";
 import { extractMapPositions } from "@/lib/corner-reference";
+import jraReferenceData from "@/lib/jra-condition-reference.json";
+import { jraReferenceForRace, type JraReferenceData } from "@/lib/jra-reference";
 import {
   isSnapshotFresh,
   metaFromBody,
@@ -954,6 +956,9 @@ async function analyze(request: NextRequest) {
     const oddsTime = jstTime(oddsSource.fetchedAt || cardSource.fetchedAt);
     const cardTime = jstTime(cardSource.fetchedAt);
     const review = { isFinished: resultRows.length > 0, finishers, payouts };
+    const jraReference = jraReferenceForRace(jraReferenceData as JraReferenceData, {
+      raceName, venue: racecourse, surface, distanceM, going, year: Number(raceDate.slice(0, 4)),
+    });
     const warnings = [
       preview
         ? "前日暫定予想です。人気・オッズ・馬体重・馬場状態は当日に自動更新されます"
@@ -967,6 +972,7 @@ async function analyze(request: NextRequest) {
     ].filter(Boolean);
     const body = {
       warnings,
+      jraReference,
       race: {
         title,
         course,
