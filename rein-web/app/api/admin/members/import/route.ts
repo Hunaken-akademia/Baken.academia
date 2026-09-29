@@ -7,9 +7,11 @@ import { SUPABASE_URL } from "@/lib/supabase/config";
 import { CampfireCsvError, parseCampfireMembers, prepareCampfireImport } from "@/lib/campfire-members.mjs";
 import { isReinAdmin } from "@/lib/rein-admin";
 import { sendReinWelcomeEmail } from "@/lib/rein-welcome-email.mjs";
+import { buildImportRows } from "@/lib/campfire-import-preview.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 const MAX_CSV_BYTES = 2 * 1024 * 1024;
 const json = (body: unknown, status = 200) =>
@@ -81,9 +83,18 @@ export async function POST(request: NextRequest) {
       }
     }
     const prepared = prepareCampfireImport(parsed.members, [...existing.values()]);
+    const outbox = [];
+    for (let offset = 0; offset < prepared.records.length; offset += 100) {
+      const { data, error } = await admin.from("rein_welcome_email_outbox")
+        .select("member_key,status")
+        .in("member_key", prepared.records.slice(offset, offset + 100).map(row => row.member_key));
+      if (error) return json({ error: "メールの送信状況を確認できません。まだ反映していません。" }, 503);
+      outbox.push(...(data || []));
+    }
+    const rows = buildImportRows(parsed.members, prepared.records, [...existing.values()], outbox);
     const snapshot = JSON.stringify([createHash("sha256").update(bytes).digest("hex"), prepared]);
     const summary = { mode, total: parsed.members.length, counts: parsed.counts,
-      protectedMembers: prepared.protectedMembers, deadlines: prepared.deadlines };
+      protectedMembers: prepared.protectedMembers, deadlines: prepared.deadlines, rows };
     if (mode === "preview") return json({ ...summary,
       previewToken: createPreviewToken(serviceKey, claims.sub, snapshot) });
     if (!verifyPreviewToken(form.get("previewToken"), serviceKey, claims.sub, snapshot))
@@ -99,19 +110,22 @@ export async function POST(request: NextRequest) {
     let emailSkipped = 0;
     if (records.length) {
       const memberByEmail = new Map(parsed.members.map(member => [member.google_email, member]));
+      const resultByKey = new Map(rows.map(row => [row.memberKey, row]));
       for (const record of records) {
         const member = memberByEmail.get(record.google_email);
         if (member?.status !== "active") continue;
         const recipient = String(record.google_email || "").trim().toLowerCase();
         const memberKey = record.member_key;
+        const rowResult = resultByKey.get(memberKey);
+        const failed = () => { emailFailed++; if (rowResult) rowResult.emailStatus = "failed"; };
         const { error: insertError } = await admin.from("rein_welcome_email_outbox")
           .upsert({ member_key: memberKey, recipient_email: recipient, status: "pending", updated_at: new Date().toISOString() },
             { onConflict: "member_key", ignoreDuplicates: true });
-        if (insertError) { emailFailed++; continue; }
+        if (insertError) { failed(); continue; }
         const { data: claimed, error: claimError } = await admin.from("rein_welcome_email_outbox")
           .update({ status: "sending", recipient_email: recipient, last_error: null, updated_at: new Date().toISOString() })
           .eq("member_key", memberKey).in("status", ["pending", "failed"]).select("member_key").maybeSingle();
-        if (claimError) { emailFailed++; continue; }
+        if (claimError) { failed(); continue; }
         if (!claimed) { emailSkipped++; continue; }
         const { data: incremented, error: attemptError } = await admin.rpc("increment_rein_welcome_attempts", { target_member_key: memberKey });
         try {
@@ -120,9 +134,10 @@ export async function POST(request: NextRequest) {
           const { error: sentError } = await admin.from("rein_welcome_email_outbox").update({ status: "sent", resend_email_id: resendId, last_error: null, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("member_key", memberKey).eq("status", "sending");
           if (sentError) throw new Error("送信結果を保存できませんでした。");
           emailSent++;
+          if (rowResult) rowResult.emailStatus = "sent";
         } catch (error) {
           await admin.from("rein_welcome_email_outbox").update({ status: "failed", last_error: String(error instanceof Error ? error.message : error).slice(0, 500), updated_at: new Date().toISOString() }).eq("member_key", memberKey).eq("status", "sending");
-          emailFailed++;
+          failed();
         }
       }
     }
