@@ -27,7 +27,7 @@ export async function refreshNarSchedule(date:string) {
   } finally {await releaseCapture(`race:nar-schedule:${date}`,lease.token).catch(()=>{});}
 }
 
-export async function refreshNarRace(raceId:string, preview=false) {
+export async function refreshNarRace(raceId:string, preview=false, expectedRelease?:string) {
   const key=narRaceKey(raceId);if(!key)throw new Error("Invalid NAR race");
   const lock=`race:nar:${raceId}:${preview?"preview":"live"}`;
   const lease=await claimCapture(lock,150);if(!lease.acquired||!lease.token)return null;
@@ -48,7 +48,11 @@ export async function refreshNarRace(raceId:string, preview=false) {
       return body;
     }
     const held:string[]=[], warnings:string[]=[];
-    const runtime=await loadNarRuntime().catch(e=>{held.push(e.message);return null;});
+    let runtime=await loadNarRuntime().catch(e=>{held.push(e.message);return null;});
+    // Release warming can reach a different server instance with an old model cache.
+    // Reload only on a mismatch; never save an old-model forecast as a new release.
+    if(expectedRelease && runtime?.model.release?.id!==expectedRelease)runtime=await loadNarRuntime(true);
+    if(expectedRelease && runtime?.model.release?.id!==expectedRelease)throw new Error("地方モデルの切り替え待ちです");
     let scored:ReturnType<typeof narRank>|null=null;
     if(runtime) {try{scored=narRank(runtime,card.horses,card.context);}catch(e){held.push(e instanceof Error?e.message:"地方評価を保留しています");}}
     const horses=scored??card.horses.map(h=>({...h,score:0,mark:"",verdict:"履歴モデル待ち",positives:[] as string[],cautions:[] as string[]}));
