@@ -37,6 +37,7 @@ def race_name_key(value: object) -> str:
     text = re.sub(r"東京優駿[（(]日本ダービー[)）]", "東京優駿", text)
     text = re.sub(r"優駿牝馬[（(]オークス[)）]", "優駿牝馬", text)
     text = re.sub(r"[（(][^()（）]*[)）]", "", text)
+    text = text.replace("日本ダービー", "東京優駿").replace("オークス", "優駿牝馬")
     for full, short in (
         ("アメリカジョッキークラブカップ", "AJCC"),
         ("ニュージーランドトロフィー", "NZT"),
