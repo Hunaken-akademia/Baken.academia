@@ -48,7 +48,7 @@ def test_build_requires_both_years_for_conditions_and_five_distinct_graded_editi
 def test_official_schedule_recovers_image_only_grades(tmp_path):
     (tmp_path / "2026.html").write_text("""<table><tr><td>9月30日水曜</td><td>GⅢ テスト記念</td><td>中山</td><td>3歳以上</td><td>芝1,200メートル</td></tr></table>""")
     schedule = official_grade_schedule(tmp_path)
-    assert schedule["2026-09-30|中山|芝|1200"] == ("G3", "テスト記念")
+    assert schedule["2026-09-30|中山|芝|1200|テスト記念"] == ("G3", "テスト記念")
 
 
 def test_graded_history_rejects_duplicate_same_year_titles():
