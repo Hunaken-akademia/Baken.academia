@@ -50,6 +50,26 @@ jobs:
         run: |
           tar --no-same-owner -xzf .dataset/jra-backfill-result.tar.gz
           test -s data/raw/jra/races-2019-2026.parquet
+      - name: Build JRA condition and graded-race reference first
+        if: matrix.lane == 'venue'
+        run: |
+          mkdir -p .jra-grades
+          for year in {2019..2026}; do
+            curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors \
+              "https://www.jra.go.jp/datafile/seiseki/replay/${year}/jyusyo.html" \
+              -o ".jra-grades/${year}.html"
+          done
+          python scripts/jra_condition_reference.py \
+            --input data/raw/jra/races-2019-2026.parquet \
+            --grade-dir .jra-grades \
+            --output reports/jra-venue-features-v2/jra-condition-reference.json
+      - name: Upload JRA condition reference first
+        if: matrix.lane == 'venue'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jra-condition-reference-v1
+          path: reports/jra-venue-features-v2/jra-condition-reference.json
+          retention-days: 90
       - name: Download normalized final odds and payouts
         if: matrix.lane == 'roi'
         run: bash scripts/download_jra_normalized_from_supabase.sh .odds-normalized
@@ -71,18 +91,7 @@ jobs:
         run: python scripts/jra_roi_analysis.py
       - name: Venue and candidate-feature analysis
         if: matrix.lane == 'venue'
-        run: |
-          mkdir -p .jra-grades
-          for year in {2019..2026}; do
-            curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors \
-              "https://www.jra.go.jp/datafile/seiseki/replay/${year}/jyusyo.html" \
-              -o ".jra-grades/${year}.html"
-          done
-          python scripts/jra_venue_feature_analysis.py
-          python scripts/jra_condition_reference.py \
-            --input data/raw/jra/races-2019-2026.parquet \
-            --grade-dir .jra-grades \
-            --output reports/jra-venue-features-v2/jra-condition-reference.json
+        run: python scripts/jra_venue_feature_analysis.py
       - name: Upload ROI report
         if: matrix.lane == 'roi'
         uses: actions/upload-artifact@v4
