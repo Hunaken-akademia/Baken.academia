@@ -2,14 +2,16 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { ADMIN_MEMBERS_PATH, LOGIN_DESTINATION_COOKIE } from "@/lib/rein-auth-navigation.mjs";
 
-export function GoogleSignInButton() {
+export function GoogleSignInButton({ admin = false }: { admin?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function signIn() {
     setLoading(true);
     setError("");
+    document.cookie = `${LOGIN_DESTINATION_COOKIE}=${admin ? ADMIN_MEMBERS_PATH : ""}; Path=/; Max-Age=${admin ? 600 : 0}; SameSite=Lax${window.location.protocol === "https:" ? "; Secure" : ""}`;
     const supabase = createClient();
     const redirectTo = `${window.location.origin}/auth/callback`;
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
