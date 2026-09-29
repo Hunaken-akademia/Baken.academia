@@ -2,9 +2,12 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import ts from 'typescript';
-async function load(file, replacements=[]){let s=readFileSync(new URL(file,import.meta.url),'utf8');for(const [a,b]of replacements)s=s.replace(a,b);const code=ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;return import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));}
+function moduleUrl(file, replacements=[]){let s=readFileSync(new URL(file,import.meta.url),'utf8');for(const [a,b]of replacements)s=s.replace(a,b);const code=ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;return 'data:text/javascript;base64,'+Buffer.from(code).toString('base64');}
+async function load(file, replacements=[]){return import(moduleUrl(file,replacements));}
+const validationUrl=moduleUrl('../lib/nar-validation.ts',[[/from "\.\/marks"/,`from ${JSON.stringify(moduleUrl('../lib/marks.ts'))}`]]);
+const {narReferenceSignals,narConditionKey}=await import(validationUrl);
 const {narRaceKey,narUrl,narVenueCodes,parseNarSchedule,parseNarCard,parseNarResult}=await load('../lib/nar-source.ts');
-const {narHistoryInputs,narRank,validateNarModel}=await load('../lib/nar-model.ts',[[/import \{ serverData \} from "\.\/server-snapshots";/,'const serverData=()=>{throw new Error("No network in ranker tests")};']]);
+const {narHistoryInputs,narRank,validateNarModel}=await load('../lib/nar-model.ts',[[/import \{ serverData \} from "\.\/server-snapshots";/,'const serverData=()=>{throw new Error("No network in ranker tests")};'],[/from "\.\/nar-validation"/,`from ${JSON.stringify(validationUrl)}`]]);
 const {expireNarReleaseMetas}=await load('../lib/nar-release.ts');
 const entry=(number,gate,info='',market='')=>`<tr class="tBorder">${gate?`<td class="courseNum course_0${gate}">${gate}</td>`:''}<td class="horseNum">${number}</td><a class="horseName" href="/HorseMarkInfo?k_lineageLoginCode=${number}">馬${number}</a><a class="jockeyName" href="/RiderMark?k_riderLicenseNo=2">騎手（所属）</a><td class="odds_weight">${market}</td><table><tr><td>全</td><td>10-9-8-7</td></tr></table><td class="odds_weight">470<br>(-2)</td><td>1:12.3　2-3-4　38.5</td><td class="info">${info}</td></tr>`;
 const card=(entries)=>`<h4>2026年9月28日（月） 船 橋 第1競走 14:40発走</h4><section class="raceTitle"><h3>出走表テスト</h3><ul class="dataArea"><li>ダート 1200ｍ（左） 天候：晴 馬場：良</li></ul></section><section class="cardTable"><table>${entries}</table></section>`;
@@ -68,4 +71,37 @@ test('model rollout refreshes future NAR forecasts only, preserving JRA and past
  const metas=new Map(entries);expireNarReleaseMetas(metas,activation,now);
  assert.deepEqual([...metas.keys()],entries.slice(2).map(([k])=>k));
  const invalid=new Map(entries);expireNarReleaseMetas(invalid,'invalid',now);assert.equal(invalid.size,entries.length);
+});
+const rate={samples:1000,hits:500,rate:.5};
+const signal={status:'adopted',gap:2,audit:{...rate,baseline:.3,difference:.2,differenceCI:[.1,.3],win:rate,tenPlus:rate}};
+const validation={version:'nar-conditions-v1',periods:{audit:'2026'},ranking:{},tendencies:[],signals:{danger:signal,longshot:signal,confidence:{status:'adopted',thresholds:[.1,.2,.3],minimumFieldSize:6,bins:[0,1,2,3].map(bin=>({bin,audit:{winner:rate,twoPlaced:rate}}))}}};
+const field=Array.from({length:10},(_,i)=>({number:i+1,popularity:10-i,firstProbability:(10-i)/55}));
+test('NAR references apply only adopted rules, require complete market, and never invent market probability',()=>{
+ const result=narReferenceSignals(field,validation,context);
+ assert.equal(result.picks.longshotCandidates.length,4);
+ assert.equal(result.picks.longshotCandidates[0].firstRank,1);
+ assert.equal(result.picks.longshotCandidates[0].marketGap,undefined);
+ assert.ok(result.reference.danger.numbers.includes(10));
+ assert.ok(result.confidence);assert.match(result.confidence.detail,/1,000/);
+ const missing=narReferenceSignals(field.map((h,i)=>i? h:{...h,popularity:0}),validation,context);
+ assert.equal(missing.picks.longshotStatus,'unavailable');assert.equal(missing.reference.danger.status,'market-missing');
+ const duplicate=narReferenceSignals(field.map((h,i)=>i? h:{...h,popularity:1}),validation,context);
+ assert.equal(duplicate.reference.danger.status,'market-missing');
+ const rejected=narReferenceSignals(field,{...validation,signals:{...validation.signals,longshot:{...signal,status:'rejected'}}},context);
+ assert.equal(rejected.picks.longshotCandidates.length,0);
+ assert.equal(narReferenceSignals(field.slice(0,5),validation,context).confidence,null);
+ assert.equal(narReferenceSignals(field,undefined,context).reference,null);
+});
+test('NAR condition routing matches Python boundaries and safe local fallback',()=>{
+ assert.equal(narConditionKey({...context,distanceM:1400},'courseDistance'),'船橋|ダート|mile');
+ assert.equal(narConditionKey({...context,distanceM:1801},'courseDistance'),'船橋|ダート|long');
+ assert.equal(narConditionKey(context,'courseGoing'),'船橋|ダート|不明');
+ const global={version:'nar-history-ranker-v1',features:Array(28).fill('test'),roles:Object.fromEntries([1,2,3].map(t=>[String(t),{mode:'hybrid',intercept:0,coef:Array.from({length:56},(_,i)=>i===1?1:0)}]))};
+ const conditional={...global,conditionalRoles:{'1':{kind:'course',models:{'船橋|ダート':{intercept:0,coef:Array.from({length:56},(_,i)=>i===1?-1:0)}}}}};
+ assert.doesNotThrow(()=>validateNarModel(conditional));
+ const out=narRank({profile,model:conditional},[horse(1),horse(2)],context);
+ assert.ok(out.find(h=>h.number===2).firstProbability>out.find(h=>h.number===1).firstProbability);
+ const fallback=narRank({profile,model:conditional},[horse(1),horse(2)],{...context,racecourse:'高知'});
+ assert.ok(fallback.find(h=>h.number===1).firstProbability>fallback.find(h=>h.number===2).firstProbability);
+ conditional.conditionalRoles['1'].models['船橋|ダート'].coef.pop();assert.throws(()=>validateNarModel(conditional));
 });

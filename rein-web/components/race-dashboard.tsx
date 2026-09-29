@@ -28,6 +28,7 @@ import { PredictionJournal, HorseNotebook } from "@/components/prediction-journa
 import { MarketRankMap } from "@/components/market-rank-map";
 import { PredictionDataStatus } from "@/components/prediction-data-status";
 import { ReinCloudProvider } from "@/components/rein-cloud-provider";
+import type { NarReference } from "@/lib/nar-validation";
 
 type HistoryFactor = {
   label: string;
@@ -105,6 +106,7 @@ type RaceConfidence = {
   note: string;
 };
 type Analysis = {
+  narReference?: NarReference | null;
   warnings?: string[];
   race: {
     league?: "jra" | "nar";
@@ -738,7 +740,7 @@ function roleReady(data: Analysis) {
   return data.evaluation?.roleModel !== "unavailable";
 }
 
-function RaceConfidenceCard({ confidence, nar = false }: { confidence?: RaceConfidence | null; nar?: boolean }) {
+function RaceConfidenceCard({ confidence, nar = false, reference }: { confidence?: RaceConfidence | null; nar?: boolean; reference?:NarReference|null }) {
   const tone = confidence?.label === "かなり高い"
     ? "border-violet-400/35 bg-violet-400/[.07] text-violet-200"
     : confidence?.label === "高め"
@@ -767,9 +769,9 @@ function RaceConfidenceCard({ confidence, nar = false }: { confidence?: RaceConf
             </>
           ) : (
             <>
-              <p className="mt-1 font-bold text-slate-300">{nar ? "地方での検証待ち" : "算出待ち"}</p>
+              <p className="mt-1 font-bold text-slate-300">{nar ? reference ? reference.confidenceStatus==="adopted"?"算出対象外・評価不足":"検証済み・改善基準未達" : "この保存予想は検証反映前" : "算出待ち"}</p>
               <p className="mt-1 text-sm text-slate-500">
-                {nar ? "中央の閾値は流用せず、地方での検証後に表示します。" : "人気・オッズと市場差評価がそろうと表示します。"}
+                {nar ? reference ? "地方独自の監査結果に基づき表示。5頭以下・評価不足、または区分ごとの実績が安定しない場合は判定しません。" : "過去の発走前予想は書き換えません。新しい検証は反映後の保存予想から適用します。" : "人気・オッズと市場差評価がそろうと表示します。"}
               </p>
             </>
           )}
@@ -948,8 +950,8 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           ) : null}
         </section>
       )}
-      <section className="mb-5 grid gap-4 lg:grid-cols-[1.45fr_.55fr]">
-        <Card className="border-slate-700 bg-gradient-to-br from-[#10233a] to-[#0b1727] text-white">
+      <section className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,.55fr)]">
+        <Card className="min-w-0 border-slate-700 bg-gradient-to-br from-[#10233a] to-[#0b1727] text-white">
           <CardContent className="p-5 sm:p-6">
             <p className="text-sm text-cyan-300">
               {data.race.start}発走 ・ {data.race.updated}
@@ -966,13 +968,13 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
             <PickCards data={data} onHorse={onHorse} />
           </CardContent>
         </Card>
-        <div className="grid gap-4">
-          <RaceConfidenceCard confidence={data.confidence} nar={data.race.league === "nar"} />
+        <div className="grid min-w-0 grid-cols-1 gap-4">
+          <RaceConfidenceCard confidence={data.confidence} nar={data.race.league === "nar"} reference={data.narReference} />
           <Card className="border-slate-700 bg-[#0c192a] text-white">
             <CardContent className="flex gap-3 p-4">
               <Gauge className="text-amber-300" />
               <div>
-                <p className="text-xs text-slate-400">展開予測</p>
+                <p className="text-xs text-slate-400">{data.race.league==="nar"?"近走の先行構成":"展開予測"}</p>
                 <p className="font-bold">{data.pace.label}</p>
                 <p className="mt-1 text-sm text-slate-400">
                   {data.pace.detail}
@@ -984,12 +986,12 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
             <CardContent className="flex gap-3 p-4">
               <AlertTriangle className="text-rose-300" />
               <div>
-                <p className="text-xs text-slate-400">危険人気馬</p>
+                <p className="text-xs text-slate-400">{data.race.league==="nar"?"人気馬の慎重評価（参考）":"危険人気馬"}</p>
                 <p className="font-bold">
-                  {data.race.league === "nar" ? "地方での検証待ち" : !rankingReady ? "評価保留" : danger ? `${danger.number} ${danger.name}` : "該当なし"}
+                  {data.race.league === "nar" ? !data.narReference ? "この保存予想は検証反映前" : data.narReference.danger.status==="market-missing" ? "全頭の人気待ち" : data.narReference.danger.status==="held" ? "評価保留" : data.narReference.danger.status!=="adopted" ? "検証済み・採用見送り" : data.narReference.danger.numbers.length ? data.narReference.danger.numbers.map(n=>`${n} ${data.horses.find(h=>h.number===n)?.name??""}`).join("・") : "該当なし" : !rankingReady ? "評価保留" : danger ? `${danger.number} ${danger.name}` : "該当なし"}
                 </p>
                 <p className="mt-1 text-sm text-slate-400">
-                  {data.race.league === "nar" ? "中央の危険人気判定は適用しません" : !rankingReady ? "総合評価の取得後に表示します" : danger?.cautions.join("・") || "人気と評価が一致"}
+                  {data.race.league === "nar" ? data.narReference?.danger.detail??"中央の判定は流用せず、発走前の保存予想を維持しています。" : !rankingReady ? "総合評価の取得後に表示します" : danger?.cautions.join("・") || "人気と評価が一致"}
                 </p>
               </div>
             </CardContent>
@@ -1007,17 +1009,23 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
         <div className="mt-4 grid gap-2 md:grid-cols-3">
           <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
             <p className="text-xs font-semibold text-amber-300">競馬場</p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{guide.venueTrait}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="course")?.detail??guide.venueTrait}</p>
           </div>
           <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
             <p className="text-xs font-semibold text-emerald-300">距離</p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{guide.distanceTrait}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="courseDistance")?.detail??guide.distanceTrait}</p>
           </div>
           <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
             <p className="text-xs font-semibold text-violet-300">今回の条件</p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{guide.layout}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="courseGoing")?.detail??guide.layout}</p>
           </div>
         </div>
+        {data.narReference && <details className="mt-4 rounded-xl border border-slate-700 p-3 text-sm">
+          <summary className="cursor-pointer font-semibold text-cyan-200">地方の補正検証・採用／見送り結果</summary>
+          <p className="mt-2 text-xs text-slate-400">監査期間：{data.narReference.auditPeriod}。選択期間は2025年。</p>
+          {data.narReference.ranking.map(r=><p key={r.role} className="mt-2 leading-6 text-slate-300">{r.role}着適性：{r.detail}</p>)}
+          <p className="mt-3 text-xs leading-5 text-slate-500">{data.narReference.note}</p>
+        </details>}
       </section>
       <RaceIntelligence data={data} insights={insights} />
       <RaceFormationMap key={data.race.raceId} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
@@ -1252,7 +1260,7 @@ function raceInsights(data: Analysis): RaceInsights {
     roleLeaders,
     courseLeaders,
     scoreGap,
-    confidence: data.race.league === "nar" ? "地方は検証中" : confidence,
+    confidence: data.race.league === "nar" ? data.confidence?.label??"判定対象外" : confidence,
     difficulty: data.race.league === "nar" ? "判定保留" : difficulty,
     oddsCoverage,
     weightCoverage,
@@ -2393,7 +2401,7 @@ function RoleRankings({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-black/10 p-3">
+    <div className="min-w-0 break-words rounded-lg border border-slate-800 bg-black/10 p-3">
       <p className="text-[11px] text-slate-500">{label}</p>
       <p className="mt-1 text-sm font-semibold text-slate-200">{value}</p>
     </div>
@@ -2478,7 +2486,7 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
         })}
       </div>
       <p className="mt-2 text-[11px] leading-5 text-slate-500">
-        本命・対抗は1着適性ランキングの1位・2位。穴候補は1着適性3〜6位のうち、4番人気以下で1着評価が市場評価を上回る馬です。
+        本命・対抗は1着適性ランキングの1位・2位。{data.race.league==="nar" ? data.narReference?.longshot.rule??"地方の穴候補は検証反映後の保存予想から適用します。" : "穴候補は1着適性3〜6位のうち、4番人気以下で1着評価が市場評価を上回る馬です。"}
         {picks.longshotReason ? `（${picks.longshotReason}）` : ""}
       </p>
       <section className="mt-4 rounded-2xl border border-rose-400/25 bg-rose-400/[.04] p-4 sm:p-5">
@@ -2506,7 +2514,7 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
                   onClick={() => onHorse(horse)}
                   className="rounded-xl border border-rose-400/20 bg-black/15 p-3 text-left transition hover:border-rose-300/50 hover:bg-white/[.03]"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white font-bold text-slate-900">
                         {horse.number}
@@ -2524,7 +2532,7 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <Metric label="1着適性" value={`${pick.firstRank}位・${horse.probabilityKind ? "評価シェア" : "推定"}${formatProbability(horse.firstProbability)}`} />
-                    <Metric label="市場モデルとの差" value={typeof pick.marketGap === "number" ? `+${(pick.marketGap * 100).toFixed(1)}ポイント` : "算出中"} />
+                    <Metric label={data.race.league==="nar"?"人気順位との差":"市場モデルとの差"} value={data.race.league==="nar"?`人気より${horse.popularity-pick.firstRank}位上位`:typeof pick.marketGap === "number" ? `+${(pick.marketGap * 100).toFixed(1)}ポイント` : "算出中"} />
                     <Metric label="2着適性順位" value={secondRank ? `${secondRank}位` : "算出中"} />
                     <Metric label="3着適性順位" value={thirdRank ? `${thirdRank}位` : "算出中"} />
                   </div>
@@ -2532,7 +2540,7 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
                     <p className="text-xs font-semibold text-slate-300">1着適性モデルが参照した要因</p>
                     {reasonViews(horse.roleReasons?.first, 3).map((reason, i) => <p key={i} className={`mt-1 break-words text-xs leading-5 ${reason.direction === "up" ? "text-cyan-200" : "text-rose-300"}`}>{reason.direction === "up" ? "↑" : "↓"} {reason.label}</p>)}
                     {!horse.roleReasons?.first?.length && <p className="mt-1 text-xs text-slate-500">要因データは未取得です。</p>}
-                    <p className="mt-2 text-[11px] leading-5 text-slate-500">矢印はモデル評価への影響です。穴候補の選定条件は上記の適性順位と市場差です。</p>
+                    <p className="mt-2 text-[11px] leading-5 text-slate-500">{data.race.league==="nar"?"地方の履歴要因は同一レース内の参考比較です。穴候補の条件は1着適性順位と人気順位の差で、期待値ではありません。":"矢印はモデル評価への影響です。穴候補の選定条件は上記の適性順位と市場差です。"}</p>
                   </div>
                 </button>
               );
@@ -2546,7 +2554,7 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
           </p>
         )}
         <p className="mt-3 text-[11px] leading-5 text-slate-500">
-          選定条件：4番人気以下、1着適性3〜6位、REIN市場モデル評価が市場評価を上回る馬。候補一覧は評価確認用で、買い目や総合順位は変更しません。
+          {data.race.league==="nar" ? data.narReference ? `${data.narReference.longshot.rule} ${data.narReference.longshot.detail}` : "この保存予想は地方の条件別検証反映前です。" : "選定条件：4番人気以下、1着適性3〜6位、REIN市場モデル評価が市場評価を上回る馬。"}候補一覧は評価確認用で、買い目や総合順位は変更しません。
         </p>
       </section>
     </>
