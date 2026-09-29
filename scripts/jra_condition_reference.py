@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from difflib import SequenceMatcher
 import json
 import re
 import unicodedata
@@ -39,7 +40,10 @@ def race_name_key(value: object) -> str:
         ("京王杯スプリングカップ", "京王杯SC"),
         ("フューチュリティステークス", "FS"),
         ("ジュベナイルフィリーズ", "JF"),
+        ("ジュベナイルF", "JF"),
         ("フィリーズレビュー", "FR"),
+        ("フューチュリティS", "FS"),
+        ("アメリカJCC", "AJCC"),
         ("ステークス", "S"),
         ("カップ", "C"),
     ):
@@ -131,6 +135,10 @@ def summarize_races(raw: pd.DataFrame, grade_schedule: dict[str, tuple[str, str]
     data["popularity"] = pd.to_numeric(data["popularity"], errors="coerce")
     data["gate"] = pd.to_numeric(data["gate"], errors="coerce")
     data["first_corner"] = data.get("corner_positions", pd.Series(index=data.index, dtype="object")).map(runner_first_corner)
+    schedule_by_condition: dict[str, list[tuple[str, tuple[str, str]]]] = {}
+    for key, value in (grade_schedule or {}).items():
+        condition, official_name_key = key.rsplit("|", 1)
+        schedule_by_condition.setdefault(condition, []).append((official_name_key, value))
     rows: list[dict[str, object]] = []
     for race_id, group in data.groupby("race_id", sort=False, observed=True):
         winners = group.loc[group["finish_position"].eq(1)]
@@ -141,6 +149,11 @@ def summarize_races(raw: pd.DataFrame, grade_schedule: dict[str, tuple[str, str]
             f"{normalized_text(first['surface'])}|{int(first['distance_m'])}|{race_name_key(first.get('race_name'))}"
         )
         official = (grade_schedule or {}).get(schedule_key)
+        if official is None:
+            condition_key, source_name_key = schedule_key.rsplit("|", 1)
+            candidates = schedule_by_condition.get(condition_key, [])
+            similar = [candidate for name_key, candidate in candidates if SequenceMatcher(None, source_name_key, name_key).ratio() >= 0.5]
+            official = similar[0] if len(similar) == 1 else None
         rows.append({
             "race_id": str(race_id), "race_date": first["race_date"], "race_year": int(first["race_year"]),
             "racecourse": normalized_text(first["racecourse"]), "race_name": normalized_text(first.get("race_name")),
