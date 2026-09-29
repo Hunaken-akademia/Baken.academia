@@ -1,0 +1,58 @@
+name: JRA condition and graded-race reference
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/jra-reference-analysis.yml
+      - scripts/jra_condition_reference.py
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: jra-condition-reference-v1
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_BROKER_URL: https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive
+      ARCHIVE_OBJECT_PATH: jra/2019-01-01_2026-09-18/jra-backfill-result.tar.gz
+      ARCHIVE_OUTPUT: .dataset/jra-backfill-result.tar.gz
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Download durable JRA history
+        run: |
+          mkdir -p .dataset
+          bash scripts/download_supabase_archive.sh
+          tar --no-same-owner -xzf .dataset/jra-backfill-result.tar.gz
+          test -s data/raw/jra/races-2019-2026.parquet
+      - name: Download official JRA graded-race schedules
+        run: |
+          mkdir -p .jra-grades
+          for year in {2019..2026}; do
+            curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors \
+              "https://www.jra.go.jp/datafile/seiseki/replay/${year}/jyusyo.html" \
+              -o ".jra-grades/${year}.html"
+          done
+      - name: Build condition and annual graded-race reference
+        run: >-
+          python scripts/jra_condition_reference.py
+          --input data/raw/jra/races-2019-2026.parquet
+          --grade-dir .jra-grades
+          --output artifacts/jra-condition-reference.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jra-condition-reference-v1
+          path: artifacts/jra-condition-reference.json
+          retention-days: 90

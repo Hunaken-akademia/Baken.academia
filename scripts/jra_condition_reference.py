@@ -7,6 +7,7 @@ import unicodedata
 from pathlib import Path
 
 import pandas as pd
+from lxml import html
 
 
 GRADE_RE = re.compile(r"(?<![A-Z0-9])G\s*([123]|I{1,3})(?![A-Z0-9])", re.I)
@@ -78,7 +79,38 @@ def period_stats(races: pd.DataFrame, year: int) -> dict[str, object]:
     }
 
 
-def summarize_races(raw: pd.DataFrame) -> pd.DataFrame:
+def official_grade_schedule(directory: Path) -> dict[str, tuple[str, str]]:
+    result: dict[str, tuple[str, str]] = {}
+    for source in sorted(directory.glob("*.html")):
+        year_match = re.search(r"20\d{2}", source.stem)
+        if not year_match:
+            continue
+        year = int(year_match.group())
+        payload = source.read_bytes()
+        decoded = payload.decode("utf-8", errors="replace")
+        if decoded.count("�") > 20:
+            decoded = payload.decode("cp932", errors="replace")
+        document = html.fromstring(decoded)
+        for row in document.xpath("//tr"):
+            cells = [" ".join(" ".join(cell.xpath(".//text()") ).split()) for cell in row.xpath("./th|./td")]
+            if len(cells) < 5:
+                continue
+            date_match = re.search(r"(\d{1,2})月(\d{1,2})日", cells[0])
+            grade_match = re.search(r"(?:J[・･]?\s*)?G\s*([ⅠⅡⅢI]{1,3}|[123])\s*(.+)", normalized_text(cells[1]), re.I)
+            distance_match = re.search(r"(\d[\d,]*)", cells[4])
+            venue = next((name for name in ("札幌", "函館", "福島", "新潟", "東京", "中山", "中京", "京都", "阪神", "小倉") if name in cells[2]), None)
+            surface = "芝" if cells[4].startswith("芝") else "ダート" if cells[4].startswith("ダ") else "障害" if cells[4].startswith("障") else None
+            if not date_match or not grade_match or not distance_match or not venue or not surface:
+                continue
+            token = normalized_text(grade_match.group(1)).upper()
+            number = token if token in "123" else str(len(token))
+            date = f"{year:04d}-{int(date_match.group(1)):02d}-{int(date_match.group(2)):02d}"
+            key = f"{date}|{venue}|{surface}|{int(distance_match.group(1).replace(',', ''))}"
+            result[key] = (f"G{number}", normalized_text(grade_match.group(2)))
+    return result
+
+
+def summarize_races(raw: pd.DataFrame, grade_schedule: dict[str, tuple[str, str]] | None = None) -> pd.DataFrame:
     data = raw.loc[raw["finish_position"].notna() & raw["surface"].isin(["芝", "ダート"])].copy()
     data["race_date"] = pd.to_datetime(data["race_date"])
     data["race_year"] = data["race_date"].dt.year
@@ -91,10 +123,12 @@ def summarize_races(raw: pd.DataFrame) -> pd.DataFrame:
         winners = group.loc[group["finish_position"].eq(1)]
         placed = group.loc[group["finish_position"].between(1, 3)]
         first = group.iloc[0]
+        schedule_key = f"{first['race_date'].date()}|{normalized_text(first['racecourse'])}|{normalized_text(first['surface'])}|{int(first['distance_m'])}"
+        official = (grade_schedule or {}).get(schedule_key)
         rows.append({
             "race_id": str(race_id), "race_date": first["race_date"], "race_year": int(first["race_year"]),
             "racecourse": normalized_text(first["racecourse"]), "race_name": normalized_text(first.get("race_name")),
-            "race_name_key": race_name_key(first.get("race_name")), "grade": grade_from_row(first),
+            "race_name_key": race_name_key(first.get("race_name")), "grade": grade_from_row(first) or (official[0] if official else None),
             "surface": normalized_text(first["surface"]), "distance_m": int(first["distance_m"]),
             "distance_band": distance_band(first["distance_m"]), "going": normalized_text(first.get("going")) or "不明",
             "field_size": int(len(group)), "winner_count": int(len(winners)),
@@ -131,7 +165,11 @@ def graded_history(races: pd.DataFrame, minimum_editions: int) -> list[dict[str,
         years = sorted(group["race_year"].unique())
         # Annual races need distinct editions across at least five years. A duplicated
         # same-year title or a one-off graded event must not become a trend card.
-        if len(years) < minimum_editions or len(group) < minimum_editions or max(years) < 2025:
+        if (
+            len(years) < minimum_editions
+            or len(group) != len(years)
+            or max(years) < 2025
+        ):
             continue
         editions = []
         for row in group.sort_values("race_date").itertuples():
@@ -147,8 +185,8 @@ def graded_history(races: pd.DataFrame, minimum_editions: int) -> list[dict[str,
     return result
 
 
-def build(raw: pd.DataFrame, minimum_races: int = 100, minimum_editions: int = 5) -> dict[str, object]:
-    races = summarize_races(raw)
+def build(raw: pd.DataFrame, minimum_races: int = 100, minimum_editions: int = 5, grade_schedule: dict[str, tuple[str, str]] | None = None) -> dict[str, object]:
+    races = summarize_races(raw, grade_schedule)
     return {
         "version": "jra-condition-reference-v1",
         "periods": {"selection": "2025", "audit": f"2026-01-01–{races['race_date'].max().date()}"},
@@ -171,12 +209,14 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--minimum-races", type=int, default=100)
     parser.add_argument("--minimum-editions", type=int, default=5)
+    parser.add_argument("--grade-dir", type=Path)
     args = parser.parse_args()
-    payload = build(pd.read_parquet(args.input), args.minimum_races, args.minimum_editions)
+    grades = official_grade_schedule(args.grade_dir) if args.grade_dir else None
+    payload = build(pd.read_parquet(args.input), args.minimum_races, args.minimum_editions, grades)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
     print(json.dumps({"coverage": payload["coverage"], "conditions": len(payload["conditions"]),
-                      "gradedRaces": len(payload["gradedRaces"]), "bytes": args.output.stat().st_size}, ensure_ascii=False))
+                      "gradedRaces": len(payload["gradedRaces"]), "officialGradeRows": len(grades or {}), "bytes": args.output.stat().st_size}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
