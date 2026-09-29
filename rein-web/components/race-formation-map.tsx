@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CORNER_AUDIT_MAE, CORNER_MODEL_VERSION, courseStages, horseSequences, predictCorner, stagePosition, type MapHorse } from "@/lib/corner-reference";
-import narCornerAudit from "@/lib/nar-corner-audit.json";
+import { courseStages, horseSequences, predictCorner, stagePosition, type MapHorse } from "@/lib/corner-reference";
 
 const frameColors = ["#94a3b8", "#f8fafc", "#171717", "#dc433c", "#3778dc", "#f4d641", "#329249", "#ec9a30", "#d94c90"];
 const styleOrder: Record<string, number> = { "逃げ": 1, "先行": 2, "好位": 3, "差し": 4, "追込": 5 };
@@ -35,10 +34,8 @@ export function RaceFormationMap({ horses, title, course, raceId, pace, league =
   const visible = projected.filter((p) => p.value !== null).sort((a,b) => a.value! - b.value! || a.horse.number-b.horse.number);
   const unknown = projected.filter((p) => p.value === null);
   const current = projected.find((p) => p.horse.number === selected);
-  const localAudit = nar ? narCornerAudit.byVenue.find(row=>row.venue===title.split(" ")[0]&&row.stage===corner) : undefined;
   const tops = [...horses].filter((h) => (h.firstSuitability ?? 0) > 0).sort((a,b) => (b.firstSuitability ?? 0)-(a.firstSuitability ?? 0)).slice(0,3).map((h) => h.number);
   const modeLabel = options.find((item) => item.id === active)?.label;
-  const legacy = horses.some((h) => h.mapPositions === undefined);
   const groupSize = Math.max(1, Math.ceil(visible.length / 3));
 
   return (
@@ -97,25 +94,7 @@ export function RaceFormationMap({ horses, title, course, raceId, pace, league =
             </> : <><p className="font-semibold">位置取りの根拠を見る</p><p className="mt-2 text-sm leading-6 text-slate-400">馬番をタップすると、推定番手と近走の通過順を確認できます。</p></>}
           </div>
           {unknown.length > 0 && <div className="rounded-xl border border-slate-700 p-3"><p className="text-xs text-slate-400">この場面は未判定</p><div className="mt-2 flex flex-wrap gap-2">{unknown.map(({horse}) => <button key={horse.number} type="button" onClick={() => setSelected(horse.number)} className="min-h-10 rounded-lg bg-white/5 px-3 text-sm">{horse.number} {horse.name}</button>)}</div></div>}
-          <details className="rounded-xl border border-slate-700 p-4 text-sm">
-            <summary className="cursor-pointer font-semibold">予測の見方・検証結果</summary>
-            <div className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
-              {nar ? <>
-                <p>地方の位置取りは近5走の当該地点を新しい順に重み付けした暫定推定です。中央の学習済みコーナーモデルや検証誤差は流用していません。</p>
-                <p>発走前保存データを{narCornerAudit.period}の実結果と照合。4角は{narCornerAudit.overall["4"].races}レース・{narCornerAudit.overall["4"].horses}頭で平均誤差{narCornerAudit.overall["4"].mae.toFixed(2)}番手（前走順位のみの場合{narCornerAudit.overall["4"].previousMae.toFixed(2)}番手）。2日間の限定検証で、補正を確定するには不十分です。</p>
-                {localAudit&&<p>この場・この地点：{localAudit.races}レース・{localAudit.horses}頭、平均誤差{localAudit.mae.toFixed(2)}番手。当日の全馬通過順が集団表記の馬は、順位を断定できないため照合対象外です。</p>}
-                <p>範囲は過去の通過順位の最小〜最大で、予測区間・的中確率ではありません。内外の進路、馬身差、想定タイムは予測対象外です。</p>
-                <p>現段階は序盤・3角・4角のみ。1・2角は地方のコース別通過地点を検証してから追加します。ばんえいに平地の隊列予測は適用しません。</p>
-              </> : <>
-              <p>AIは2019〜2024年の過去データで学習した位置取りモデルです。近走通過順・頭数・距離・芝ダート・枠から地点別に推定します。当日オッズ・人気・今回の着順結果は使いません。</p>
-              <p>2026年データの4角検証では平均誤差 {CORNER_AUDIT_MAE.toFixed(2)}番手。目安幅は2025年の検証誤差から算出したもので、各馬に同じ確率を保証するものではありません。</p>
-              <p>序盤は最初の記録地点の予測で、発馬直後ではありません。1・2角を通らないコースでは該当ボタンを出しません。直線・障害・未登録コースではAIコーナー予測を保留します。</p>
-              <p>内外の進路・馬身差・想定タイムはまだ予測対象外です。前走表示は各馬の別レースの通過順位を比較する参考図です。</p>
-              <p>総合評価・1〜3着適性・買い目は変更していません。{legacy ? "一部は既存保存データの通過順を使用しています。" : ""}</p>
-              <p>モデル：{CORNER_MODEL_VERSION} / 検証期間：2026年1月〜9月13日</p>
-              </>}
-            </div>
-          </details>
+          <p className="text-xs leading-5 text-slate-400">位置取りは予測の目安です。実際の進路・馬身差を表すものではありません。</p>
           {!eligible && <p className="text-xs leading-5 text-amber-200">{banei ? "ばんえいにコーナーはないため、平地の隊列図は表示しません。" : "このコースまたは日付はAI予測対象外のため、脚質を表示しています。"}</p>}
         </div>
       </div>
