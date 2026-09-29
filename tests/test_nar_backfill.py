@@ -17,7 +17,7 @@ class NarBackfillTest(unittest.TestCase):
         <td class="e">北海道</td><td class="f">牡 4</td><td class="g">56</td>
         <td class="h jockeyName"><a href="/KeibaWeb/DataRoom/RiderMark?k_riderLicenseNo=J1">騎手A</a></td>
         <td class="i"><a class="trainerName" href="/KeibaWeb/DataRoom/TrainerMark?k_trainerLicenseNo=T1">調教師A</a></td>
-        <td class="j horseWeight">480<span>(2)</span></td><td class="k">1:25.0</td><td class="l"></td><td class="m">38.1</td><td class="o">2</td><td class="p">3.4</td>
+        <td class="j horseWeight">480<span>(2)</span></td><td class="k">1:25.0</td><td class="l"></td><td class="m">38.1</td><td class="n corner_position">4-3-2-1</td><td class="o">2</td><td class="p">3.4</td>
         </tr></table></section></main>'''.encode()
         url = "https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?k_raceDate=2019%2F01%2F01&k_raceNo=1&k_babaCode=3"
         row = parse_result_page(payload, url)[0]
@@ -33,6 +33,7 @@ class NarBackfillTest(unittest.TestCase):
         self.assertEqual(row["weight_carried"], 56.0)
         self.assertEqual(row["finish_time"], "1:25.0")
         self.assertEqual(row["last_3f"], 38.1)
+        self.assertEqual(row["corner_positions"], "4-3-2-1")
         self.assertEqual(row["finish_position"], 1)
         self.assertEqual(row["popularity"], 2)
         self.assertEqual(row["win_odds"], 3.4)

@@ -212,6 +212,7 @@ def parse_result_page(payload: bytes, source_url: str) -> list[dict[str, object]
             "finish_time": _text(_cell(runner, "k")) or None,
             "margin": _text(_cell(runner, "l")) or None,
             "last_3f": _float(_text(_cell(runner, "m"))),
+            "corner_positions": _text(_cell(runner, "n")) or None,
             "popularity": _int(_text(_cell(runner, "o"))),
             "win_odds": _float(_text(_cell(runner, "p"))),
             "payouts": payout_json, "source": "NAR地方競馬情報サイト", "source_url": source_url,

@@ -10,6 +10,7 @@ on:
       - scripts/nar_partial_analysis.py
       - scripts/nar_live_model.py
       - scripts/nar_full_revalidation.py
+      - scripts/nar_condition_validation.py
       - reports/nar-current-release-model-20260928.json
   schedule:
     - cron: "17 */6 * * *"
@@ -95,6 +96,11 @@ jobs:
             signed_url="$(jq -er '.signed_url' <<<"${response}")"
             archive=".nar-archives/${period}.tar.gz"
             curl --fail-with-body --silent --show-error --retry 3 "${signed_url}" -o "${archive}"
+            if [[ "$completed" == 0 ]]; then
+              tar -tzf "${archive}" > /tmp/nar-archive-members.txt
+              echo "First archive raw HTML cache count: $(grep -c 'html.gz$' /tmp/nar-archive-members.txt || true)"
+              head -20 /tmp/nar-archive-members.txt
+            fi
             # Legacy archives include duplicate events and unused odds tables.
             tar --no-same-owner --wildcards --no-anchored --exclude='*-odds-*' --exclude='*-payouts*' --exclude='*-manifest*' -xzf "${archive}" -C .nar-dataset 'nar-*.parquet'
             completed=$((completed + 1))
@@ -120,6 +126,20 @@ jobs:
         if: steps.archives.outputs.completed != '0'
         shell: bash
         run: cat artifacts/nar-partial-analysis/summary.md >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Validate venue weights and reference signals
+        if: steps.archives.outputs.completed != '0'
+        env:
+          OPENBLAS_NUM_THREADS: '2'
+          OMP_NUM_THREADS: '2'
+        run: >-
+          python scripts/nar_condition_validation.py
+          --input-file artifacts/nar-partial-analysis/nar-partial-combined.parquet
+          --output-dir artifacts/nar-partial-analysis
+
+      - name: Publish condition validation summary
+        if: steps.archives.outputs.completed != '0'
+        run: cat artifacts/nar-partial-analysis/condition-summary.md >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Publish latest partial NAR analysis to REIN
         if: steps.archives.outputs.completed != '0'
