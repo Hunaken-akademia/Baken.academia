@@ -73,7 +73,7 @@ export default async function AccessPage() {
           <p className="mt-3 leading-7 text-slate-300">{message.body}</p>
 
           <div className="mt-6 rounded-2xl border border-slate-700 bg-black/15 p-4 text-sm text-slate-400">
-            <p>中央・地方とも会員向け先行公開中。会員情報の利用期間・プランに従って表示します。</p>
+            <p>中央・地方とも会員向け公開中。会員情報の利用期間・プランに従って表示します。</p>
             <p className="mt-1">CAMPFIRE特典：初月無料（参加した最初の月の参加費が無料）</p>
           </div>
 
