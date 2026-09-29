@@ -4,7 +4,7 @@ import json
 
 import pandas as pd
 
-from scripts.jra_condition_reference import build, grade_from_row, race_name_key, runner_first_corner
+from scripts.jra_condition_reference import build, grade_from_row, official_grade_schedule, race_name_key, runner_first_corner
 
 
 def test_grade_name_and_corner_parsing_are_strict_enough():
@@ -43,3 +43,26 @@ def test_build_requires_both_years_for_conditions_and_five_distinct_graded_editi
     assert len(payload["gradedRaces"]) == 1
     assert len(payload["gradedRaces"][0]["editions"]) == 6
     assert payload["gradedRaces"][0]["key"] == "テスト記念"
+
+
+def test_official_schedule_recovers_image_only_grades(tmp_path):
+    (tmp_path / "2026.html").write_text("""<table><tr><td>9月30日水曜</td><td>GⅢ テスト記念</td><td>中山</td><td>3歳以上</td><td>芝1,200メートル</td></tr></table>""")
+    schedule = official_grade_schedule(tmp_path)
+    assert schedule["2026-09-30|中山|芝|1200"] == ("G3", "テスト記念")
+
+
+def test_graded_history_rejects_duplicate_same_year_titles():
+    rows = []
+    for year in range(2021, 2027):
+        repeats = 2 if year == 2025 else 1
+        for repeat in range(repeats):
+            for number in (1, 2, 3):
+                rows.append({
+                    "race_id": f"{year}-duplicate-{repeat}", "race_date": f"{year}-09-{20 + repeat:02d}",
+                    "racecourse": "中山", "race_name": "重複記念", "race_class": "GIII",
+                    "race_category": "重賞", "surface": "芝", "distance_m": 1200, "going": "良",
+                    "horse_id": f"{year}-{repeat}-{number}", "horse_number": number, "gate": number,
+                    "popularity": number, "finish_position": number, "corner_positions": json.dumps([str(number)]),
+                })
+    payload = build(pd.DataFrame(rows), minimum_races=999, minimum_editions=5)
+    assert payload["gradedRaces"] == []
