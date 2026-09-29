@@ -33,6 +33,9 @@ def race_name_key(value: object) -> str:
     text = normalized_text(value)
     text = re.sub(r"第\s*\d+\s*回", "", text)
     text = re.sub(r"[（(]\s*(?:G|JPN)\s*[123IⅡⅢ]+\s*[)）]", "", text, flags=re.I)
+    text = re.sub(r"天皇賞[（(](春|秋)[)）]", r"天皇賞\1", text)
+    text = re.sub(r"東京優駿[（(]日本ダービー[)）]", "東京優駿", text)
+    text = re.sub(r"優駿牝馬[（(]オークス[)）]", "優駿牝馬", text)
     text = re.sub(r"[（(][^()（）]*[)）]", "", text)
     for full, short in (
         ("アメリカジョッキークラブカップ", "AJCC"),
