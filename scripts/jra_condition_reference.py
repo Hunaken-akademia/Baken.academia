@@ -92,7 +92,7 @@ def official_grade_schedule(directory: Path) -> dict[str, tuple[str, str]]:
             decoded = payload.decode("cp932", errors="replace")
         document = html.fromstring(decoded)
         for row in document.xpath("//tr"):
-            cells = [" ".join(" ".join(cell.xpath(".//text()") ).split()) for cell in row.xpath("./th|./td")]
+            cells = [" ".join(" ".join(cell.xpath(".//text() | .//@alt")).split()) for cell in row.xpath("./th|./td")]
             if len(cells) < 5:
                 continue
             date_match = re.search(r"(\d{1,2})月(\d{1,2})日", cells[0])
