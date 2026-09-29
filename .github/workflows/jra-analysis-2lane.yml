@@ -72,9 +72,16 @@ jobs:
       - name: Venue and candidate-feature analysis
         if: matrix.lane == 'venue'
         run: |
+          mkdir -p .jra-grades
+          for year in {2019..2026}; do
+            curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors \
+              "https://www.jra.go.jp/datafile/seiseki/replay/${year}/jyusyo.html" \
+              -o ".jra-grades/${year}.html"
+          done
           python scripts/jra_venue_feature_analysis.py
           python scripts/jra_condition_reference.py \
             --input data/raw/jra/races-2019-2026.parquet \
+            --grade-dir .jra-grades \
             --output reports/jra-venue-features-v2/jra-condition-reference.json
       - name: Upload ROI report
         if: matrix.lane == 'roi'
