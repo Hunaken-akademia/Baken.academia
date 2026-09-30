@@ -742,6 +742,14 @@ function roleReady(data: Analysis) {
   return data.evaluation?.roleModel !== "unavailable";
 }
 
+function predictionIsComplete(data: Analysis) {
+  return data.horses.length > 0 &&
+    data.horses.every((horse) => typeof horse.weight === "number" && horse.weight > 0) &&
+    data.horses.every((horse) => horse.odds !== null && horse.odds > 0 && horse.popularity > 0) &&
+    data.evaluation?.roleModel === "ready" &&
+    data.evaluation?.overall === "ready";
+}
+
 function RaceConfidenceCard({ confidence, nar = false, reference }: { confidence?: RaceConfidence | null; nar?: boolean; reference?:NarReference|null }) {
   const tone = confidence?.label === "かなり高い"
     ? "border-violet-400/35 bg-violet-400/[.07] text-violet-200"
@@ -825,6 +833,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
   const held = data.evaluation?.held ?? [];
   const rolesReady = roleReady(data);
   const rankingReady = overallReady(data);
+  const completePrediction = predictionIsComplete(data);
   const listHorses = rankingReady
     ? data.horses
     : [...data.horses].sort((a, b) => a.number - b.number);
@@ -832,7 +841,16 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
   const firstRank = (horse: Horse) =>
     firstOrder.findIndex((item) => item.number === horse.number) + 1;
   return (
-    <>
+    <div className={`rounded-3xl border-2 p-3 transition-colors sm:p-4 ${completePrediction ? "border-emerald-400/70 bg-emerald-400/[.025]" : "border-amber-400/70 bg-amber-400/[.025]"}`}>
+      <div className={`mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${completePrediction ? "border-emerald-400/30 bg-emerald-400/[.08] text-emerald-200" : "border-amber-400/30 bg-amber-400/[.08] text-amber-200"}`}>
+        <div>
+          <p className="text-sm font-bold">{completePrediction ? "完全予想" : "更新待ちの予想"}</p>
+          <p className="mt-0.5 text-xs opacity-75">{completePrediction ? "馬体重を含む当日データを取得済み" : "未発表・未取得の当日データがあります"}</p>
+        </div>
+        <Badge className={completePrediction ? "bg-emerald-300 text-emerald-950" : "bg-amber-300 text-amber-950"}>
+          {completePrediction ? "完全" : "暫定"}
+        </Badge>
+      </div>
       {data.model && (
         <section className="mb-4 flex flex-wrap gap-x-4 gap-y-1 rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-2 text-xs text-slate-400">
           <span className="font-semibold text-cyan-300">{data.race.league === "nar" ? data.model.release?.validatedRanking ? "地方専用・全量履歴 接続済み" : "地方の取得済み履歴・暫定版" : "8年履歴 接続済み"}</span>
@@ -1204,7 +1222,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
       {rolesReady && <MarketReinComparison data={data} horses={listHorses} />}
       <DetailedComparison data={data} horses={listHorses} />
       {rankingReady && <OverallAssessment data={data} insights={insights} onHorse={onHorse} />}
-    </>
+    </div>
   );
 }
 
