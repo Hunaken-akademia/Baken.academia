@@ -2,6 +2,11 @@ name: NAR rolling partial analysis
 
 on:
   workflow_dispatch:
+    inputs:
+      audit_second_third:
+        description: 'Research only: audit second-place support for third-place ranking'
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -35,6 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
+      SUPPORT_AUDIT_ONLY: ${{ inputs.audit_second_third == true || contains(github.event.head_commit.message, '[second-third-support-audit]') }}
       SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
     steps:
       - uses: actions/checkout@v4
@@ -118,19 +124,19 @@ jobs:
           echo "v2チャンクがまだ完成していないため、今回は正常終了します。" >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Analyze acquired NAR data
-        if: steps.archives.outputs.completed != '0'
+        if: steps.archives.outputs.completed != '0' && env.SUPPORT_AUDIT_ONLY != 'true'
         run: >-
           python scripts/nar_partial_analysis.py
           --input-dir .nar-dataset
           --output-dir artifacts/nar-partial-analysis
 
       - name: Publish summary
-        if: steps.archives.outputs.completed != '0'
+        if: steps.archives.outputs.completed != '0' && env.SUPPORT_AUDIT_ONLY != 'true'
         shell: bash
         run: cat artifacts/nar-partial-analysis/summary.md >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Validate venue weights and reference signals
-        if: steps.archives.outputs.completed != '0'
+        if: steps.archives.outputs.completed != '0' && env.SUPPORT_AUDIT_ONLY != 'true'
         env:
           OPENBLAS_NUM_THREADS: '2'
           OMP_NUM_THREADS: '2'
@@ -140,11 +146,11 @@ jobs:
           --output-dir artifacts/nar-partial-analysis
 
       - name: Publish condition validation summary
-        if: steps.archives.outputs.completed != '0'
+        if: steps.archives.outputs.completed != '0' && env.SUPPORT_AUDIT_ONLY != 'true'
         run: cat artifacts/nar-partial-analysis/condition-summary.md >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Publish latest partial NAR analysis to REIN
-        if: steps.archives.outputs.completed != '0'
+        if: steps.archives.outputs.completed != '0' && env.SUPPORT_AUDIT_ONLY != 'true'
         shell: bash
         env:
           SUPABASE_SERVER_DATA_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/rein-server-data"
@@ -172,7 +178,7 @@ jobs:
             --data "${payload}"
 
       - name: Revalidate frozen NAR release against full data
-        if: steps.archives.outputs.completed != '0'
+        if: steps.archives.outputs.completed != '0' && env.SUPPORT_AUDIT_ONLY != 'true'
         run: >-
           python scripts/nar_full_revalidation.py
           --input-file artifacts/nar-partial-analysis/nar-partial-combined.parquet
@@ -180,18 +186,36 @@ jobs:
           --output-dir artifacts/nar-partial-analysis/full-revalidation
 
       - name: Publish full revalidation summary
-        if: steps.archives.outputs.completed != '0'
+        if: steps.archives.outputs.completed != '0' && env.SUPPORT_AUDIT_ONLY != 'true'
         shell: bash
         run: cat artifacts/nar-partial-analysis/full-revalidation/summary.md >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Remove temporary combined parquet before artifact upload
-        if: steps.archives.outputs.completed != '0'
+        if: steps.archives.outputs.completed != '0' && env.SUPPORT_AUDIT_ONLY != 'true'
         run: rm -f artifacts/nar-partial-analysis/nar-partial-combined.parquet
 
       - uses: actions/upload-artifact@v4
-        if: steps.archives.outputs.completed != '0'
+        if: steps.archives.outputs.completed != '0' && env.SUPPORT_AUDIT_ONLY != 'true'
         with:
           name: nar-partial-analysis-v2
           path: artifacts/nar-partial-analysis
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Audit second-place support without publishing a model
+        if: steps.archives.outputs.completed != '0' && env.SUPPORT_AUDIT_ONLY == 'true'
+        env:
+          OPENBLAS_NUM_THREADS: '2'
+          OMP_NUM_THREADS: '2'
+        run: >-
+          python scripts/audit_second_third_support.py
+          --league nar --input-dir .nar-dataset
+          --output-dir artifacts/second-third-support-audit
+
+      - uses: actions/upload-artifact@v4
+        if: steps.archives.outputs.completed != '0' && env.SUPPORT_AUDIT_ONLY == 'true'
+        with:
+          name: nar-second-third-support-audit
+          path: artifacts/second-third-support-audit
           if-no-files-found: error
           retention-days: 14
