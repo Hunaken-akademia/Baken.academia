@@ -19,6 +19,31 @@ def live_identifiers(f, rows, raw):
         f[col] = pd.Series(ids[col].astype(str).str.lstrip('0').replace('', '0').to_numpy(), index=f.index).astype('category')
     return f
 
+def align_live_rates(f, rows, raw):
+    h=raw.loc[~raw.finish_status.astype(str).str.contains('取消|除外')].copy()
+    h['race_date']=pd.to_datetime(h.race_date)
+    h=h.sort_values(['race_date','race_id','horse_number']).reset_index(drop=True)
+    for col in ('horse_id','jockey_id','trainer_id'):
+        h[col]=h[col].astype(str).str.lstrip('0').replace('', '0')
+    valid=h.finish_position.notna().astype(int);placed=h.finish_position.between(1,3).astype(int)
+    wet=h.going.isin(['重','不良'])
+    n=valid.groupby([h.horse_id,wet]).cumsum()-valid
+    t=placed.groupby([h.horse_id,wet]).cumsum()-placed
+    h['horse_wet_prior_starts']=n
+    h['horse_wet_prior_top3_rate']=(t+4.5)/(n+20)
+    for entity in ('jockey_id','trainer_id'):
+        daily=pd.DataFrame({'entity':h[entity],'date':h.race_date,'n':1,'w':h.finish_position.eq(1).astype(int),'t':placed}).groupby(['entity','date']).sum().reset_index()
+        lookup=[]
+        for key,g in daily.groupby('entity',sort=False):
+            g=g.set_index('date').sort_index();z=g[['n','w','t']].rolling('90D',closed='left').sum();z['entity']=key;lookup.append(z.reset_index())
+        z=pd.concat(lookup).set_index(['entity','date']);q=z.reindex(pd.MultiIndex.from_arrays([h[entity],h.race_date])).fillna(0)
+        h[entity+'_recent90_win']=((q.w+1.5)/(q.n+20)).to_numpy()
+        h[entity+'_recent90_place']=((q.t+4.5)/(q.n+20)).to_numpy()
+    cols=['horse_wet_prior_starts','horse_wet_prior_top3_rate']+[e+'_recent90_'+t for e in ('jockey_id','trainer_id') for t in ('win','place')]
+    z=rows[['race_id','horse_number']].merge(h[['race_id','horse_number']+cols],on=['race_id','horse_number'],validate='one_to_one')
+    for col in cols:f[col]=z[col].to_numpy()
+    return f
+
 def jra_predictions():
     from rein_research import prepare
     from rein_research_v3 import add_v3_features
@@ -31,7 +56,7 @@ def jra_predictions():
         # Live runtime strips leading zeroes in rider/trainer identifiers.
         # Match it rather than quietly evaluating a training-only feature path.
         raw = pd.read_parquet(root/'data/history.parquet')
-        f = live_identifiers(f, out, raw)
+        f = align_live_rates(live_identifiers(f, out, raw), out, raw)
         schema = json.loads((root/'schema.json').read_text())
         ss = json.loads((ROOT/'rein-web/api/models/second_joint_v5.schema.json').read_text())
         with gzip.open(ROOT/'rein-web/api/models/second_joint_v5.txt.gz','rt') as stream:
@@ -39,6 +64,7 @@ def jra_predictions():
         third = lgb.Booster(model_file=str(root/'models/third.txt'))
         out['second'] = second.predict(f[ss['feature_order']],num_threads=2)[:,ss['second_class_index']]
         out['third'] = third.predict(f[schema['role_feature_order']['third']],num_threads=2)
+        f.to_parquet(cache.parent/'batch-features.parquet',index=False)
         out.to_parquet(cache,index=False)
         return out
     raw = pd.read_parquet(root / 'data/history.parquet')
@@ -70,7 +96,7 @@ def jra_predictions():
     third = lgb.Booster(model_file=str(root / 'models/third.txt'))
     mask = x.race_date.ge('2025-01-01') & x.surface.isin(['芝', 'ダート'])
     out = x.loc[mask, ['race_id','horse_number','race_date','racecourse','distance_m','going','popularity','finish_position']].copy()
-    f = live_identifiers(f, x, raw)
+    f = align_live_rates(live_identifiers(f, x, raw), x, raw)
     sf = f.loc[mask, second_schema['feature_order']]
     tf = f.loc[mask, schema['role_feature_order']['third']]
     print('Predict current JRA models', len(out), flush=True)
