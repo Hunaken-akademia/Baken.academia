@@ -12,14 +12,35 @@ import argparse
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'scripts'), str(ROOT / 'src'), str(ROOT / 'rein-web/api')]
 
+def live_identifiers(f, rows, raw):
+    keys = ['race_id', 'horse_number']
+    ids = rows[keys].merge(raw[keys + ['jockey_id','trainer_id']], on=keys, how='left', validate='one_to_one')
+    for col in ('jockey_id','trainer_id'):
+        f[col] = pd.Series(ids[col].astype(str).str.lstrip('0').replace('', '0').to_numpy(), index=f.index).astype('category')
+    return f
+
 def jra_predictions():
     from rein_research import prepare
     from rein_research_v3 import add_v3_features
     from baken_academia.features import build_feature_frame
     root = next((ROOT / '.second-third-audit/jra').glob('*/schema.json')).parent
     cache = ROOT / '.second-third-audit/jra/current-role-predictions.parquet'
-    if cache.exists():
-        return pd.read_parquet(cache)
+    if cache.exists() and (cache.parent/'batch-features.parquet').exists():
+        out = pd.read_parquet(cache)
+        f = pd.read_parquet(cache.parent/'batch-features.parquet')
+        # Live runtime strips leading zeroes in rider/trainer identifiers.
+        # Match it rather than quietly evaluating a training-only feature path.
+        raw = pd.read_parquet(root/'data/history.parquet')
+        f = live_identifiers(f, out, raw)
+        schema = json.loads((root/'schema.json').read_text())
+        ss = json.loads((ROOT/'rein-web/api/models/second_joint_v5.schema.json').read_text())
+        with gzip.open(ROOT/'rein-web/api/models/second_joint_v5.txt.gz','rt') as stream:
+            second = lgb.Booster(model_str=stream.read())
+        third = lgb.Booster(model_file=str(root/'models/third.txt'))
+        out['second'] = second.predict(f[ss['feature_order']],num_threads=2)[:,ss['second_class_index']]
+        out['third'] = third.predict(f[schema['role_feature_order']['third']],num_threads=2)
+        out.to_parquet(cache,index=False)
+        return out
     raw = pd.read_parquet(root / 'data/history.parquet')
     print('JRA historical features', len(raw), flush=True)
     x, added = add_v3_features(prepare(raw))
@@ -49,9 +70,11 @@ def jra_predictions():
     third = lgb.Booster(model_file=str(root / 'models/third.txt'))
     mask = x.race_date.ge('2025-01-01') & x.surface.isin(['芝', 'ダート'])
     out = x.loc[mask, ['race_id','horse_number','race_date','racecourse','distance_m','going','popularity','finish_position']].copy()
+    f = live_identifiers(f, x, raw)
     sf = f.loc[mask, second_schema['feature_order']]
     tf = f.loc[mask, schema['role_feature_order']['third']]
     print('Predict current JRA models', len(out), flush=True)
+    f.loc[mask].to_parquet(cache.parent/'batch-features.parquet',index=False)
     out['second'] = second.predict(sf, num_threads=2)[:,second_schema['second_class_index']]
     out['third'] = third.predict(tf, num_threads=2)
     out.to_parquet(cache,index=False)
@@ -78,6 +101,9 @@ def nar_predictions(input_dir):
             # Replay the venue correction already adopted by the previous audit.
             models=local_models(data,features,y,train,'course',model)
             scores=conditioned_predict(data,features,model,models,'course')
+        # Candidate blends use positive odds scores; monotonic conversion leaves
+        # the current and rank-blend orders unchanged. These are ranking weights,
+        # not calibrated probabilities or the published sigmoid-share scale.
         data[role]=np.exp(scores-pd.Series(scores).groupby(data.race_id).transform('max'))
     return data.loc[data.race_date.ge('2025-01-01'),['race_id','horse_number','race_date','racecourse','distance_m','going','popularity','finish_position','second','third']]
 
@@ -136,8 +162,10 @@ def evaluate(data):
     selected=max(grid,key=key)
     constrained=[n for n in scores if n=='current' or n.startswith(('support-','rank-lift-'))]
     conditional=max(constrained,key=key)
-    report={'selected':selected,'selectedConditional':conditional,'selection':grid,'audit':{},'comparisons':{},'byCourse':{}}
-    for name in dict.fromkeys(['current',selected,conditional,'blend-0.2','blend-0.5']):
+    guarded = [n for n in scores if all(grid[n][s]['top5']['hits'] >= grid['current'][s]['top5']['hits'] for s in ('pop4plus','pop10plus'))]
+    guarded_selected = max(guarded,key=key)
+    report={'selected':selected,'selectedConditional':conditional,'selectedPopularityGuarded':guarded_selected,'selection':grid,'audit':{},'comparisons':{},'byCourse':{}}
+    for name in dict.fromkeys(['current',selected,conditional,guarded_selected,'blend-0.2','blend-0.5']):
         report['audit'][name]=metrics(data.loc[test],scores[name].loc[test])
         report['comparisons'][name]=paired(data.loc[test],scores[name].loc[test],scores['current'].loc[test])
     for course,g in data.loc[test].groupby('racecourse'):
