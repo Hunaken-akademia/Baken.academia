@@ -313,7 +313,11 @@ async function storeAnalysis(response: Response, raceId: string, preview: boolea
 async function refreshInBackground(request: NextRequest, raceId: string, preview: boolean, mustBeScheduled = false) {
   try {
     if (mustBeScheduled) {
-      const { schedule } = await serverData<{schedule:{payload:{venues:Array<{races:Array<{raceId:string}>}>}}|null}>("schedule",{date:dateJst(preview?1:0)});
+      const requestedDate = request.nextUrl.searchParams.get("date") || "";
+      const targetDate = /^20\\d{2}-\\d{2}-\\d{2}$/.test(requestedDate) && requestedDate >= dateJst(-365) && requestedDate <= dateJst()
+        ? requestedDate
+        : dateJst(preview ? 1 : 0);
+      const { schedule } = await serverData<{schedule:{payload:{venues:Array<{races:Array<{raceId:string}>}>}}|null}>("schedule",{date:targetDate});
       if (!schedule?.payload.venues.some(v=>v.races.some(r=>r.raceId===raceId))) return;
     }
     // A completed but not-yet-final result keeps its original prediction time.
