@@ -23,8 +23,9 @@ const FUNCTION_BUDGET_MS = 285_000;
 // (6 runs an hour x 12 races).
 const MAX_BACKLOG_JOBS = 12;
 
-async function loadRaces(origin: string, secret: string, day: "today" | "tomorrow", league: "jra" | "nar" = "jra") {
-  const response = await fetch(`${origin}${league === "nar" ? "/api/nar" : "/api"}/races${day === "tomorrow" ? "?day=tomorrow" : ""}`, {
+async function loadRaces(origin: string, secret: string, day: "today" | "tomorrow", league: "jra" | "nar" = "jra", requestedDate?: string) {
+  const query = requestedDate ? `?date=${encodeURIComponent(requestedDate)}` : day === "tomorrow" ? "?day=tomorrow" : "";
+  const response = await fetch(`${origin}${league === "nar" ? "/api/nar" : "/api"}/races${query}`, {
     cache: "no-store",
     headers: { authorization: `Bearer ${secret}` },
     signal: AbortSignal.timeout(league === "nar" ? 100_000 : 30_000),
@@ -59,8 +60,9 @@ export async function GET(request: NextRequest) {
     const narRuntime=league==="nar"?await loadNarRuntime(!!expectedRelease):null;
     if(expectedRelease && (league!=="nar" || narRuntime?.model.release?.id!==expectedRelease))return NextResponse.json({error:"Model release pending"},{status:503});
     const stored = targetDate !== dateJst() ? await serverData<{schedule:{payload:{venues:RaceVenue[]}}|null}>("schedule",{date:targetDate,league}) : null;
-    if (targetDate !== dateJst() && !stored?.schedule) return NextResponse.json({ok:false,error:"No saved schedule for requested date"},{status:404});
-    const todaysRaces = stored ? (stored.schedule?.payload.venues ?? []).flatMap(v=>(v.races??[]).map(r=>({...r,preview:false}))) : await loadRaces(origin, secret, "today", league);
+    const todaysRaces = stored?.schedule
+      ? stored.schedule.payload.venues.flatMap(v=>(v.races??[]).map(r=>({...r,preview:false})))
+      : await loadRaces(origin, secret, "today", league, targetDate !== dateJst() ? targetDate : undefined);
     // Tomorrow's card is optional work; a failure there must not stop today's refresh.
     const today = todaysRaces.map(r=>({...r,date:targetDate}));
     const localHour = new Date(Date.now()+9*3600_000).getUTCHours();
