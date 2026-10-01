@@ -79,13 +79,15 @@ export function parseNarCard(html: string, raceId: string) {
     const markets = contents(block,"td","odds_weight").map(narText);
     const odds = finite(markets[0]?.match(/^([\d.]+)\s*\(/)?.[1] ?? "");
     const popularity = Number(markets[0]?.match(/\((\d+)人気\)/)?.[1] ?? 0);
-    const weight = markets[1]?.match(/^(\d+)\s*\(([+-]?\d+)\)/);
+    // First-time starters have no previous weight, so NAR publishes only the
+    // current value (for example "447") without a parenthesized change.
+    const weight = markets[1]?.match(/^(\d+)(?:\s*\(([+-]?\d+)\))?$/);
     const age = narText(block).match(/(せん|セン|牡|牝)\s*(\d+)/);
     // Only the past-race timing cells contain time + passing order + final 3f.
     const positions = [...block.matchAll(/\d+:\d{2}\.\d\s*[　\s]+(\d{1,2}(?:-\d{1,2}){1,3})\s*[　\s]+\d+\.\d/g)].map(m=>m[1]).slice(0,5);
     const early = positions.length ? positions.reduce((s,p,i)=>s+Number(p.split("-")[0])*(5-i),0)/positions.reduce((s,_,i)=>s+5-i,0) : null;
     const weightCarried = narText(block).match(/(?:生|毛)\s+(\d{2,3}\.\d)\s+/)?.[1];
-    horses.push({horseId:idFrom(block,"k_lineageLoginCode"),number,gate,name,jockeyId:idFrom(block,"k_riderLicenseNo"),trainerId:idFrom(block,"k_trainerLicenseNo"),jockey:narText(contents(block,"a","jockeyName")[0] ?? "").split("（")[0],trainer:narText(block.match(/<a[^>]*href=["'][^"']*TrainerMark[^"']*["'][^>]*>([\s\S]*?)<\/a>/)?.[1] ?? ""),odds,popularity,...(weight?{weight:Number(weight[1]),weightChange:Number(weight[2])}:{}),...(age?{sex:age[1],age:Number(age[2])}:{}),...(weightCarried?{weightCarried:Number(weightCarried)}:{}),style:early===null?"不明":early<=2?"逃げ":early<=4?"先行":early<=6?"好位":early<=9?"差し":"追込",earlyPosition:early,recentPositions:positions,mapPositions:positions,pastCorners:positions.map(p=>p.split("-").length)});
+    horses.push({horseId:idFrom(block,"k_lineageLoginCode"),number,gate,name,jockeyId:idFrom(block,"k_riderLicenseNo"),trainerId:idFrom(block,"k_trainerLicenseNo"),jockey:narText(contents(block,"a","jockeyName")[0] ?? "").split("（")[0],trainer:narText(block.match(/<a[^>]*href=["'][^"']*TrainerMark[^"']*["'][^>]*>([\s\S]*?)<\/a>/)?.[1] ?? ""),odds,popularity,...(weight?{weight:Number(weight[1]),...(weight[2]!==undefined?{weightChange:Number(weight[2])}:{})}:{}),...(age?{sex:age[1],age:Number(age[2])}:{}),...(weightCarried?{weightCarried:Number(weightCarried)}:{}),style:early===null?"不明":early<=2?"逃げ":early<=4?"先行":early<=6?"好位":early<=9?"差し":"追込",earlyPosition:early,recentPositions:positions,mapPositions:positions,pastCorners:positions.map(p=>p.split("-").length)});
   }
   if (!horses.length || new Set(horses.map(h=>h.number)).size!==horses.length || horses.some(h=>h.gate<1||h.gate>8)) throw new Error("地方出走表を安全に読み取れませんでした");
   return {race:{raceId,title:`${key.venue} ${key.number}R ${raceName}`,course,condition:going,start,startsAt:Date.parse(`${key.date}T${start}:00+09:00`),updated:"",league:"nar" as const},horses,scratched,context:{racecourse:key.venue,surface,distanceM:distance,going,code:key.code,date:key.date}};
