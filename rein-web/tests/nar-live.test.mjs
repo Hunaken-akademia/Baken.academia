@@ -9,7 +9,7 @@ const {narReferenceSignals,narConditionKey}=await import(validationUrl);
 const {narRaceKey,narUrl,narVenueCodes,parseNarSchedule,parseNarCard,parseNarResult}=await load('../lib/nar-source.ts');
 const {narHistoryInputs,narRank,validateNarModel}=await load('../lib/nar-model.ts',[[/import \{ serverData \} from "\.\/server-snapshots";/,'const serverData=()=>{throw new Error("No network in ranker tests")};'],[/from "\.\/nar-validation"/,`from ${JSON.stringify(validationUrl)}`]]);
 const {expireNarReleaseMetas}=await load('../lib/nar-release.ts');
-const entry=(number,gate,info='',market='')=>`<tr class="tBorder">${gate?`<td class="courseNum course_0${gate}">${gate}</td>`:''}<td class="horseNum">${number}</td><a class="horseName" href="/HorseMarkInfo?k_lineageLoginCode=${number}">馬${number}</a><a class="jockeyName" href="/RiderMark?k_riderLicenseNo=2">騎手（所属）</a><td class="odds_weight">${market}</td><table><tr><td>全</td><td>10-9-8-7</td></tr></table><td class="odds_weight">470<br>(-2)</td><td>1:12.3　2-3-4　38.5</td><td class="info">${info}</td></tr>`;
+const entry=(number,gate,info='',market='',weight='470<br>(-2)')=>`<tr class="tBorder">${gate?`<td class="courseNum course_0${gate}">${gate}</td>`:''}<td class="horseNum">${number}</td><a class="horseName" href="/HorseMarkInfo?k_lineageLoginCode=${number}">馬${number}</a><a class="jockeyName" href="/RiderMark?k_riderLicenseNo=2">騎手（所属）</a><td class="odds_weight">${market}</td><table><tr><td>全</td><td>10-9-8-7</td></tr></table><td class="odds_weight">${weight}</td><td>1:12.3　2-3-4　38.5</td><td class="info">${info}</td></tr>`;
 const card=(entries)=>`<h4>2026年9月28日（月） 船 橋 第1競走 14:40発走</h4><section class="raceTitle"><h3>出走表テスト</h3><ul class="dataArea"><li>ダート 1200ｍ（左） 天候：晴 馬場：良</li></ul></section><section class="cardTable"><table>${entries}</table></section>`;
 test('NAR identity validates dates/venue, cannot overlap Yahoo JRA IDs',()=>{
  assert.equal(narRaceKey('2606040911'),null);assert.equal(narRaceKey('202613281901'),null);assert.equal(narRaceKey('202602311901'),null);assert.equal(narRaceKey('202609289901'),null);assert.equal(narRaceKey('202609281913'),null);
@@ -30,6 +30,10 @@ test('nested card, rowspan gates, missing markets, scratches and real passing ce
  assert.throws(()=>parseNarCard(card(entry(1,1)),'202609281902'));
  assert.throws(()=>parseNarCard(card(entry(1,1)),'202509281901'));
  assert.throws(()=>parseNarCard(card(entry(1,1)),'202609281101'));
+});
+test('first-time starters keep body weight when NAR publishes no change',()=>{
+ const r=parseNarCard(card(entry(1,1,'','<span>2.5</span> (1人気)','447')),'202609281901');
+ assert.equal(r.horses[0].weight,447);assert.equal(r.horses[0].weightChange,undefined);
 });
 test('result popularity uses exact class o, not gate; cancelled runners separate',()=>{
  const row=(n,finish)=>`<tr class="tBorder"><td class="a">${finish}</td><td class="b courseNum">8</td><td class="c">${n}</td><td class="horseName">馬${n}</td><td class="o popularNum">2</td><td class="p">3.4</td></tr>`;
