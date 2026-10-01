@@ -560,7 +560,7 @@ function VenueScreen({
               type="button"
               onClick={() => onDay(value)}
               aria-pressed={!historicalDate && day === value}
-              className={`rounded-lg px-4 py-2 text-sm font-bold transition ${day === value ? "bg-cyan-300 text-[#07111f]" : "text-slate-400 hover:text-white"}`}
+              className={`rounded-lg px-4 py-2 text-sm font-bold transition ${!historicalDate && day === value ? "bg-cyan-300 text-[#07111f]" : "text-slate-400 hover:text-white"}`}
             >
               {value === "today" ? "今日" : "明日"}
             </button>
@@ -568,12 +568,12 @@ function VenueScreen({
         </div>
         <label className="mb-4 flex flex-wrap items-center gap-3 text-sm text-slate-300" data-no-swipe>
           <span>過去1年の開催日</span>
-          <input type="date" value={historicalDate} max={new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Tokyo"}).format(new Date())} onChange={(event) => onDate(event.target.value)} className="rounded-lg border border-slate-600 bg-[#07111f] px-3 py-2 text-white" />
+          <input type="date" value={historicalDate} max={new Date(Date.now()+9*3600_000).toISOString().slice(0,10)} onChange={(event) => onDate(event.target.value)} className="rounded-lg border border-slate-600 bg-[#07111f] px-3 py-2 text-white" />
         </label>
         <p className="text-sm font-semibold text-cyan-300">{historicalDate ? "過去開催" : day === "today" ? "本日" : "明日"}の{area === "nar" ? "地方" : "中央"}競馬</p>
         <h1 className="mt-1 text-2xl font-black">開催場を選択</h1>
         <p className="mt-2 text-sm text-slate-400">
-          {schedule?.dateLabel || `${day === "today" ? "本日" : "明日"}の開催情報を取得中`}
+          {schedule?.dateLabel || `${historicalDate ? "過去" : day === "today" ? "本日" : "明日"}の開催情報を取得中`}
         </p>
       </section>
       {loading && !schedule ? (
