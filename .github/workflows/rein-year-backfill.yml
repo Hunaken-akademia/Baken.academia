@@ -1,0 +1,70 @@
+name: REIN one-year race snapshot backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: "Start date JST (YYYY-MM-DD, blank = rolling 365 days)"
+        required: false
+        type: string
+      end_date:
+        description: "End date JST (YYYY-MM-DD, blank = yesterday)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      chunks: ${{ steps.chunks.outputs.matrix }}
+    steps:
+      - name: Split the requested period into monthly chunks
+        id: chunks
+        env:
+          START_DATE: ${{ inputs.start_date }}
+          END_DATE: ${{ inputs.end_date }}
+          TZ: Asia/Tokyo
+        run: |
+          python - <<'PY'
+          import json, os
+          from datetime import date, datetime, timedelta
+          from zoneinfo import ZoneInfo
+          today = datetime.now(ZoneInfo("Asia/Tokyo")).date()
+          start = date.fromisoformat(os.environ["START_DATE"]) if os.environ.get("START_DATE") else today - timedelta(days=365)
+          end = date.fromisoformat(os.environ["END_DATE"]) if os.environ.get("END_DATE") else today - timedelta(days=1)
+          if start < today - timedelta(days=365) or end >= today or start > end:
+              raise ValueError("Dates must be within the last 365 completed days")
+          chunks = []
+          cursor = start
+          while cursor <= end:
+              next_month = (cursor.replace(day=28) + timedelta(days=4)).replace(day=1)
+              chunk_end = min(end, next_month - timedelta(days=1))
+              chunks.append({"start": cursor.isoformat(), "end": chunk_end.isoformat()})
+              cursor = chunk_end + timedelta(days=1)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("matrix=" + json.dumps(chunks) + "\n")
+          PY
+
+  backfill:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.chunks) }}
+    env:
+      START_DATE: ${{ matrix.start }}
+      END_DATE: ${{ matrix.end }}
+      TZ: Asia/Tokyo
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Rebuild historical race snapshots
+        run: bash scripts/rein_year_backfill.sh

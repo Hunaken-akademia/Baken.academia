@@ -6,7 +6,10 @@ export const dynamic="force-dynamic";
 export const maxDuration=120;
 const headers={"cache-control":"private, no-store"};
 export async function GET(request:NextRequest) {
-  const date=dateJst(request.nextUrl.searchParams.get("day")==="tomorrow"?1:0);
+  const requested=request.nextUrl.searchParams.get("date")??"";
+  const today=dateJst(),oldest=dateJst(-365);
+  if(requested&&(!/^20\d{2}-\d{2}-\d{2}$/.test(requested)||requested<oldest||requested>today))return NextResponse.json({error:"過去1年分の日付を指定してください"},{status:400,headers});
+  const date=requested||dateJst(request.nextUrl.searchParams.get("day")==="tomorrow"?1:0);
   try {
     const cached=await narCache.get(`schedule:${date}`).catch(()=>null);
     if(typeof cached==="string")return new NextResponse(cached,{headers:{...headers,"content-type":"application/json"}});
