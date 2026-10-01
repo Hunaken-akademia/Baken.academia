@@ -76,9 +76,10 @@ export async function GET(request: NextRequest) {
     if(narRuntime)expireNarReleaseMetas(metas,narRuntime.updatedAt,Date.now());
     const planned = planPrecompute(races, metas, new Date());
     const near = planned.filter((job) => job.reason === "near-start");
-    const jobs = [...near, ...planned.filter((job) => job.reason !== "near-start").slice(0, MAX_BACKLOG_JOBS)];
+    const retrospective = targetDate < dateJst(-1);
+    const jobs = [...near, ...planned.filter((job) => job.reason !== "near-start").slice(0, retrospective ? 4 : MAX_BACKLOG_JOBS)];
 
-    const results = await mapWithConcurrency(jobs, league === "nar" ? 2 : 3, async (job) => {
+    const results = await mapWithConcurrency(jobs, retrospective ? 1 : league === "nar" ? 2 : 3, async (job) => {
       const remaining = START_BUDGET_MS - (Date.now() - startedAt);
       if (remaining <= 0) return { raceId: job.raceId, preview: job.preview, reason: job.reason, ok: false, complete: false, status: -1 };
       try {
