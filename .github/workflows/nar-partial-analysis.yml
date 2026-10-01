@@ -36,7 +36,7 @@ concurrency:
 
 jobs:
   analyze:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    if: "!contains(github.event.head_commit.message, '[eight-year-recall]') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -219,3 +219,107 @@ jobs:
           path: artifacts/second-third-support-audit
           if-no-files-found: error
           retention-days: 14
+
+  eight-year-recall:
+    if: contains(github.event.head_commit.message, '[eight-year-recall]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+      OPENBLAS_NUM_THREADS: '2'
+      OMP_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: rein-role-v4-f09ba60f2141dda639c667423b1a07eec73eb0dc
+          path: .second-third-audit/jra
+          github-token: ${{ github.token }}
+          run-id: "36202792464"
+      - name: Extract frozen JRA model and full history
+        run: |
+          tar --no-same-owner -xzf .second-third-audit/jra/*.bundle.tar.gz -C .second-third-audit/jra
+          python -m py_compile scripts/rein_eight_year_recall.py
+      - name: Download every completed NAR archive currently in Supabase
+        id: archives
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p .nar-archives .nar-dataset
+
+          oidc_token=""
+          oidc_refreshed_at=0
+          refresh_oidc_token() {
+            local now token_response
+            now="$(date +%s)"
+            if [[ -n "${oidc_token}" ]] && (( now - oidc_refreshed_at < 240 )); then return; fi
+            token_response="$(curl --fail-with-body --silent --show-error --retry 3 \
+              -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=rein-supabase-archive-v1")"
+            oidc_token="$(jq -er '.value' <<<"${token_response}")"
+            oidc_refreshed_at="${now}"
+          }
+
+          python scripts/plan_nar_resume.py >/tmp/nar-plan.log
+          python - <<'PY' > /tmp/nar-periods.txt
+          from scripts.plan_nar_resume import build_periods
+          for p in build_periods():
+              print(f"{p['year']} {p['period']}")
+          PY
+
+          completed=0
+          while read -r year period; do
+            refresh_oidc_token
+            path="nar/archive/all-bets/v2/${year}/${period}.tar.gz"
+            payload="$(jq -nc --arg path "${path}" '{action:"exists",path:$path}')"
+            response="$(curl --fail-with-body --silent --show-error --retry 3 \
+              -X POST "${SUPABASE_BROKER_URL}" \
+              -H "Authorization: Bearer ${oidc_token}" \
+              -H "Content-Type: application/json" \
+              --data "${payload}")"
+            exists="$(jq -r '.exists // false' <<<"${response}")"
+            if [[ "${exists}" != "true" ]]; then
+              continue
+            fi
+
+            refresh_oidc_token
+            payload="$(jq -nc --arg path "${path}" '{action:"sign-download",path:$path}')"
+            response="$(curl --fail-with-body --silent --show-error --retry 3 \
+              -X POST "${SUPABASE_BROKER_URL}" \
+              -H "Authorization: Bearer ${oidc_token}" \
+              -H "Content-Type: application/json" \
+              --data "${payload}")"
+            signed_url="$(jq -er '.signed_url' <<<"${response}")"
+            archive=".nar-archives/${period}.tar.gz"
+            curl --fail-with-body --silent --show-error --retry 3 "${signed_url}" -o "${archive}"
+            if [[ "$completed" == 0 ]]; then
+              tar -tzf "${archive}" > /tmp/nar-archive-members.txt
+              echo "First archive raw HTML cache count: $(grep -c 'html.gz$' /tmp/nar-archive-members.txt || true)"
+              head -20 /tmp/nar-archive-members.txt
+            fi
+            # Legacy archives include duplicate events and unused odds tables.
+            tar --no-same-owner --wildcards --no-anchored --exclude='*-odds-*' --exclude='*-payouts*' --exclude='*-manifest*' -xzf "${archive}" -C .nar-dataset 'nar-*.parquet'
+            completed=$((completed + 1))
+          done < /tmp/nar-periods.txt
+
+          echo "Completed NAR chunks downloaded: ${completed}"
+          echo "completed=${completed}" >> "${GITHUB_OUTPUT}"
+
+
+      - name: Compute all-years exact-place recall
+        run: python scripts/rein_eight_year_recall.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rein-eight-year-recall-20261001
+          path: artifacts/rein-eight-year
+          retention-days: 30
