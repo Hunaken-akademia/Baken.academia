@@ -194,6 +194,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
   const api = area === "nar" ? "/api/nar" : "/api";
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [scheduleDay, setScheduleDay] = useState<ScheduleDay>("today");
+  const [historicalDate, setHistoricalDate] = useState("");
   const [venue, setVenue] = useState<Venue | null>(null);
   const [data, setData] = useState<Analysis | null>(null);
   const [activeHorse, setActiveHorse] = useState<Horse | null>(null);
@@ -218,7 +219,8 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
       setError("");
     }
     try {
-      const response = await fetch(`${api}/races?day=${day}`);
+      const scheduleUrl = historicalDate ? `${api}/races?date=${historicalDate}` : `${api}/races?day=${day}`;
+      const response = await fetch(scheduleUrl);
       const result = (await response.json()) as Schedule & { error?: string };
       if (!response.ok)
         throw new Error(result.error || "開催情報を取得できませんでした");
@@ -241,7 +243,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
   }
 
   async function analyze(race: Pick<Race, "raceId">, background = false, attempt = 0) {
-    const key = `${scheduleDay}:${race.raceId}`;
+    const key = `${historicalDate || scheduleDay}:${race.raceId}`;
     if (background && selectedRace.current !== key) return;
     const serial = ++analysisRequest.current;
     if (staleRetry.current) clearTimeout(staleRetry.current);
@@ -255,7 +257,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
       setError(""); setFailedRace(null);
     }
     try {
-      const response = await fetch(`${api}/analyze?raceId=${race.raceId}${scheduleDay === "tomorrow" ? "&preview=1" : ""}`);
+      const response = await fetch(`${api}/analyze?raceId=${race.raceId}${scheduleDay === "tomorrow" ? "&preview=1" : ""}${historicalDate ? `&date=${historicalDate}` : ""}`);
       const result = (await response.json().catch(() => ({}))) as Analysis & { error?: string };
       if (serial !== analysisRequest.current || selectedRace.current !== key) return;
       if (response.status === 202) {
@@ -304,7 +306,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
       clearInterval(clock);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [scheduleDay]);
+  }, [scheduleDay, historicalDate]);
 
   useEffect(() => {
     const raceId = data?.race.raceId;
@@ -485,8 +487,18 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
               setFailedRace(null);
               setVenue(item);
             }}
+            historicalDate={historicalDate}
+            onDate={(date) => {
+              setHistoricalDate(date);
+              setSchedule(null);
+              setVenue(null);
+              cancelAnalysis();
+              setData(null);
+              setScheduleDay("today");
+            }}
             onDay={(day) => {
-              if (day === scheduleDay) return;
+              if (day === scheduleDay && !historicalDate) return;
+              setHistoricalDate("");
               setSchedule(null);
               setVenue(null);
               cancelAnalysis();
@@ -497,7 +509,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
         )}
         {!venue && !data && children}
         {venue && !data && (
-          <RaceScreen venue={venue} day={scheduleDay} loading={loading} onAnalyze={analyze} />
+          <RaceScreen venue={venue} day={historicalDate ? "past" : scheduleDay} loading={loading} onAnalyze={analyze} />
         )}
         {data && (
           <AnalysisScreen
@@ -526,13 +538,17 @@ function VenueScreen({
   loading,
   onSelect,
   onDay,
+  historicalDate,
+  onDate,
 }: {
   area: "jra" | "nar";
   schedule: Schedule | null;
   day: ScheduleDay;
   loading: boolean;
+  historicalDate: string;
   onSelect: (venue: Venue) => void;
   onDay: (day: ScheduleDay) => void;
+  onDate: (date: string) => void;
 }) {
   return (
     <>
@@ -543,14 +559,18 @@ function VenueScreen({
               key={value}
               type="button"
               onClick={() => onDay(value)}
-              aria-pressed={day === value}
+              aria-pressed={!historicalDate && day === value}
               className={`rounded-lg px-4 py-2 text-sm font-bold transition ${day === value ? "bg-cyan-300 text-[#07111f]" : "text-slate-400 hover:text-white"}`}
             >
               {value === "today" ? "今日" : "明日"}
             </button>
           ))}
         </div>
-        <p className="text-sm font-semibold text-cyan-300">{day === "today" ? "本日" : "明日"}の{area === "nar" ? "地方" : "中央"}競馬</p>
+        <label className="mb-4 flex flex-wrap items-center gap-3 text-sm text-slate-300" data-no-swipe>
+          <span>過去1年の開催日</span>
+          <input type="date" value={historicalDate} max={new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Tokyo"}).format(new Date())} onChange={(event) => onDate(event.target.value)} className="rounded-lg border border-slate-600 bg-[#07111f] px-3 py-2 text-white" />
+        </label>
+        <p className="text-sm font-semibold text-cyan-300">{historicalDate ? "過去開催" : day === "today" ? "本日" : "明日"}の{area === "nar" ? "地方" : "中央"}競馬</p>
         <h1 className="mt-1 text-2xl font-black">開催場を選択</h1>
         <p className="mt-2 text-sm text-slate-400">
           {schedule?.dateLabel || `${day === "today" ? "本日" : "明日"}の開催情報を取得中`}
@@ -612,7 +632,7 @@ function RaceScreen({
   onAnalyze,
 }: {
   venue: Venue;
-  day: ScheduleDay;
+  day: ScheduleDay | "past";
   loading: boolean;
   onAnalyze: (race: Pick<Race, "raceId">) => void;
 }) {
@@ -625,7 +645,9 @@ function RaceScreen({
           <p className="mt-2 text-sm text-slate-400">
             {day === "tomorrow"
               ? "前日出走表による暫定予想です。人気・オッズ・馬体重・馬場は当日に更新します"
-              : "発走前は予想、確定後は着順・予想印・買い目を照合できます"}
+              : day === "past"
+                ? "過去レースの全着順と出走馬を表示します。予想評価は参考再計算です"
+                : "発走前は予想、確定後は着順・予想印・買い目を照合できます"}
           </p>
         </div>
         <Badge className="bg-white/10 text-white">
