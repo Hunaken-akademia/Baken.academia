@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
   const requestedDate = request.nextUrl.searchParams.get("date") || "";
   const today = dateJst();
   const oldest = dateJst(-365);
-  if (requestedDate && (!/^20\\d{2}-\\d{2}-\\d{2}$/.test(requestedDate) || requestedDate < oldest || requestedDate > today))
+  if (requestedDate && (!/^20\d{2}-\d{2}-\d{2}$/.test(requestedDate) || requestedDate < oldest || requestedDate > today))
     return NextResponse.json({error:"過去1年分の日付を指定してください"},{status:400,headers:publicCache});
   const cacheKey = requestedDate || dateJst(day === "tomorrow" ? 1 : 0);
   try {
