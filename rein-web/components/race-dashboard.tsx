@@ -827,7 +827,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
   onBack: () => void;
   onHorse: (horse: Horse) => void;
 }) {
-  const top3 = data.review?.finishers.slice(0, 3) ?? [];
+  const finishers = data.review?.finishers ?? [];
   const guide = courseGuide(data.race);
   const insights = raceInsights(data);
   const held = data.evaluation?.held ?? [];
@@ -897,12 +897,12 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
               <p className="text-xs font-semibold tracking-widest text-emerald-300">
                 結果照合
               </p>
-              <h2 className="mt-1 text-lg font-bold">確定結果と予想を照合</h2>
+              <h2 className="mt-1 text-lg font-bold">全着順と予想を照合</h2>
             </div>
             <Badge className="bg-emerald-300 text-emerald-950">確定</Badge>
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {top3.map((finisher) => {
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {finishers.map((finisher) => {
               const predicted = data.horses.find(
                 (horse) => horse.number === finisher.number,
               );
