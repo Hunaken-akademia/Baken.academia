@@ -74,7 +74,12 @@ function races(html: string, nextRace: number) {
 
 export async function GET(request: NextRequest) {
   const day: ScheduleDay = request.nextUrl.searchParams.get("day") === "tomorrow" ? "tomorrow" : "today";
-  const cacheKey = dateJst(day === "tomorrow" ? 1 : 0);
+  const requestedDate = request.nextUrl.searchParams.get("date") || "";
+  const today = dateJst();
+  const oldest = dateJst(-365);
+  if (requestedDate && (!/^20\\d{2}-\\d{2}-\\d{2}$/.test(requestedDate) || requestedDate < oldest || requestedDate > today))
+    return NextResponse.json({error:"過去1年分の日付を指定してください"},{status:400,headers:publicCache});
+  const cacheKey = requestedDate || dateJst(day === "tomorrow" ? 1 : 0);
   try {
     const shared = await sharedSchedule.get(cacheKey);
     if (typeof shared === "string") {
@@ -95,7 +100,7 @@ export async function GET(request: NextRequest) {
     const { schedule } = await serverData<{ schedule: { payload: unknown; generated_at: string } | null }>("schedule", { date: cacheKey });
     if (schedule) {
       const age = Date.now() - Date.parse(schedule.generated_at);
-      if (age > (day === "today" ? 3600_000 : 3 * 3600_000)) waitUntil(refreshSchedule(day, cacheKey).catch(() => { console.error("REIN schedule refresh failed"); }));
+      if (age > (requestedDate ? 30 * 86400_000 : day === "today" ? 3600_000 : 3 * 3600_000)) waitUntil(refreshSchedule(cacheKey).catch(() => { console.error("REIN schedule refresh failed"); }));
       else await sharedSchedule.set(cacheKey, JSON.stringify(schedule.payload), { ttl: 900 }).catch(() => {});
       return NextResponse.json(schedule.payload, { headers: { ...publicCache, "x-rein-store": "server" } });
     }
@@ -109,7 +114,7 @@ export async function GET(request: NextRequest) {
       headers: { ...failureCacheHeaders, "content-type": "application/json; charset=utf-8", "x-rein-failure-cache": "1" },
     });
   }
-  const response = await cachedSchedule(`schedule:${cacheKey}`, () => loadSchedule(day));
+  const response = await cachedSchedule(`schedule:${cacheKey}`, () => loadSchedule(cacheKey));
   if (response.ok) {
     try {
       const payload = await response.clone().json();
@@ -128,35 +133,38 @@ export async function GET(request: NextRequest) {
   return response;
 }
 
-async function refreshSchedule(day: ScheduleDay, cacheKey: string) {
-  const response = await cachedSchedule(`schedule:${cacheKey}`, () => loadSchedule(day));
+async function refreshSchedule(cacheKey: string) {
+  const response = await cachedSchedule(`schedule:${cacheKey}`, () => loadSchedule(cacheKey));
   if (!response.ok) return;
   const payload = await response.json();
   await serverData("save-schedule", { date: cacheKey, payload });
   await sharedSchedule.set(cacheKey, JSON.stringify(payload), { ttl: 900 });
 }
 
-async function loadSchedule(day: ScheduleDay) {
+async function loadSchedule(cacheKey: string) {
   try {
-    const target = jstDate(day);
-    const source = day === "today"
+    const target = {year:+cacheKey.slice(0,4),month:+cacheKey.slice(5,7),date:+cacheKey.slice(8,10)};
+    const isToday = cacheKey === dateJst();
+    const isPast = cacheKey < dateJst();
+    const source = isToday
       ? await fetchSource(`${BASE}/`, "開催情報")
-      : await fetchSource(`${BASE}/schedule/monthly?month=${target.month}&year=${target.year}`, "翌日の開催情報");
-    const seeds = day === "today" ? venueSeeds(source) : monthlyVenueSeeds(source, target.date);
-    const emptyLabel = day === "today" ? "本日の開催" : `${target.year}年${target.month}月${target.date}日の開催`;
+      : await fetchSource(`${BASE}/schedule/monthly?month=${target.month}&year=${target.year}`, "開催情報");
+    const seeds = isToday ? venueSeeds(source) : monthlyVenueSeeds(source, target.date);
+    const emptyLabel = isToday ? "本日の開催" : `${target.year}年${target.month}月${target.date}日の開催`;
     if (!seeds.length) return NextResponse.json({ dateLabel: emptyLabel, updatedAt: new Date().toISOString(), venues: [] }, { headers: publicCache });
     const venues = await Promise.all(seeds.map(async (seed) => {
       const html = await fetchSource(`${BASE}/race/list/${seed.eventId}`, `${seed.name}のレース一覧`);
       const parsed = races(html, 0);
-      if (day === "tomorrow") {
+      if (isPast) return { ...seed, nextRace: 13, nextStart: "--:--", races: parsed.map((race) => ({ ...race, status: "確定" as const })) };
+      if (!isToday) {
         const first = parsed[0];
-        return { ...seed, nextRace: first?.number ?? 1, nextStart: first?.start ?? "--:--", races: parsed.map((race) => ({ ...race, status: "発売前" })) };
+        return { ...seed, nextRace: first?.number ?? 1, nextStart: first?.start ?? "--:--", races: parsed.map((race) => ({ ...race, status: "発売前" as const })) };
       }
       return { ...seed, ...raceProgress(parsed) };
     }));
-    const dateLabel = day === "today"
+    const dateLabel = isToday
       ? decode(source.match(/<section[^>]*id="raceflash"[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>/i)?.[1] || "本日の開催")
-      : `${target.year}年${target.month}月${target.date}日の開催（暫定）`;
+      : `${target.year}年${target.month}月${target.date}日の開催${isPast ? "" : "（暫定）"}`;
     return NextResponse.json({ dateLabel, updatedAt: new Date().toISOString(), venues }, { headers: publicCache });
   } catch (error) {
     return NextResponse.json(
