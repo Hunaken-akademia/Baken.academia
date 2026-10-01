@@ -65,6 +65,11 @@ test('cron plan: near-start first, then missing/stale later races, then results,
   ]);
 });
 
+test('a race 65 minutes away is prioritized so the 60-minute forecast is ready', () => {
+  const race = { raceId: 'weight-window', start: '12:05', preview: false };
+  assert.equal(planPrecompute([race], new Map(), now)[0].reason, 'near-start');
+});
+
 test('yesterday result catch-up uses the race date and completed races are not recalculated', () => {
   const race = {raceId: 'yesterday', start: '16:00', date: '2026-09-25', preview:false};
   assert.equal(planPrecompute([race],new Map(),now)[0].reason,'result');
