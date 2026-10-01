@@ -1,4 +1,5 @@
 name: NAR rolling partial analysis
+# Historical recall retries refresh authentication per archive.
 
 on:
   workflow_dispatch:
