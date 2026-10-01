@@ -36,11 +36,11 @@ test('only the bound main-branch workflow may archive daily data',()=>{
  for(const patch of [{repository_id:'evil'},{ref:'refs/pull/2/merge'},{event_name:'pull_request'},{workflow_ref:'other'}])assert.equal(validGithubCaptureClaims({...good,...patch}),false);
 });
 
-test('held race cards are saved without entering forecast history or freezing refresh',()=>{
+test('confirmed results are final even when model scoring is held',()=>{
  const value={...body(),capture:{complete:false},review:{isFinished:true,finishers:[{number:1,finish:1},{number:2,finish:2},{number:3,finish:3}]}};
  const record=snapshotRecord(value,false,after);
  assert.equal(record.payload,value);
- assert.equal(record.is_final,false);
+ assert.equal(record.is_final,true);
  assert.equal(record.prestart,false);
  assert.equal(record.journal,null);
 });
