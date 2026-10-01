@@ -66,10 +66,13 @@ export async function refreshNarRace(raceId:string, preview=false, expectedRelea
       const audit=result.candidates?.[result.selectedKind]?.audit;
       if(result.status==="adopted"&&audit)comparison[role][runtime.model.roles[role].mode]={...comparison[role][runtime.model.roles[role].mode],audit2026:audit};
     }}
+    const complete=!!scored
+      && card.horses.every(h=>typeof h.weight==="number"&&h.weight>0)
+      && card.horses.every(h=>h.odds!==null&&h.odds>0&&h.popularity>0);
     const model=runtime?{...runtime.profile.meta,version:`${runtime.model.version}:${runtime.sha.slice(0,12)}`,release:runtime.model.release,probabilityKind:"ranking-share",strategy:runtime.model.conditionValidation?"地方専用ハイブリッド＋検証済みの着順別・場別補正。順位モデルに当日人気とオッズは不使用":runtime.model.release?.validatedRanking?"地方専用ハイブリッド・当日人気とオッズは評価に不使用":"地方専用・当日人気とオッズは評価に不使用",overallPolicy:"1〜3着の相対順位を均等合成",markPolicy:signals?.reference?"本命・対抗は1着適性順。穴候補は地方の人気順位差を検証した参考条件":"1着適性順。市場モデル未検証のため穴の印は保留",snapshotPolicy:"サーバーで一括保存",provisional:!runtime.model.release?.validatedRanking,validation:comparison,roleModes:Object.fromEntries(Object.entries(runtime.model.roles).map(([k,v])=>[k,v.mode]))}:undefined;
     const body={...card,race:{...card.race,updated:new Date(fetchedAt).toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"}),dataTimes:{card:fetchedAt,odds:card.horses.some(h=>h.odds!==null)?fetchedAt:null}},horses,model,pace,warnings,narReference:signals?.reference??null,
       prediction:{phase:preview?"preview":result?.isFinished?"final":after?"poststart":"prestart",source:after?"rebuilt":"live",generatedAt:fetchedAt,label:preview?"前日参考":after?"発走後・参考再計算":runtime?.model.release?.validatedRanking?"発走前・地方専用評価":"発走前・地方暫定"},
-      evaluation:{roleModel:scored?"ready":"unavailable",overall:scored?"ready":"held",tickets:"held",held},capture:{complete:!!scored},
+      evaluation:{roleModel:scored?"ready":"unavailable",overall:scored?"ready":"held",tickets:"held",held},capture:{complete},
       confidence:signals?.confidence??null,picks:signals?.picks??selectPicks(horses,{roleModelReady:!!scored,marketReady:false}),tickets:[],review:result??undefined,
     };
     await saveSnapshot(body,preview);
