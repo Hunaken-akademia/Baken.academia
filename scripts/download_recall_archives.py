@@ -1,6 +1,6 @@
 import concurrent.futures,io,json,os,time,tarfile,urllib.request
 from pathlib import Path
-from scripts.plan_nar_resume import build_periods
+from plan_nar_resume import build_periods
 broker=os.environ['SUPABASE_BROKER_URL']
 def post(action,path):
     for attempt in range(5):
