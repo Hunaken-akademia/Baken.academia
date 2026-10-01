@@ -1,0 +1,32 @@
+name: REIN one-year race snapshot backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: "Start date JST (YYYY-MM-DD, blank = rolling 365 days)"
+        required: false
+        type: string
+      end_date:
+        description: "End date JST (YYYY-MM-DD, blank = yesterday)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      START_DATE: ${{ inputs.start_date }}
+      END_DATE: ${{ inputs.end_date }}
+      TZ: Asia/Tokyo
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Rebuild historical race snapshots
+        run: bash scripts/rein_year_backfill.sh
