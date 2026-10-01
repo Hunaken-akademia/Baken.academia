@@ -2257,7 +2257,7 @@ function HorseDetails({ horse, data }: { horse: Horse; data: Analysis }) {
           label="馬体重"
           value={
             horse.weight
-              ? `${horse.weight}kg（${signed(horse.weightChange)}）`
+              ? `${horse.weight}kg${horse.weightChange === undefined ? "" : `（${signed(horse.weightChange)}）`}`
               : "未発表"
           }
         />
