@@ -20,7 +20,7 @@ export function snapshotRecord(body: any, preview: boolean, now = Date.now()) {
   } : null;
   const finishers = body.review?.isFinished && Array.isArray(body.review.finishers) ? body.review.finishers.filter((r: any) => r.finish >= 1 && r.finish <= 3).map((r: any) => ({ number: r.number, finish: r.finish })) : [];
   const result = finishers.length === 3 && new Set(finishers.map((r: any) => r.number)).size === 3 && [1,2,3].every(n => finishers.filter((r: any) => r.finish === n && numbers.includes(r.number)).length === 1) ? finishers : null;
-  return { race_id: id, race_date: date, slot: preview ? "preview" : "live", generated_at: body.prediction.generatedAt, starts_at: hasStart ? new Date(starts).toISOString() : null, is_final: complete && body.review?.isFinished === true, payload: body, journal, result, roster, prestart: authentic && body.prediction.phase === "prestart" };
+  return { race_id: id, race_date: date, slot: preview ? "preview" : "live", generated_at: body.prediction.generatedAt, starts_at: hasStart ? new Date(starts).toISOString() : null, is_final: result !== null, payload: body, journal, result, roster, prestart: authentic && body.prediction.phase === "prestart" };
 }
 
 function validGithubRepositoryClaims(claims: Record<string, unknown>) {
