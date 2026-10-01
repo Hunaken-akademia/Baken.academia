@@ -7,9 +7,10 @@ export const SNAPSHOT_KEY = "snapshot-market-top4-confidence-v3";
 export const PREVIEW_SNAPSHOT_KEY = "snapshot-preview-market-top4-confidence-v3";
 
 const MINUTE = 60_000;
-// The cron runs every 10 minutes; races within an hour of the start are refreshed on
-// every run, later races and previews less often.
-export const NEAR_START_MINUTES = 60;
+// Start priority refreshes 75 minutes before post time. This gives the 10-minute
+// cron one full attempt before the 60-minute mark, including NAR horse weights
+// that are published around an hour before the race.
+export const NEAR_START_MINUTES = 75;
 export const NEAR_MAX_AGE_MS = 12 * MINUTE;
 export const FAR_MAX_AGE_MS = 180 * MINUTE;
 export const PREVIEW_MAX_AGE_MS = 360 * MINUTE;
@@ -90,7 +91,7 @@ export function minutesUntilStart(start: string, now: Date) {
   return +match[1] * 60 + +match[2] - (jst.getUTCHours() * 60 + jst.getUTCMinutes());
 }
 
-// Ordered work list for one cron run. Today's races within the hour always come first
+// Ordered work list for one cron run. Today's races within 75 minutes always come first
 // (odds move most there), then missing/stale snapshots for the rest of today, then
 // finished races without a result snapshot, then tomorrow's previews.
 export function planPrecompute(
