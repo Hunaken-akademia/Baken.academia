@@ -10,7 +10,7 @@ export const maxDuration=180;
 const headers={"cache-control":"private, no-store"};
 export async function GET(request:NextRequest) {
   const id=request.nextUrl.searchParams.get("raceId")??"",key=narRaceKey(id),preview=request.nextUrl.searchParams.get("preview")==="1";
-  if(!key||![dateJst(-1),dateJst(),dateJst(1)].includes(key.date)||preview!==(key.date===dateJst(1)))return NextResponse.json({error:"Invalid race"},{status:400,headers});
+  if(!key||key.date<dateJst(-365)||key.date>dateJst(1)||preview!==(key.date===dateJst(1)))return NextResponse.json({error:"Invalid race"},{status:400,headers});
   const token=request.headers.get("authorization")??"",secret=process.env.CRON_SECRET;
   const expected=secret?`Bearer ${secret}`:"";
   const internal=!!expected&&Buffer.byteLength(token)===Buffer.byteLength(expected)&&timingSafeEqual(Buffer.from(token),Buffer.from(expected));
