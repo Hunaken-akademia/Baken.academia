@@ -11,7 +11,7 @@ valid_date() { [[ "$1" =~ ^20[0-9]{2}-[0-9]{2}-[0-9]{2}$ ]] && [[ "$(date -d "$1
 valid_date "$start" && valid_date "$end" || { echo "::error::Dates must use YYYY-MM-DD"; exit 2; }
 [[ "$start" < "$end" || "$start" == "$end" ]] || { echo "::error::START_DATE must be on or before END_DATE"; exit 2; }
 oldest="$(TZ=Asia/Tokyo date -d '365 days ago' +%F)"
-[[ "$start" >= "$oldest" && "$end" < "$today" ]] || { echo "::error::Backfill dates must be within the last 365 completed days"; exit 2; }
+[[ ! "$start" < "$oldest" && "$end" < "$today" ]] || { echo "::error::Backfill dates must be within the last 365 completed days"; exit 2; }
 
 get_token() {
   curl --fail --silent --show-error --retry 3 \
