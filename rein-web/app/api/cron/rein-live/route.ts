@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   const requested = request.nextUrl.searchParams.get("date");
   const league = request.nextUrl.searchParams.get("area") === "nar" ? "nar" : "jra";
   const targetDate = requested ?? dateJst();
-  if (!/^20\\d{2}-\\d{2}-\\d{2}$/.test(targetDate) || targetDate < dateJst(-365) || targetDate > dateJst()) return NextResponse.json({error:"Invalid capture date"},{status:400});
+  if (!/^20\d{2}-\d{2}-\d{2}$/.test(targetDate) || targetDate < dateJst(-365) || targetDate > dateJst()) return NextResponse.json({error:"Invalid capture date"},{status:400});
   const lockKey = `cron:${league}:${targetDate}`;
   const lease = await claimCapture(lockKey,300).catch(() => null);
   if (!lease?.acquired || !lease.token) return NextResponse.json({ok:true,deferred:true,reason:"capture-in-progress"},{status:202});
