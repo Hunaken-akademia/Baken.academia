@@ -17,16 +17,25 @@ export function narUrl(page: "TodayRaceInfoTop" | "RaceList" | "DebaTable" | "Ra
   if (number) q.set("k_raceNo",String(number));
   return `https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/${page}?${q}`;
 }
+export function narScheduleIndexUrl(date: string, now = Date.now()) {
+  const today = new Date(now + 9 * 3600_000).toISOString().slice(0,10);
+  if (date >= today) return narUrl("TodayRaceInfoTop", date);
+  const q = new URLSearchParams({k_year:date.slice(0,4),k_month:String(Number(date.slice(5,7)))});
+  return `https://www.keiba.go.jp/KeibaWeb/MonthlyConveneInfo/MonthlyConveneInfoTop?${q}`;
+}
 export function narVenueCodes(html: string, date: string) {
   if (!html.includes('TodayRaceInfo') || /<title>エラー/.test(html)) throw new Error("地方開催情報を確認できません");
   const codes = new Set<string>();
-  for (const match of html.matchAll(/href=["']([^"']*\/RaceList\?[^"']+)["']/g)) {
+  for (const match of html.matchAll(/href\s*=\s*["']([^"']*\/RaceList\?[^"']+)["']/gi)) {
     const url = new URL(match[1].replaceAll("&amp;","&"),"https://www.keiba.go.jp");
     if (url.searchParams.get("k_raceDate")?.replaceAll("/","-") !== date) continue;
     const code = (url.searchParams.get("k_babaCode") ?? "").padStart(2,"0");
     if (NAR_COURSES[code]) codes.add(code);
   }
-  if (!codes.size && !narText(html).includes(`${Number(date.slice(5,7))}月${Number(date.slice(8))}日`)) throw new Error("対象日の地方開催情報が未確認です");
+  const monthlyYear = html.match(/<option\b[^>]*value=["'](\d{4})["'][^>]*\bselected\b/i)?.[1];
+  const monthlyMonth = html.match(/<p>\s*(\d{1,2})月\s*<\/p>/)?.[1];
+  const validMonth = html.includes("MonthlyConveneInfoTop") && monthlyYear === date.slice(0,4) && Number(monthlyMonth) === Number(date.slice(5,7));
+  if (!codes.size && !validMonth && !narText(html).includes(`${Number(date.slice(5,7))}月${Number(date.slice(8))}日`)) throw new Error("対象日の地方開催情報が未確認です");
   return [...codes];
 }
 export function parseNarSchedule(html: string, date: string, code: string) {
