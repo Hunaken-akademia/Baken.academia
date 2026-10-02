@@ -27,6 +27,7 @@ import { RaceFormationMap } from "@/components/race-formation-map";
 import { PredictionJournal, HorseNotebook } from "@/components/prediction-journal";
 import { MarketRankMap } from "@/components/market-rank-map";
 import { PredictionDataStatus } from "@/components/prediction-data-status";
+import { RaceCalendar } from "@/components/race-calendar";
 import { ReinCloudProvider } from "@/components/rein-cloud-provider";
 import type { NarReference } from "@/lib/nar-validation";
 import type { JraRaceReference } from "@/lib/jra-reference";
@@ -195,6 +196,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [scheduleDay, setScheduleDay] = useState<ScheduleDay>("today");
   const [historicalDate, setHistoricalDate] = useState("");
+  const [showCalendar, setShowCalendar] = useState(false);
   const [venue, setVenue] = useState<Venue | null>(null);
   const [data, setData] = useState<Analysis | null>(null);
   const [activeHorse, setActiveHorse] = useState<Horse | null>(null);
@@ -286,6 +288,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
   }
 
   useEffect(() => {
+    if (showCalendar) return;
     void loadSchedule(scheduleDay);
     const refresh = () => {
       if (document.visibilityState === "visible") void loadSchedule(scheduleDay, true);
@@ -306,7 +309,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
       clearInterval(clock);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [scheduleDay, historicalDate]);
+  }, [scheduleDay, historicalDate, showCalendar]);
 
   useEffect(() => {
     const raceId = data?.race.raceId;
@@ -488,8 +491,27 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
               setVenue(item);
             }}
             historicalDate={historicalDate}
+            showCalendar={showCalendar}
+            onCalendar={() => {
+              setShowCalendar(true);
+              setHistoricalDate("");
+              setSchedule(null);
+              setVenue(null);
+              cancelAnalysis();
+              setData(null);
+            }}
+            onSelectHistorical={(date, item) => {
+              setHistoricalDate(date);
+              setShowCalendar(false);
+              setScheduleDay("today");
+              setSchedule({ dateLabel: date + "の開催", updatedAt: new Date().toISOString(), venues: [item] });
+              setVenue(item);
+              cancelAnalysis();
+              setData(null);
+            }}
             onDate={(date) => {
               setHistoricalDate(date);
+              setShowCalendar(false);
               setSchedule(null);
               setVenue(null);
               cancelAnalysis();
@@ -497,7 +519,8 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
               setScheduleDay("today");
             }}
             onDay={(day) => {
-              if (day === scheduleDay && !historicalDate) return;
+              if (day === scheduleDay && !historicalDate && !showCalendar) return;
+              setShowCalendar(false);
               setHistoricalDate("");
               setSchedule(null);
               setVenue(null);
@@ -540,6 +563,9 @@ function VenueScreen({
   onDay,
   historicalDate,
   onDate,
+  showCalendar,
+  onCalendar,
+  onSelectHistorical,
 }: {
   area: "jra" | "nar";
   schedule: Schedule | null;
@@ -549,11 +575,14 @@ function VenueScreen({
   onSelect: (venue: Venue) => void;
   onDay: (day: ScheduleDay) => void;
   onDate: (date: string) => void;
+  showCalendar: boolean;
+  onCalendar: () => void;
+  onSelectHistorical: (date: string, venue: Venue) => void;
 }) {
   return (
     <>
       <section className="mb-5 rounded-2xl border border-slate-700 bg-gradient-to-br from-[#10233a] to-[#0b1727] p-5">
-        <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-black/20 p-1" data-no-swipe>
+        <div className="mb-4 grid grid-cols-3 gap-2 rounded-xl bg-black/20 p-1" data-no-swipe>
           {(["today", "tomorrow"] as const).map((value) => (
             <button
               key={value}
@@ -565,18 +594,26 @@ function VenueScreen({
               {value === "today" ? "今日" : "明日"}
             </button>
           ))}
+          <button type="button" onClick={onCalendar} aria-pressed={showCalendar}
+            className={"rounded-lg px-3 py-2 text-sm font-bold transition " + (showCalendar ? "bg-emerald-300 text-[#07111f]" : "text-slate-400 hover:text-white")}>
+            開催一覧
+          </button>
         </div>
-        <label className="mb-4 flex flex-wrap items-center gap-3 text-sm text-slate-300" data-no-swipe>
-          <span>過去1年の開催日</span>
-          <input type="date" value={historicalDate} max={new Date(Date.now()+9*3600_000).toISOString().slice(0,10)} onChange={(event) => onDate(event.target.value)} className="rounded-lg border border-slate-600 bg-[#07111f] px-3 py-2 text-white" />
-        </label>
-        <p className="text-sm font-semibold text-cyan-300">{historicalDate ? "過去開催" : day === "today" ? "本日" : "明日"}の{area === "nar" ? "地方" : "中央"}競馬</p>
-        <h1 className="mt-1 text-2xl font-black">開催場を選択</h1>
+        {!showCalendar && (
+          <details className="mb-4 text-sm text-slate-300" data-no-swipe>
+            <summary className="cursor-pointer">日付を直接指定</summary>
+            <input type="date" value={historicalDate} min={new Date(Date.now()+9*3600_000-365*86400_000).toISOString().slice(0,10)} max={new Date(Date.now()+9*3600_000).toISOString().slice(0,10)} onChange={(event) => onDate(event.target.value)} className="mt-3 rounded-lg border border-slate-600 bg-[#07111f] px-3 py-2 text-white" />
+          </details>
+        )}
+        <p className="text-sm font-semibold text-cyan-300">{showCalendar ? "過去1年" : historicalDate ? "過去開催" : day === "today" ? "本日" : "明日"}の{area === "nar" ? "地方" : "中央"}競馬</p>
+        <h1 className="mt-1 text-2xl font-black">{showCalendar ? "開催一覧から選択" : "開催場を選択"}</h1>
         <p className="mt-2 text-sm text-slate-400">
           {schedule?.dateLabel || `${historicalDate ? "過去" : day === "today" ? "本日" : "明日"}の開催情報を取得中`}
         </p>
       </section>
-      {loading && !schedule ? (
+      {showCalendar ? (
+        <RaceCalendar area={area} selectedDate={historicalDate} onSelect={onSelectHistorical} />
+      ) : loading && !schedule ? (
         <div className="grid min-h-56 place-items-center rounded-2xl border border-slate-800 bg-[#0c192a]">
           <RefreshCw className="size-8 animate-spin text-cyan-300" />
         </div>
