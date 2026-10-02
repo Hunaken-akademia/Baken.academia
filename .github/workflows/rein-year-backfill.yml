@@ -11,6 +11,15 @@ on:
         description: "End date JST (YYYY-MM-DD, blank = yesterday)"
         required: false
         type: string
+      area:
+        description: "League to rebuild"
+        required: false
+        default: both
+        type: choice
+        options:
+          - both
+          - jra
+          - nar
 
 permissions:
   contents: read
@@ -61,6 +70,7 @@ jobs:
     env:
       START_DATE: ${{ matrix.start }}
       END_DATE: ${{ matrix.end }}
+      AREA: ${{ inputs.area || 'both' }}
       TZ: Asia/Tokyo
     steps:
       - uses: actions/checkout@v4
