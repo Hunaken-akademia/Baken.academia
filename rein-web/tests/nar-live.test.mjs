@@ -6,7 +6,7 @@ function moduleUrl(file, replacements=[]){let s=readFileSync(new URL(file,import
 async function load(file, replacements=[]){return import(moduleUrl(file,replacements));}
 const validationUrl=moduleUrl('../lib/nar-validation.ts',[[/from "\.\/marks"/,`from ${JSON.stringify(moduleUrl('../lib/marks.ts'))}`]]);
 const {narReferenceSignals,narConditionKey}=await import(validationUrl);
-const {narRaceKey,narUrl,narVenueCodes,parseNarSchedule,parseNarCard,parseNarResult}=await load('../lib/nar-source.ts');
+const {narRaceKey,narUrl,narScheduleIndexUrl,narVenueCodes,parseNarSchedule,parseNarCard,parseNarResult}=await load('../lib/nar-source.ts');
 const {narHistoryInputs,narRank,validateNarModel}=await load('../lib/nar-model.ts',[[/import \{ serverData \} from "\.\/server-snapshots";/,'const serverData=()=>{throw new Error("No network in ranker tests")};'],[/from "\.\/nar-validation"/,`from ${JSON.stringify(validationUrl)}`]]);
 const {expireNarReleaseMetas}=await load('../lib/nar-release.ts');
 const entry=(number,gate,info='',market='',weight='470<br>(-2)')=>`<tr class="tBorder">${gate?`<td class="courseNum course_0${gate}">${gate}</td>`:''}<td class="horseNum">${number}</td><a class="horseName" href="/HorseMarkInfo?k_lineageLoginCode=${number}">馬${number}</a><a class="jockeyName" href="/RiderMark?k_riderLicenseNo=2">騎手（所属）</a><td class="odds_weight">${market}</td><table><tr><td>全</td><td>10-9-8-7</td></tr></table><td class="odds_weight">${weight}</td><td>1:12.3　2-3-4　38.5</td><td class="info">${info}</td></tr>`;
@@ -21,6 +21,18 @@ test('schedule excludes adjacent-date links and respects venue namespace',()=>{
  assert.deepEqual(narVenueCodes(html,'2026-09-28'),['19']);assert.throws(()=>narVenueCodes('<title>エラー</title>','2026-09-28'));
  const schedule=parseNarSchedule('<tr class="data"><td>1R</td><td>14:40</td><td></td><td></td><td>テスト</td><td>左1200m</td></tr>','2026-09-28','19');
  assert.equal(schedule.races[0].raceId,'202609281901');assert.equal(schedule.races[0].status,'発売前');
+});
+test('historical schedules use the monthly calendar and accept official href spacing',()=>{
+ const now=Date.parse('2026-10-02T10:00:00Z');
+ const past=new URL(narScheduleIndexUrl('2026-07-01',now));
+ assert.equal(past.pathname,'/KeibaWeb/MonthlyConveneInfo/MonthlyConveneInfoTop');
+ assert.equal(past.searchParams.get('k_year'),'2026');assert.equal(past.searchParams.get('k_month'),'7');
+ assert.match(narScheduleIndexUrl('2026-10-02',now),/TodayRaceInfoTop/);
+ assert.match(narScheduleIndexUrl('2026-10-03',now),/TodayRaceInfoTop/);
+ const month='<a href="/MonthlyConveneInfoTop">日程</a><option value="2026" selected>2026</option><p>7月</p><a href= "/KeibaWeb/TodayRaceInfo/RaceList?k_raceDate=2026%2F07%2F01&amp;k_babaCode=36">門別</a><a href= "/KeibaWeb/TodayRaceInfo/RaceList?k_raceDate=2026%2F07%2F02&amp;k_babaCode=19">船橋</a>';
+ assert.deepEqual(narVenueCodes(month,'2026-07-01'),['36']);
+ assert.deepEqual(narVenueCodes(month,'2026-07-03'),[]);
+ assert.throws(()=>narVenueCodes(month,'2026-06-01'));
 });
 test('nested card, rowspan gates, missing markets, scratches and real passing cells',()=>{
  const r=parseNarCard(card(entry(1,7,'','<span>3.4</span> (2人気)')+entry(2,0)+entry(3,8,'出走取消')),'202609281901');
