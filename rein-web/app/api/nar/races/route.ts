@@ -20,5 +20,8 @@ export async function GET(request:NextRequest) {
     }
     const payload=await refreshNarSchedule(date);
     return NextResponse.json(payload??{error:"開催情報を準備中です。少し待って更新してください。"},{status:payload?200:503,headers});
-  }catch{return NextResponse.json({error:"地方開催情報を取得できませんでした。時間をおいて更新してください。"},{status:503,headers});}
+  }catch(error){
+    console.error("NAR schedule refresh failed", { date, error: error instanceof Error ? error.message : String(error) });
+    return NextResponse.json({error:"地方開催情報を取得できませんでした。時間をおいて更新してください。"},{status:503,headers});
+  }
 }
