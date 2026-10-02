@@ -17,13 +17,13 @@ export async function GET(request: NextRequest) {
   const monthStart = month + "-01";
   const monthEnd = new Date(Date.UTC(year, monthNumber, 0)).toISOString().slice(0, 10);
   const oldest = dateJst(-365);
-  const today = dateJst();
-  if (monthStart > today || monthEnd < oldest) {
-    return NextResponse.json({ error: "過去1年分の開催月を指定してください" }, { status: 400, headers });
+  const latest = dateJst(365);
+  if (monthStart > latest || monthEnd < oldest) {
+    return NextResponse.json({ error: "過去1年〜今後1年の開催月を指定してください" }, { status: 400, headers });
   }
 
   const from = monthStart < oldest ? oldest : monthStart;
-  const to = monthEnd > today ? today : monthEnd;
+  const to = monthEnd > latest ? latest : monthEnd;
   try {
     const { schedules } = await scheduleCalendar(from, to, league as "jra" | "nar");
     const days = schedules
