@@ -1,0 +1,33 @@
+name: Recover interrupted NAR historical backfill
+
+on:
+  workflow_run:
+    workflows: [REIN one-year race snapshot backfill]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  resume:
+    # Only recover the original interrupted run, once. A recovery run cannot
+    # trigger another recovery, and the current worker is allowed to finish.
+    if: github.event.workflow_run.id == 36937606893 && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date(Date.now() + 9 * 3600_000);
+            const oldest = new Date(today.getTime() - 365 * 86400_000).toISOString().slice(0, 10);
+            const start = oldest > '2025-10-02' ? oldest : '2025-10-02';
+            const end = '2026-07-31';
+            if (start > end) throw new Error('Recovery period is outside the supported history window');
+            await github.rest.actions.createWorkflowDispatch({
+              ...context.repo,
+              workflow_id: 'rein-year-backfill.yml',
+              ref: 'main',
+              inputs: { start_date: start, end_date: end, area: 'nar' },
+            });
+            core.info(`Started NAR recovery for ${start} through ${end}`);
