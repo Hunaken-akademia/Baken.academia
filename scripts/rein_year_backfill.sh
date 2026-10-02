@@ -19,7 +19,12 @@ get_token() {
     "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=rein-live-capture-v1" | jq -er '.value'
 }
 
-for area in jra nar; do
+case "${AREA:-both}" in
+  both) areas=(jra nar) ;;
+  jra|nar) areas=("$AREA") ;;
+  *) echo "::error::AREA must be both, jra, or nar"; exit 2 ;;
+esac
+for area in "${areas[@]}"; do
   current="$start"
   while [[ "$current" < "$end" || "$current" == "$end" ]]; do
     echo "Backfill $area $current"
