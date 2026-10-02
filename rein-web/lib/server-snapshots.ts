@@ -31,3 +31,7 @@ export async function raceHistory(raceId: string, league: "jra" | "nar" = "jra")
 export function dateJst(offsetDays = 0, now = Date.now()) { return new Date(now + 9 * 3600_000 + offsetDays * 86400_000).toISOString().slice(0,10); }
 export const claimCapture = (key: string, ttl = 180) => serverData<{ acquired: boolean; token: string | null }>("claim", { key, ttl });
 export const releaseCapture = (key: string, token: string) => serverData("release", { key, token });
+
+export async function scheduleCalendar(from: string, to: string, league: "jra" | "nar") {
+  return serverData<{ schedules: Array<{ race_date: string; payload: { venues: Array<Record<string, any>> }; generated_at: string }> }>("calendar", { from, to, league });
+}

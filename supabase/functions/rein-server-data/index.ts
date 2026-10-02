@@ -139,6 +139,11 @@ Deno.serve(async req => {
    checked(await admin.from("rein_schedule_snapshots").upsert({race_date:b.date,league,payload:b.payload,generated_at:new Date().toISOString()}));
    return json({saved:true});
   }
+  if (action === "calendar") {
+   if ((who !== "production" && who !== "preview") || !dateValid(b.from) || !dateValid(b.to) || b.from > b.to || Date.parse(b.to)-Date.parse(b.from) > 32*86400_000 || !["jra","nar"].includes(b.league)) return json({error:"Invalid calendar range"},400);
+   const schedules = checked(await admin.from("rein_schedule_snapshots").select("race_date,payload,generated_at").eq("league",b.league).gte("race_date",b.from).lte("race_date",b.to).order("race_date"));
+   return json({schedules});
+  }
   if (action === "history") {
    if (!raceIdValid(b.raceId)) return json({error:"Invalid race"},400);
    const league=b.league??"jra";
