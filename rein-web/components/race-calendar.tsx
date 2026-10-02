@@ -21,6 +21,10 @@ const JRA_GRADES: Array<[string, string]> = [
   ["シリウスステークス", "GⅢ"], ["サウジアラビアロイヤルカップ", "GⅢ"], ["アルテミスステークス", "GⅢ"],
   ["府中牝馬ステークス", "GⅢ"], ["富士ステークス", "GⅡ"], ["スワンステークス", "GⅡ"], ["京成杯オータムハンデ", "GⅢ"],
   ["紫苑ステークス", "GⅡ"], ["京王杯2歳ステークス", "GⅡ"], ["デイリー杯2歳ステークス", "GⅡ"],
+  ["京大賞", "GⅡ"], ["毎日王", "GⅡ"], ["秋華", "GⅠ"], ["菊花", "GⅠ"], ["皐月", "GⅠ"],
+  ["桜花", "GⅠ"], ["有馬", "GⅠ"], ["ジャパンC", "GⅠ"], ["チャンピオンズC", "GⅠ"],
+  ["スプリンターズ", "GⅠ"], ["高松宮", "GⅠ"], ["フェブラリー", "GⅠ"], ["NHKマイル", "GⅠ"],
+  ["阪神JF", "GⅠ"], ["ホープフル", "GⅠ"], ["エリ女", "GⅠ"], ["マイルCS", "GⅠ"],
 ];
 
 const NAR_GRADES: Array<[string, string]> = [
@@ -60,8 +64,10 @@ export function RaceCalendar({
 }) {
   const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
   const oldest = new Date(Date.now() + 9 * 3600_000 - 365 * 86400_000).toISOString().slice(0, 10);
+  const latest = new Date(Date.now() + 9 * 3600_000 + 365 * 86400_000).toISOString().slice(0, 10);
   const currentMonth = today.slice(0, 7);
   const minimumMonth = oldest.slice(0, 7);
+  const maximumMonth = latest.slice(0, 7);
   const [month, setMonth] = useState(selectedDate ? selectedDate.slice(0, 7) : currentMonth);
   const [days, setDays] = useState<CalendarDay[]>([]);
   const [loading, setLoading] = useState(false);
@@ -106,7 +112,7 @@ export function RaceCalendar({
             <ChevronLeft className="size-5" />
           </button>
           <span className="min-w-28 text-center font-bold text-white">{month.replace("-", "年")}月</span>
-          <button type="button" aria-label="次の月" disabled={month >= currentMonth} onClick={() => setMonth((value) => shiftMonth(value, 1))}
+          <button type="button" aria-label="次の月" disabled={month >= maximumMonth} onClick={() => setMonth((value) => shiftMonth(value, 1))}
             className="rounded-lg p-2 text-slate-300 hover:bg-white/10 disabled:opacity-30">
             <ChevronRight className="size-5" />
           </button>
@@ -161,7 +167,7 @@ export function RaceCalendar({
           ))}
         </div>
       )}
-      <p className="border-t border-slate-800 px-4 py-2 text-[11px] text-slate-500">グレード表記はレース名から照合できた競走に表示しています。</p>
+      <p className="border-t border-slate-800 px-4 py-2 text-[11px] text-slate-500">過去1年〜今後1年の開催を表示しています。グレード表記はレース名から照合できた競走に表示しています。</p>
     </section>
   );
 }
