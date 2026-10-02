@@ -1,7 +1,7 @@
 import { getCache } from "@vercel/functions";
 import { fetchSource } from "./source-fetch";
 import { serverData, storedSnapshot, saveSnapshot, claimCapture, releaseCapture } from "./server-snapshots";
-import { parseNarCard, parseNarResult, parseNarSchedule, narVenueCodes, narRaceKey, narUrl, type NarHorse } from "./nar-source";
+import { parseNarCard, parseNarResult, parseNarSchedule, narVenueCodes, narRaceKey, narUrl, narScheduleIndexUrl, type NarHorse } from "./nar-source";
 import { loadNarRuntime, narRank } from "./nar-model";
 import { raceProgress } from "./race-progress";
 import { selectPicks } from "./marks";
@@ -12,7 +12,7 @@ export async function refreshNarSchedule(date:string) {
   const lease=await claimCapture(`race:nar-schedule:${date}`,120);
   if(!lease.acquired || !lease.token) return null;
   try {
-    const index=await fetchSource(narUrl("TodayRaceInfoTop",date),"地方開催一覧");
+    const index=await fetchSource(narScheduleIndexUrl(date),"地方開催一覧");
     const codes=narVenueCodes(index,date),venues=[];
     for (const code of codes) {
       const html=await fetchSource(narUrl("RaceList",date,code),"地方レース一覧");
