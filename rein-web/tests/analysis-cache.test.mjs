@@ -5,7 +5,7 @@ import ts from 'typescript';
 
 const source = readFileSync(new URL('../lib/analysis-cache.ts', import.meta.url), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
-const { isSnapshotFresh, metaFromBody, planPrecompute, snapshotTtlSeconds } = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
+const { backfillPage, isSnapshotFresh, metaFromBody, planPrecompute, snapshotTtlSeconds } = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
 
 const now = new Date('2026-09-26T02:00:00Z'); // 11:00 JST
 const minutes = (n) => n * 60_000;
@@ -83,4 +83,14 @@ test('a held card remains displayable but eligible for result refresh', () => {
   assert.equal(isSnapshotFresh(value,now.getTime()),true);
   assert.equal(isSnapshotFresh(value,now.getTime()+minutes(13)),false);
   assert.equal(planPrecompute([{raceId:'held',start:'10:00',preview:false}],new Map([['live:held',value]]),now)[0].reason,'result');
+});
+
+test('historical cursor moves past saved cards without results and leaves later races eligible', () => {
+  const races = ['202512140309','202512140305','202512140306','202512140310'].map(raceId => ({raceId,start:'16:00',date:'2025-12-14',preview:false}));
+  const metas = new Map(races.map(r=>['live:'+r.raceId,meta(1)]));
+  const pending = planPrecompute(races,metas,now);
+  assert.deepEqual(backfillPage(pending,'').map(r=>r.raceId),['202512140305','202512140306','202512140309','202512140310']);
+  assert.deepEqual(backfillPage(pending,'202512140306').map(r=>r.raceId),['202512140309','202512140310']);
+  assert.equal(metas.get('live:202512140305').final,false);
+  assert.equal(backfillPage(pending,'').length,4);
 });
