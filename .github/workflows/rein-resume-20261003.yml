@@ -1,0 +1,37 @@
+name: Resume REIN historical snapshots after October 3 repair
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/rein-resume-20261003.yml]
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  resume:
+    if: github.event.head_commit.message == 'Resume incomplete REIN historical snapshots on October 3'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            // Replace the retry using the old worker with the repaired main worker.
+            const old = await github.rest.actions.getWorkflowRun({...context.repo, run_id: 37012804482});
+            if (old.data.status !== 'completed') {
+              await github.rest.actions.cancelWorkflowRun({...context.repo, run_id: 37012804482});
+              let stopped = false;
+              for (let i = 0; i < 40; i++) {
+                const check = await github.rest.actions.getWorkflowRun({...context.repo, run_id: 37012804482});
+                if (check.data.status === 'completed') { stopped = true; break; }
+                await new Promise(resolve => setTimeout(resolve, 3000));
+              }
+              if (!stopped) throw new Error('Old recovery has not stopped; do not overlap backfills');
+            }
+            const yesterday = new Date(Date.now() + 9 * 3600_000 - 86400_000).toISOString().slice(0,10);
+            await github.rest.actions.createWorkflowDispatch({
+              ...context.repo, workflow_id: 'rein-year-backfill.yml', ref: 'main',
+              inputs: {start_date: '2025-12-01', end_date: yesterday, area: 'both'}
+            });
+            core.info('Dispatched repaired backfill from December 1 through ' + yesterday);
