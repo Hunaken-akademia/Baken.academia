@@ -132,3 +132,9 @@ export function planPrecompute(
   later.sort((a, b) => a.minutes - b.minutes);
   return [...near, ...later.map(({ minutes: _minutes, ...job }) => job), ...results, ...previews];
 }
+
+// Move a historical pass past saved cards whose results were not published.
+// These remain non-final and can be retried by a later pass.
+export function backfillPage(jobs: PrecomputeJob[], after: string) {
+  return jobs.filter(job => job.raceId > after).sort((a,b) => a.raceId.localeCompare(b.raceId));
+}
