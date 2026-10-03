@@ -24,6 +24,7 @@ import { raceProgress } from "@/lib/race-progress";
 import { reasonViews } from "@/lib/feature-labels";
 import { roleOrder, type Picks, type MarkPick } from "@/lib/marks";
 import { RaceFormationMap } from "@/components/race-formation-map";
+import { RaceReplay } from "@/components/race-replay";
 import { PredictionJournal, HorseNotebook } from "@/components/prediction-journal";
 import { MarketRankMap } from "@/components/market-rank-map";
 import { PredictionDataStatus } from "@/components/prediction-data-status";
@@ -1135,6 +1136,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
       </section>}
       <RaceIntelligence data={data} insights={insights} />
       <RaceFormationMap key={data.race.raceId} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
+      <RaceReplay key={`replay-${data.race.raceId}`} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} picks={data.picks} roleReady={roleReady(data)} />
       <RaceShapeReference data={data} />
       <PredictionJournal data={data} />
       <ConditionReferenceRankings data={data} />
