@@ -29,12 +29,13 @@ for area in "${areas[@]}"; do
   while [[ "$current" < "$end" || "$current" == "$end" ]]; do
     echo "Backfill $area $current"
     complete=false
+    cursor=""
     for attempt in {1..40}; do
       token="$(get_token)"
       response_file="$(mktemp)"
       status="$(curl --silent --show-error --max-time 310 --output "$response_file" --write-out '%{http_code}' \
         -H "Authorization: Bearer $token" \
-        "$origin/api/cron/rein-live?date=$current&area=$area")"
+        "$origin/api/cron/rein-live?date=$current&area=$area&backfill=1&after=$cursor")"
       unset token
       jq -c '{league,date,planned,attempted,updated,held,incomplete,failed,deferred,remaining,error}' "$response_file" 2>/dev/null || true
 
@@ -52,12 +53,16 @@ for area in "${areas[@]}"; do
       remaining="$(jq -er '.remaining' "$response_file")"
       updated="$(jq -er '.updated' "$response_file")"
       ok="$(jq -r '.ok' "$response_file")"
+      next_cursor="$(jq -r '.nextCursor // ""' "$response_file")"
+      unavailable="$(jq -r '(.unavailableResults // []) | join(",")' "$response_file")"
+      [[ -z "$unavailable" ]] || echo "::warning::Saved cards without published results: $area $current $unavailable"
       rm -f "$response_file"
       if [[ "$remaining" == "0" && "$ok" == "true" ]]; then complete=true; break; fi
       if [[ "$updated" == "0" ]]; then
         echo "::error::No progress while $remaining $area races remain on $current"
         exit 1
       fi
+      if [[ -n "$next_cursor" && "$next_cursor" != "$cursor" ]]; then cursor="$next_cursor"; fi
       sleep 5
     done
     [[ "$complete" == "true" ]] || { echo "::error::Backfill still has remaining races for $area $current"; exit 1; }
