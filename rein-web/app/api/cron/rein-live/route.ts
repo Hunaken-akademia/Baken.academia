@@ -5,7 +5,7 @@ import { mapWithConcurrency, type RaceVenue } from "@/lib/rein-live";
 import { loadNarRuntime } from "@/lib/nar-model";
 import { expireNarReleaseMetas } from "@/lib/nar-release";
 import {
-  planPrecompute,
+  planPrecompute, backfillPage,
   type PrecomputeRace,
 } from "@/lib/analysis-cache";
 
@@ -74,7 +74,11 @@ export async function GET(request: NextRequest) {
     const metas = await durableMetas(targetDate);
     if (tomorrow.length) for (const [key,value] of await durableMetas(dateJst(1))) metas.set(key,value);
     if(narRuntime)expireNarReleaseMetas(metas,narRuntime.updatedAt,Date.now());
-    const planned = planPrecompute(races, metas, new Date());
+    const backfill = requested !== null && targetDate < dateJst() && request.nextUrl.searchParams.get("backfill") === "1";
+    const after = backfill ? request.nextUrl.searchParams.get("after") || "" : "";
+    if (after && !/^\d{10,12}$/.test(after)) return NextResponse.json({error:"Invalid backfill cursor"},{status:400});
+    const pending = planPrecompute(races, metas, new Date());
+    const planned = backfill ? backfillPage(pending, after) : pending;
     const near = planned.filter((job) => job.reason === "near-start");
     const retrospective = targetDate < dateJst(-1);
     const jobs = [...near, ...planned.filter((job) => job.reason !== "near-start").slice(0, retrospective ? 4 : MAX_BACKLOG_JOBS)];
@@ -91,7 +95,9 @@ export async function GET(request: NextRequest) {
             signal: AbortSignal.timeout(Math.max(5_000, Math.min(ANALYZE_TIMEOUT_MS, FUNCTION_BUDGET_MS - (Date.now() - startedAt)))),
           },
         );
+        const body = backfill && response.ok ? await response.json() : null;
         return {
+          resultAvailable: body?.review?.isFinished === true,
           raceId: job.raceId,
           preview: job.preview,
           reason: job.reason,
@@ -120,7 +126,12 @@ export async function GET(request: NextRequest) {
     };
     await serverData("run", { summary: { ...summary, results } });
     console.info("REIN precompute", JSON.stringify(summary));
-    return NextResponse.json({ ok: summary.failed === 0 && summary.incomplete === 0, ...summary, remaining: Math.max(0, planned.length-summary.updated), results }, {
+    return NextResponse.json({ ok: summary.failed === 0 && summary.incomplete === 0, ...summary,
+      ...(backfill ? {
+        nextCursor: results.length && results.every(r => r.ok) ? jobs[jobs.length-1].raceId : after,
+        unavailableResults: results.filter(r => r.ok && "resultAvailable" in r && !r.resultAvailable).map(r => r.raceId),
+      } : {}),
+      remaining: Math.max(0, planned.length-summary.updated), results }, {
       headers: { "Cache-Control": "private, no-store" },
     });
   } catch (error) {
