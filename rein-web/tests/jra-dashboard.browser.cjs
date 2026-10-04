@@ -28,6 +28,7 @@ function moduleUrl(name){const source=fs.readFileSync(path.join(web,'lib',name+'
    if(tab==='展開') {await page.getByTestId('race-replay').waitFor();await page.getByRole('button',{name:'再生',exact:true}).click();await page.getByRole('button',{name:'一時停止',exact:true}).click();}
    if(tab==='馬の詳細') {await page.getByLabel('詳細を見る馬').selectOption('3');await page.getByText('定例重賞・過去傾向').waitFor();}
    if(tab==='騎手') {await page.getByLabel('騎手・馬を検索').fill('検証騎手3');assert.equal(await page.locator('details').count(),1);await page.getByText('12.5%',{exact:true}).waitFor();}
+   if(tab==='予想') {const panel=page.getByRole('region',{name:'着順別の穴馬適性'}); for(const role of ['1着','2着','3着']) {await panel.getByRole('button',{name:role+'の穴',exact:true}).click(); await panel.getByLabel('穴馬の人気条件').selectOption('10');assert.equal(await panel.getByRole('button').count(),6);await panel.getByText(role+'適性 全頭中10位',{exact:true}).waitFor();} await panel.getByLabel('穴馬の人気条件').selectOption('4');}
    if(tab==='結果') await page.getByText('確定結果の取得後に、全着順と保存した予想を比較できます。').waitFor();
    for (const width of [320,390,768,1280]) {await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width,tab+' width '+width);}
  }

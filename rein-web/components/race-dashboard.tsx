@@ -22,7 +22,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { compactSelections } from "@/lib/tickets";
 import { raceProgress } from "@/lib/race-progress";
 import { reasonViews } from "@/lib/feature-labels";
-import { roleOrder, type Picks, type MarkPick } from "@/lib/marks";
+import { longshotRoleOrder } from "@/lib/longshot-roles";
+import { roleOrder, type RoleKey, type Picks, type MarkPick } from "@/lib/marks";
 import { RaceFormationMap } from "@/components/race-formation-map";
 import { JockeyProfiles } from "@/components/jockey-profiles";
 import { RaceReplay } from "@/components/race-replay";
@@ -2548,17 +2549,11 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
   const byNumber = (pick: MarkPick | null | undefined) =>
     pick ? data.horses.find((horse) => horse.number === pick.number) : undefined;
   if (!picks || picks.status !== "ready") {
-    return (
-      <p className="mt-5 rounded-xl border border-dashed border-slate-600 p-3 text-sm text-slate-400">
-        {"評価を保留しています"}
-      </p>
-    );
+    return <>
+      <p className="mt-5 rounded-xl border border-dashed border-slate-600 p-3 text-sm text-slate-400">評価を保留しています</p>
+      <LongshotRoles data={data} onHorse={onHorse} />
+    </>;
   }
-  const candidates = picks.longshotCandidates ?? (picks.longshot ? [picks.longshot] : []);
-  const roleRanks = {
-    second: new Map<number, number>(roleOrder(data.horses, "second").map((horse, index): [number, number] => [horse.number, index + 1])),
-    third: new Map<number, number>(roleOrder(data.horses, "third").map((horse, index): [number, number] => [horse.number, index + 1])),
-  };
   const slots: Array<{ title: string; pick: MarkPick | null; empty?: string }> = [
     { title: "本命", pick: picks.main },
     { title: "対抗", pick: picks.rival },
@@ -2615,74 +2610,45 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
       <p className="mt-2 text-[11px] leading-5 text-slate-500">
         本命・対抗・穴候補はREINの参考評価です。
       </p>
-      <section className="mt-4 rounded-2xl border border-rose-400/25 bg-rose-400/[.04] p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="font-bold text-rose-200">穴候補一覧・評価</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-400">
-              買い目とは別に、人気よりREIN評価が高い馬を確認できます。
-            </p>
-          </div>
-          <Badge className="bg-rose-400/10 text-rose-200">
-            {candidates.length ? `${candidates.length}頭` : "候補なし"}
-          </Badge>
-        </div>
-        {candidates.length ? (
-          <div className="mt-3 grid gap-2 md:grid-cols-2">
-            {candidates.map((pick, index) => {
-              const horse = byNumber(pick);
-              if (!horse) return null;
-              const secondRank = roleRanks.second.get(horse.number);
-              const thirdRank = roleRanks.third.get(horse.number);
-              return (
-                <button
-                  key={horse.number}
-                  onClick={() => onHorse(horse)}
-                  className="rounded-xl border border-rose-400/20 bg-black/15 p-3 text-left transition hover:border-rose-300/50 hover:bg-white/[.03]"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white font-bold text-slate-900">
-                        {horse.number}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate font-semibold text-slate-100">{horse.name}</span>
-                        <span className="mt-0.5 block text-xs text-slate-400">
-                          {horse.popularity}番人気・単勝{horse.odds === null ? "未取得" : `${horse.odds}倍`}
-                        </span>
-                      </span>
-                    </div>
-                    <Badge className={index === 0 ? "shrink-0 bg-rose-400/15 text-rose-200" : "shrink-0 bg-white/10 text-slate-300"}>
-                      {index === 0 ? "穴候補筆頭" : "穴候補"}
-                    </Badge>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <Metric label="1着適性" value={`${pick.firstRank}位・${horse.probabilityKind ? "評価シェア" : "推定"}${formatProbability(horse.firstProbability)}`} />
-                    <Metric label={data.race.league==="nar"?"人気順位との差":"市場モデルとの差"} value={data.race.league==="nar"?`人気より${horse.popularity-pick.firstRank}位上位`:typeof pick.marketGap === "number" ? `+${(pick.marketGap * 100).toFixed(1)}ポイント` : "算出中"} />
-                    <Metric label="2着適性順位" value={secondRank ? `${secondRank}位` : "算出中"} />
-                    <Metric label="3着適性順位" value={thirdRank ? `${thirdRank}位` : "算出中"} />
-                  </div>
-                  <div className="mt-3 border-t border-rose-400/15 pt-2">
-                    <p className="text-xs font-semibold text-slate-300">1着適性モデルが参照した要因</p>
-                    {reasonViews(horse.roleReasons?.first, 3).map((reason, i) => <p key={i} className={`mt-1 break-words text-xs leading-5 ${reason.direction === "up" ? "text-cyan-200" : "text-rose-300"}`}>{reason.direction === "up" ? "↑" : "↓"} {reason.label}</p>)}
-                    {!horse.roleReasons?.first?.length && <p className="mt-1 text-xs text-slate-500">要因データは未取得です。</p>}
-                    <p className="mt-2 text-[11px] leading-5 text-slate-500">参考情報としてご確認ください。</p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="mt-3 rounded-lg border border-dashed border-slate-700 px-3 py-3 text-sm text-slate-400">
-            {picks.longshotStatus === "unavailable"
-              ? picks.longshotReason ?? "人気・市場評価を取得できないため、穴候補を保留しています。"
-              : picks.longshotReason ?? "今回の条件に合う穴候補はいません。"}
-          </p>
-        )}
-        <p className="mt-3 text-[11px] leading-5 text-slate-500">
-          候補一覧は参考評価です。的中や利益を保証するものではありません。
-        </p>
-      </section>
+      <LongshotRoles data={data} onHorse={onHorse} />
     </>
+  );
+}
+
+
+function LongshotRoles({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) => void }) {
+  const [role, setRole] = useState<RoleKey>("first");
+  const [minPopularity, setMinPopularity] = useState<4 | 6 | 10>(4);
+  const label = { first: "1着", second: "2着", third: "3着" }[role];
+  const result = longshotRoleOrder(data.horses, role, minPopularity);
+  return (
+    <section className="mt-4 rounded-2xl border border-rose-400/25 bg-rose-400/[.04] p-4 sm:p-5" aria-label="着順別の穴馬適性">
+      <h2 className="font-bold text-rose-200">着順別の穴馬適性</h2>
+      <p className="mt-1 text-xs leading-5 text-slate-400">人気薄の中で、各着順の適性が高い順に最大3頭を表示します。買い目とは別の参考比較です。</p>
+      <div className="mt-3 flex gap-2" role="group" aria-label="穴馬の着順">
+        {(["first", "second", "third"] as const).map(key => <button key={key} aria-pressed={role === key} onClick={() => setRole(key)} className={`flex-1 rounded-lg border px-3 py-2 text-sm ${role === key ? "border-rose-300 bg-rose-400/15 text-rose-200" : "border-slate-700 text-slate-400"}`}>{({ first: "1着の穴", second: "2着の穴", third: "3着の穴" })[key]}</button>)}
+      </div>
+      <label className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">人気の条件
+        <select aria-label="穴馬の人気条件" value={minPopularity} onChange={event => setMinPopularity(Number(event.target.value) as 4 | 6 | 10)} className="rounded-lg border border-slate-700 bg-slate-900 p-2 text-slate-200">
+          <option value={4}>4番人気以下</option><option value={6}>6番人気以下</option><option value={10}>10番人気以下</option>
+        </select>
+      </label>
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        {result.candidates.map(({ horse, overallRank, outsiderRank }) => <button key={horse.number} onClick={() => onHorse(horse)} className="min-w-0 rounded-xl border border-rose-400/20 bg-black/15 p-3 text-left hover:border-rose-300/50">
+          <p className="text-xs text-rose-200">人気薄内 {outsiderRank}位</p>
+          <p className="mt-2 break-words font-semibold">{horse.number} {horse.name}</p>
+          <p className="mt-1 text-xs text-slate-400">{horse.popularity}番人気・単勝{horse.odds === null ? "未取得" : `${horse.odds}倍`}</p>
+          <p className="mt-3 font-bold text-cyan-200">{label}適性 全頭中{overallRank}位</p>
+          <p className="mt-1 text-[11px] text-slate-400">{horse.popularity > overallRank ? `人気順位より${horse.popularity - overallRank}位上位` : "人気順位を上回る評価ではありません"}</p>
+          <div className="mt-3 border-t border-rose-400/15 pt-2">
+            <p className="text-xs text-slate-300">{label}モデルの評価要因</p>
+            {reasonViews(horse.roleReasons?.[role], 2).map((reason, i) => <p key={i} className={`mt-1 break-words text-xs leading-5 ${reason.direction === "up" ? "text-cyan-200" : "text-rose-300"}`}>{reason.direction === "up" ? "↑" : "↓"} {reason.label}</p>)}
+            {!horse.roleReasons?.[role]?.length && <p className="mt-1 text-xs text-slate-500">要因データは未取得です。</p>}
+          </div>
+        </button>)}
+      </div>
+      {!result.candidates.length && <p className="mt-3 text-sm text-slate-400">{result.reason ?? "この人気条件に該当する馬はいません。"}</p>}
+      <p className="mt-3 text-[11px] leading-5 text-slate-500">人気薄内の上位でも、全頭中の適性は低い場合があります。順位は的中率・回収率を示すものではありません。上の穴候補カードとは選定条件が異なります。</p>
+    </section>
   );
 }
