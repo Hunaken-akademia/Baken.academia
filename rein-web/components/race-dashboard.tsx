@@ -24,6 +24,7 @@ import { raceProgress } from "@/lib/race-progress";
 import { reasonViews } from "@/lib/feature-labels";
 import { roleOrder, type Picks, type MarkPick } from "@/lib/marks";
 import { RaceFormationMap } from "@/components/race-formation-map";
+import { JockeyProfiles } from "@/components/jockey-profiles";
 import { RaceReplay } from "@/components/race-replay";
 import { PredictionJournal, HorseNotebook } from "@/components/prediction-journal";
 import { MarketRankMap } from "@/components/market-rank-map";
@@ -963,6 +964,264 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           </div>
         </section>
       )}
+      <section className="mb-5 grid grid-cols-1 gap-4">
+        <Card className="min-w-0 border-slate-700 bg-gradient-to-br from-[#10233a] to-[#0b1727] text-white">
+          <CardContent className="p-5 sm:p-6">
+            <p className="text-sm text-cyan-300">
+              {data.race.start}発走 ・ {data.race.updated}
+            </p>
+            {data.prediction && data.prediction.phase !== "prestart" && (
+              <p className="mt-1 text-xs leading-5 text-amber-200">{data.prediction.label}</p>
+            )}
+            <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
+              {data.race.title}
+            </h1>
+            <p className="mt-1 text-slate-400">
+              {data.race.course}　{data.race.condition}
+            </p>
+          </CardContent>
+        </Card>
+      </section>
+      <Tabs key={data.race.raceId} defaultValue="prediction" onSwipeBack={onBack}>
+        <TabsList aria-label="レースの情報" className="sticky top-0 z-20 mb-4 grid h-auto min-h-12 w-full grid-cols-5 border border-slate-700 bg-[#0c192a] shadow-lg">
+          {[["prediction", "予想"], ["formation", "展開"], ["detail", "馬の詳細"], ["jockeys", "騎手"], ["review", "結果"]].map(([value, label]) => (
+            <TabsTrigger key={value} value={value} className="min-h-11 px-1 text-[11px] sm:text-sm">{label}</TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent value="prediction">
+          <PickCards data={data} onHorse={onHorse} />
+        <div className="grid min-w-0 grid-cols-1 gap-4">
+          <RaceConfidenceCard confidence={data.confidence} nar={data.race.league === "nar"} reference={data.narReference} />
+          <Card className="border-slate-700 bg-[#0c192a] text-white">
+            <CardContent className="flex gap-3 p-4">
+              <Gauge className="text-amber-300" />
+              <div>
+                <p className="text-xs text-slate-400">{data.race.league==="nar"?"近走の先行構成":"展開予測"}</p>
+                <p className="font-bold">{data.pace.label}</p>
+                <p className="mt-1 text-sm text-slate-400">
+                  {data.pace.detail}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-700 bg-[#0c192a] text-white">
+            <CardContent className="flex gap-3 p-4">
+              <AlertTriangle className="text-rose-300" />
+              <div>
+                <p className="text-xs text-slate-400">{data.race.league==="nar"?"人気馬の慎重評価（参考）":"危険人気馬"}</p>
+                <p className="font-bold">
+                  {data.race.league === "nar" ? !data.narReference ? "この保存予想は検証反映前" : data.narReference.danger.status==="market-missing" ? "全頭の人気待ち" : data.narReference.danger.status==="held" ? "評価保留" : data.narReference.danger.status!=="adopted" ? "該当なし" : data.narReference.danger.numbers.length ? data.narReference.danger.numbers.map(n=>`${n} ${data.horses.find(h=>h.number===n)?.name??""}`).join("・") : "該当なし" : !rankingReady ? "評価保留" : danger ? `${danger.number} ${danger.name}` : "該当なし"}
+                </p>
+                <p className="mt-1 text-sm text-slate-400">
+                  {!rankingReady ? "評価の取得後に表示します" : "REINの参考評価です。"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+          <RaceIntelligence data={data} insights={insights} />
+          <h2 className="mb-3 text-lg font-bold">1〜3着適性</h2>
+          {rolesReady ? (
+            <RoleRankings horses={data.horses} onHorse={onHorse} />
+          ) : (
+            <HeldPanel text="着順別モデルの結果を取得できないため、着順適性ランキングを保留しています。" />
+          )}
+          <h2 className="mb-3 mt-6 text-lg font-bold">全頭評価・馬の詳細</h2>
+          <p className="mb-3 text-xs leading-5 text-slate-500">
+            {rankingReady ? "順位と評価点はレース内の比較用です。評価点は勝率ではありません。" : "総合順位は保留中のため、馬番順で表示しています。"}
+          </p>
+          <div className="overflow-hidden rounded-2xl border border-slate-700 bg-[#0c192a]">
+            {listHorses.map((horse, index) => {
+              const expanded = activeHorse?.number === horse.number;
+              return (
+                <Fragment key={horse.number}>
+                  <button
+                    onClick={() => onHorse(horse)}
+                    aria-expanded={expanded}
+                    className={`grid w-full grid-cols-[28px_36px_minmax(0,1fr)_58px_20px] items-center gap-2 border-b border-slate-800 px-3 py-3 text-left transition sm:grid-cols-[32px_40px_minmax(0,1fr)_105px_60px_20px] ${expanded ? "bg-cyan-400/8" : "hover:bg-white/[.03]"}`}
+                  >
+                    <span className="text-center text-sm text-slate-500">
+                      {rankingReady ? index + 1 : "－"}
+                    </span>
+                    <span className="grid size-8 place-items-center rounded-md bg-white font-bold text-slate-900">
+                      {horse.number}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">
+                        {visibleMark(horse.mark)} {horse.name}
+                      </p>
+                      <p className="truncate text-xs text-slate-500">
+                        {[horse.style, visibleVerdict(horse.verdict)].filter(Boolean).join("・")}
+                        <span className="hidden sm:inline">
+                          　履歴 {horse.historySamples ?? 0}走 / 補正{" "}
+                          {horse.historyAdjustment &&
+                          horse.historyAdjustment > 0
+                            ? "+"
+                            : ""}
+                          {horse.historyAdjustment ?? 0}
+                        </span>
+                      </p>
+                    </div>
+                    <p className="text-right text-lg font-black text-cyan-300">
+                      {rankingReady ? (
+                        <>
+                          {horse.score}
+                          <span className="text-xs text-slate-500">pt</span>
+                        </>
+                      ) : (
+                        <span className="text-xs font-normal text-slate-500">保留</span>
+                      )}
+                    </p>
+                    <span className="hidden text-right text-sm text-slate-400 sm:block">
+                      {horse.popularity > 0 ? `${horse.popularity}人気` : "人気未発表"}
+                    </span>
+                    <ChevronRight
+                      className={`size-4 text-slate-600 transition ${expanded ? "rotate-90 text-cyan-300" : ""}`}
+                    />
+                  </button>
+                  {expanded && (
+                    <div className="border-b border-slate-700 bg-[#091522] p-3 sm:p-5">
+                      <HorseDetails horse={horse} data={data} />
+                    </div>
+                  )}
+                </Fragment>
+              );
+            })}
+          </div>
+          {rolesReady && <MarketReinComparison data={data} horses={listHorses} />}
+          {rankingReady && <OverallAssessment data={data} insights={insights} onHorse={onHorse} />}
+          <details className="mt-5 rounded-xl border border-slate-700 bg-[#0c192a] p-4">
+            <summary className="cursor-pointer font-bold">参考買い目を開く</summary>
+            <div className="mt-4">
+          {data.evaluation?.tickets === "held" && (
+            <HeldPanel text={data.race.league === "nar" ? "地方の自動買い目・回収率は未検証のため保留しています。中央専用の買い目補正は流用しません。" : "買い目は保留中です。人気・着順別モデルの結果がそろってから生成します。"} />
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {data.tickets.map((ticket) => (
+              <Card
+                key={ticket.type}
+                className="border-slate-700 bg-[#0c192a] text-white"
+              >
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">{ticket.type}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {ticket.tiers.map((item) => (
+                    <div
+                      key={item.group}
+                      className="rounded-lg border border-slate-800 bg-black/10 p-3"
+                    >
+                      <div className="mb-2 flex justify-between">
+                        <Badge className={groupStyle[item.group]}>
+                          {item.group}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className="border-slate-600 text-slate-300"
+                        >
+                          {item.points}点
+                        </Badge>
+                      </div>
+                      <p className="font-mono text-xs leading-6 text-slate-200">
+                        {compactSelections(item.selections).join(" / ") ||
+                          "該当なし"}
+                      </p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+            </div>
+          </details>
+        </TabsContent>
+        <TabsContent value="formation">
+          <RaceFormationMap horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
+          <RaceReplay horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} picks={data.picks} roleReady={rolesReady} />
+          <RaceShapeReference data={data} />
+        </TabsContent>
+        <TabsContent value="detail">
+          <label className="mb-4 flex flex-wrap items-center gap-3 text-sm" data-no-swipe>
+            馬を選ぶ
+            <select aria-label="詳細を見る馬" value={activeHorse?.number ?? ""} onChange={(event) => { const horse = data.horses.find((item) => item.number === Number(event.target.value)); if (horse) onHorse(horse); }} className="min-h-11 max-w-full rounded-lg border border-slate-600 bg-[#101f32] px-3">
+              <option value="">選択してください</option>
+              {[...data.horses].sort((a, b) => a.number - b.number).map((horse) => <option key={horse.number} value={horse.number}>{horse.number} {horse.name}</option>)}
+            </select>
+          </label>
+          {activeHorse ? (
+            <Card className="border-slate-700 bg-[#0c192a] text-white">
+              <CardContent className="p-5">
+                <HorseDetails horse={activeHorse} data={data} />
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-700 bg-[#0c192a] p-8 text-center text-slate-400">
+              全頭評価か着順適性から馬を選ぶと詳細診断を表示します
+            </div>
+          )}
+          <DetailedComparison data={data} horses={listHorses} />
+          <ConditionReferenceRankings data={data} />
+      <section className="mb-5 rounded-2xl border border-cyan-400/20 bg-[#0c192a] p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold tracking-widest text-cyan-300">コースガイド</p>
+            <h2 className="mt-1 text-lg font-bold">{guide.venue}・この条件の特徴</h2>
+          </div>
+          <Badge className="bg-cyan-400/10 text-cyan-300">予想の前提</Badge>
+        </div>
+        <div className="mt-4 grid gap-2 md:grid-cols-3">
+          <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
+            <p className="text-xs font-semibold text-amber-300">競馬場</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="course")?.detail??data.jraReference?.conditions.find(c=>c.kind==="course")?.detail??guide.venueTrait}</p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
+            <p className="text-xs font-semibold text-emerald-300">距離</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="courseDistance")?.detail??data.jraReference?.conditions.find(c=>c.kind==="courseDistance")?.detail??guide.distanceTrait}</p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
+            <p className="text-xs font-semibold text-violet-300">今回の条件</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{`馬場：${data.race.condition || "未発表"}` }</p>
+          </div>
+        </div>
+
+
+      </section>
+      {data.jraReference?.graded && <section className="mb-5 min-w-0 rounded-2xl border border-amber-400/25 bg-gradient-to-br from-[#151d2b] to-[#0c192a] p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold tracking-widest text-amber-300">定例重賞・過去傾向</p>
+            <h2 className="mt-1 break-words text-lg font-bold">{data.jraReference.graded.grade}・{data.jraReference.graded.name}</h2>
+          </div>
+          <Badge className="bg-amber-400/10 text-amber-200">当年を除く直近{data.jraReference.graded.editions}回</Badge>
+        </div>
+        <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {[
+            ["1番人気の勝利",data.jraReference.graded.favoriteWinRate],
+            ["1〜3番人気の勝利",data.jraReference.graded.top3PopularityWinRate],
+            ["6番人気以下の勝利",data.jraReference.graded.sixPlusWinRate],
+            ["10番人気以下が3着内",data.jraReference.graded.tenPlusPlacedRate],
+            ["1〜4枠の勝利",data.jraReference.graded.innerGateWinRate],
+          ].map(([label,value])=><div key={String(label)} className="min-w-0 rounded-xl border border-slate-800 bg-black/15 p-3">
+            <p className="text-xs text-slate-400">{String(label)}</p><p className="mt-1 text-xl font-bold text-white">{typeof value==="number"?`${(value*100).toFixed(1)}%`:"母数不足"}</p>
+          </div>)}
+        </div>
+        <p className="mt-3 text-sm leading-6 text-slate-300">勝ち馬が最初の通過地点で3番手以内：{typeof data.jraReference.graded.frontWinRate==="number"?`${(data.jraReference.graded.frontWinRate*100).toFixed(1)}%（通過順あり${data.jraReference.graded.frontSamples}回）`:"母数不足"}。</p>
+        {(data.jraReference.graded.venueChanges||data.jraReference.graded.courseChanges)&&<p className="mt-1 text-xs leading-5 text-amber-200">開催場・距離の変更年を含みます。各年の条件は下の一覧に併記しています。</p>}
+        <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {data.jraReference.graded.recent.map(edition=><div key={edition.date} className="min-w-0 rounded-xl border border-slate-800 bg-[#0b1727] p-3 text-xs leading-5">
+            <p className="font-bold text-slate-100">{edition.year}年・{edition.venue}</p>
+            <p className="text-slate-400">{edition.surface}{edition.distanceM}m・{edition.going}</p>
+            <p className="mt-1 text-slate-300">勝ち馬 {edition.winnerPopularity?`${edition.winnerPopularity}番人気`:"人気不明"}</p>
+            <p className="break-words text-slate-500">3着内人気 {edition.placedPopularities.length?edition.placedPopularities.join("・"):"不明"}</p>
+          </div>)}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-slate-500">{data.jraReference.graded.yearFrom}〜{data.jraReference.graded.yearTo}年から集計。当年結果は含めません。過去傾向であり、今回の的中確率や買い推奨ではありません。</p>
+      </section>}
+        </TabsContent>
+        <TabsContent value="jockeys">
+          <JockeyProfiles horses={data.horses} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} />
+        </TabsContent>
+        <TabsContent value="review">
       {data.review?.isFinished && (
         <section className="mb-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/[.07] p-4 sm:p-5">
           <div className="flex items-center justify-between">
@@ -1043,259 +1302,10 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           ) : null}
         </section>
       )}
-      <section className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,.55fr)]">
-        <Card className="min-w-0 border-slate-700 bg-gradient-to-br from-[#10233a] to-[#0b1727] text-white">
-          <CardContent className="p-5 sm:p-6">
-            <p className="text-sm text-cyan-300">
-              {data.race.start}発走 ・ {data.race.updated}
-            </p>
-            {data.prediction && data.prediction.phase !== "prestart" && (
-              <p className="mt-1 text-xs leading-5 text-amber-200">{data.prediction.label}</p>
-            )}
-            <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
-              {data.race.title}
-            </h1>
-            <p className="mt-1 text-slate-400">
-              {data.race.course}　{data.race.condition}
-            </p>
-            <PickCards data={data} onHorse={onHorse} />
-          </CardContent>
-        </Card>
-        <div className="grid min-w-0 grid-cols-1 gap-4">
-          <RaceConfidenceCard confidence={data.confidence} nar={data.race.league === "nar"} reference={data.narReference} />
-          <Card className="border-slate-700 bg-[#0c192a] text-white">
-            <CardContent className="flex gap-3 p-4">
-              <Gauge className="text-amber-300" />
-              <div>
-                <p className="text-xs text-slate-400">{data.race.league==="nar"?"近走の先行構成":"展開予測"}</p>
-                <p className="font-bold">{data.pace.label}</p>
-                <p className="mt-1 text-sm text-slate-400">
-                  {data.pace.detail}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-slate-700 bg-[#0c192a] text-white">
-            <CardContent className="flex gap-3 p-4">
-              <AlertTriangle className="text-rose-300" />
-              <div>
-                <p className="text-xs text-slate-400">{data.race.league==="nar"?"人気馬の慎重評価（参考）":"危険人気馬"}</p>
-                <p className="font-bold">
-                  {data.race.league === "nar" ? !data.narReference ? "この保存予想は検証反映前" : data.narReference.danger.status==="market-missing" ? "全頭の人気待ち" : data.narReference.danger.status==="held" ? "評価保留" : data.narReference.danger.status!=="adopted" ? "該当なし" : data.narReference.danger.numbers.length ? data.narReference.danger.numbers.map(n=>`${n} ${data.horses.find(h=>h.number===n)?.name??""}`).join("・") : "該当なし" : !rankingReady ? "評価保留" : danger ? `${danger.number} ${danger.name}` : "該当なし"}
-                </p>
-                <p className="mt-1 text-sm text-slate-400">
-                  {!rankingReady ? "評価の取得後に表示します" : "REINの参考評価です。"}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-      <section className="mb-5 rounded-2xl border border-cyan-400/20 bg-[#0c192a] p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold tracking-widest text-cyan-300">コースガイド</p>
-            <h2 className="mt-1 text-lg font-bold">{guide.venue}・この条件の特徴</h2>
-          </div>
-          <Badge className="bg-cyan-400/10 text-cyan-300">予想の前提</Badge>
-        </div>
-        <div className="mt-4 grid gap-2 md:grid-cols-3">
-          <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
-            <p className="text-xs font-semibold text-amber-300">競馬場</p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="course")?.detail??data.jraReference?.conditions.find(c=>c.kind==="course")?.detail??guide.venueTrait}</p>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
-            <p className="text-xs font-semibold text-emerald-300">距離</p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{data.narReference?.conditions.find(c=>c.kind==="courseDistance")?.detail??data.jraReference?.conditions.find(c=>c.kind==="courseDistance")?.detail??guide.distanceTrait}</p>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
-            <p className="text-xs font-semibold text-violet-300">今回の条件</p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">{`馬場：${data.race.condition || "未発表"}` }</p>
-          </div>
-        </div>
-
-
-      </section>
-      {data.jraReference?.graded && <section className="mb-5 min-w-0 rounded-2xl border border-amber-400/25 bg-gradient-to-br from-[#151d2b] to-[#0c192a] p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-widest text-amber-300">定例重賞・過去傾向</p>
-            <h2 className="mt-1 break-words text-lg font-bold">{data.jraReference.graded.grade}・{data.jraReference.graded.name}</h2>
-          </div>
-          <Badge className="bg-amber-400/10 text-amber-200">当年を除く直近{data.jraReference.graded.editions}回</Badge>
-        </div>
-        <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {[
-            ["1番人気の勝利",data.jraReference.graded.favoriteWinRate],
-            ["1〜3番人気の勝利",data.jraReference.graded.top3PopularityWinRate],
-            ["6番人気以下の勝利",data.jraReference.graded.sixPlusWinRate],
-            ["10番人気以下が3着内",data.jraReference.graded.tenPlusPlacedRate],
-            ["1〜4枠の勝利",data.jraReference.graded.innerGateWinRate],
-          ].map(([label,value])=><div key={String(label)} className="min-w-0 rounded-xl border border-slate-800 bg-black/15 p-3">
-            <p className="text-xs text-slate-400">{String(label)}</p><p className="mt-1 text-xl font-bold text-white">{typeof value==="number"?`${(value*100).toFixed(1)}%`:"母数不足"}</p>
-          </div>)}
-        </div>
-        <p className="mt-3 text-sm leading-6 text-slate-300">勝ち馬が最初の通過地点で3番手以内：{typeof data.jraReference.graded.frontWinRate==="number"?`${(data.jraReference.graded.frontWinRate*100).toFixed(1)}%（通過順あり${data.jraReference.graded.frontSamples}回）`:"母数不足"}。</p>
-        {(data.jraReference.graded.venueChanges||data.jraReference.graded.courseChanges)&&<p className="mt-1 text-xs leading-5 text-amber-200">開催場・距離の変更年を含みます。各年の条件は下の一覧に併記しています。</p>}
-        <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {data.jraReference.graded.recent.map(edition=><div key={edition.date} className="min-w-0 rounded-xl border border-slate-800 bg-[#0b1727] p-3 text-xs leading-5">
-            <p className="font-bold text-slate-100">{edition.year}年・{edition.venue}</p>
-            <p className="text-slate-400">{edition.surface}{edition.distanceM}m・{edition.going}</p>
-            <p className="mt-1 text-slate-300">勝ち馬 {edition.winnerPopularity?`${edition.winnerPopularity}番人気`:"人気不明"}</p>
-            <p className="break-words text-slate-500">3着内人気 {edition.placedPopularities.length?edition.placedPopularities.join("・"):"不明"}</p>
-          </div>)}
-        </div>
-        <p className="mt-3 text-xs leading-5 text-slate-500">{data.jraReference.graded.yearFrom}〜{data.jraReference.graded.yearTo}年から集計。当年結果は含めません。過去傾向であり、今回の的中確率や買い推奨ではありません。</p>
-      </section>}
-      <RaceIntelligence data={data} insights={insights} />
-      <RaceFormationMap key={data.race.raceId} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
-      <RaceReplay key={`replay-${data.race.raceId}`} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} picks={data.picks} roleReady={roleReady(data)} />
-      <RaceShapeReference data={data} />
-      <PredictionJournal data={data} />
-      <ConditionReferenceRankings data={data} />
-      <Tabs defaultValue="ranking" onSwipeBack={onBack}>
-        <TabsList className="mb-4 grid h-auto min-h-11 w-full grid-cols-4 bg-[#0c192a]">
-          <TabsTrigger value="ranking" className="px-1 text-xs sm:text-sm">
-            全頭評価
-          </TabsTrigger>
-          <TabsTrigger value="roles" className="px-1 text-xs sm:text-sm">
-            着順適性
-          </TabsTrigger>
-          <TabsTrigger value="tickets" className="px-1 text-xs sm:text-sm">
-            買い目
-          </TabsTrigger>
-          <TabsTrigger value="detail" className="px-1 text-xs sm:text-sm">
-            診断
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="ranking">
-          <p className="mb-3 text-xs leading-5 text-slate-500">
-            {rankingReady ? "順位と評価点はレース内の比較用です。評価点は勝率ではありません。" : "総合順位は保留中のため、馬番順で表示しています。"}
-          </p>
-          <div className="overflow-hidden rounded-2xl border border-slate-700 bg-[#0c192a]">
-            {listHorses.map((horse, index) => {
-              const expanded = activeHorse?.number === horse.number;
-              return (
-                <Fragment key={horse.number}>
-                  <button
-                    onClick={() => onHorse(horse)}
-                    aria-expanded={expanded}
-                    className={`grid w-full grid-cols-[28px_36px_minmax(0,1fr)_58px_20px] items-center gap-2 border-b border-slate-800 px-3 py-3 text-left transition sm:grid-cols-[32px_40px_minmax(0,1fr)_105px_60px_20px] ${expanded ? "bg-cyan-400/8" : "hover:bg-white/[.03]"}`}
-                  >
-                    <span className="text-center text-sm text-slate-500">
-                      {rankingReady ? index + 1 : "－"}
-                    </span>
-                    <span className="grid size-8 place-items-center rounded-md bg-white font-bold text-slate-900">
-                      {horse.number}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold">
-                        {visibleMark(horse.mark)} {horse.name}
-                      </p>
-                      <p className="truncate text-xs text-slate-500">
-                        {[horse.style, visibleVerdict(horse.verdict)].filter(Boolean).join("・")}
-                        <span className="hidden sm:inline">
-                          　履歴 {horse.historySamples ?? 0}走 / 補正{" "}
-                          {horse.historyAdjustment &&
-                          horse.historyAdjustment > 0
-                            ? "+"
-                            : ""}
-                          {horse.historyAdjustment ?? 0}
-                        </span>
-                      </p>
-                    </div>
-                    <p className="text-right text-lg font-black text-cyan-300">
-                      {rankingReady ? (
-                        <>
-                          {horse.score}
-                          <span className="text-xs text-slate-500">pt</span>
-                        </>
-                      ) : (
-                        <span className="text-xs font-normal text-slate-500">保留</span>
-                      )}
-                    </p>
-                    <span className="hidden text-right text-sm text-slate-400 sm:block">
-                      {horse.popularity > 0 ? `${horse.popularity}人気` : "人気未発表"}
-                    </span>
-                    <ChevronRight
-                      className={`size-4 text-slate-600 transition ${expanded ? "rotate-90 text-cyan-300" : ""}`}
-                    />
-                  </button>
-                  {expanded && (
-                    <div className="border-b border-slate-700 bg-[#091522] p-3 sm:p-5">
-                      <HorseDetails horse={horse} data={data} />
-                    </div>
-                  )}
-                </Fragment>
-              );
-            })}
-          </div>
-        </TabsContent>
-        <TabsContent value="roles">
-          {rolesReady ? (
-            <RoleRankings horses={data.horses} onHorse={onHorse} />
-          ) : (
-            <HeldPanel text="着順別モデルの結果を取得できないため、着順適性ランキングを保留しています。" />
-          )}
-        </TabsContent>
-        <TabsContent value="tickets">
-          {data.evaluation?.tickets === "held" && (
-            <HeldPanel text={data.race.league === "nar" ? "地方の自動買い目・回収率は未検証のため保留しています。中央専用の買い目補正は流用しません。" : "買い目は保留中です。人気・着順別モデルの結果がそろってから生成します。"} />
-          )}
-          <div className="grid gap-3 sm:grid-cols-2">
-            {data.tickets.map((ticket) => (
-              <Card
-                key={ticket.type}
-                className="border-slate-700 bg-[#0c192a] text-white"
-              >
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{ticket.type}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {ticket.tiers.map((item) => (
-                    <div
-                      key={item.group}
-                      className="rounded-lg border border-slate-800 bg-black/10 p-3"
-                    >
-                      <div className="mb-2 flex justify-between">
-                        <Badge className={groupStyle[item.group]}>
-                          {item.group}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className="border-slate-600 text-slate-300"
-                        >
-                          {item.points}点
-                        </Badge>
-                      </div>
-                      <p className="font-mono text-xs leading-6 text-slate-200">
-                        {compactSelections(item.selections).join(" / ") ||
-                          "該当なし"}
-                      </p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-        <TabsContent value="detail">
-          {activeHorse ? (
-            <Card className="border-slate-700 bg-[#0c192a] text-white">
-              <CardContent className="p-5">
-                <HorseDetails horse={activeHorse} data={data} />
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-slate-700 bg-[#0c192a] p-8 text-center text-slate-400">
-              全頭評価か着順適性から馬を選ぶと詳細診断を表示します
-            </div>
-          )}
+          {!data.review?.isFinished && <HeldPanel text="確定結果の取得後に、全着順と保存した予想を比較できます。" />}
+          <PredictionJournal data={data} />
         </TabsContent>
       </Tabs>
-      {rolesReady && <MarketReinComparison data={data} horses={listHorses} />}
-      <DetailedComparison data={data} horses={listHorses} />
-      {rankingReady && <OverallAssessment data={data} insights={insights} onHorse={onHorse} />}
     </div>
   );
 }

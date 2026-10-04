@@ -81,3 +81,25 @@ test('course geometry: left-handed venues mirror, outer turf uses the outer cour
   assert.equal(replayGeometry('京都9R', '芝・右・外 1400m').homeStraight, 404);
   assert.equal(replayGeometry('京都9R', '芝・右 1400m').homeStraight, 328);
 });
+
+test('runners keep moving forward and do not jump lanes at checkpoints', () => {
+  const plan = buildReplay(race);
+  let previous = replayFrame(plan, 0);
+  for (let step = 1; step <= 2000; step += 1) {
+    const next = replayFrame(plan, step / 2000);
+    for (const runner of next.runners) {
+      const before = previous.runners.find((item) => item.number === runner.number);
+      assert.ok(runner.remaining <= before.remaining + 1e-8, `${runner.number} must not run backwards`);
+      assert.ok(Math.abs(runner.lane - before.lane) < .03, `${runner.number} must not jump lanes`);
+    }
+    previous = next;
+  }
+  for (const cp of plan.checkpoints.slice(1, -1)) {
+    const progress = 1 - cp.remaining / plan.geometry.distance;
+    const before = replayFrame(plan, progress - 1e-5), at = replayFrame(plan, progress), after = replayFrame(plan, progress + 1e-5);
+    for (const runner of at.runners) {
+      const left = before.runners.find((r) => r.number === runner.number), right = after.runners.find((r) => r.number === runner.number);
+      assert.ok(Math.abs((left.remaining - runner.remaining) - (runner.remaining - right.remaining)) < .001, 'speed should continue through a corner');
+    }
+  }
+});

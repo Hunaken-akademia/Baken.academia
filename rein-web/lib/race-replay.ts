@@ -270,18 +270,44 @@ export function replayFrame(plan: ReplayPlan, progress: number): ReplayFrame {
   const from = checkpoints[index];
   const to = checkpoints[Math.min(index + 1, checkpoints.length - 1)];
   const span = from.remaining - to.remaining;
-  const t = span > 0 ? smooth((from.remaining - leaderRemaining) / span) : 1;
-  const spacingFrom = spacing[index];
-  const spacingTo = spacing[Math.min(index + 1, spacing.length - 1)];
+  // Use a continuous velocity through checkpoints instead of restarting an
+  // ease-in/ease-out for every corner. Clamp tangents to preserve forward motion.
+  const at = (checkpoint: number, number: number) => {
+    const cp = checkpoints[checkpoint];
+    return cp.remaining + cp.order.findIndex((item) => item.number === number) * spacing[checkpoint];
+  };
+  const travelled = geometry.distance - leaderRemaining;
+  const rawT = span > 0 ? (from.remaining - leaderRemaining) / span : 1;
+  const velocity = (checkpoint: number, number: number) => {
+    const previous = Math.max(0, checkpoint - 1), next = Math.min(checkpoints.length - 1, checkpoint + 1);
+    const beforeSpan = checkpoints[previous].remaining - checkpoints[checkpoint].remaining;
+    const afterSpan = checkpoints[checkpoint].remaining - checkpoints[next].remaining;
+    const before = beforeSpan > 0 ? (at(previous, number) - at(checkpoint, number)) / beforeSpan : null;
+    const after = afterSpan > 0 ? (at(checkpoint, number) - at(next, number)) / afterSpan : null;
+    if (before === null) return Math.max(0, after ?? 1);
+    if (after === null) return Math.max(0, before);
+    return before > 0 && after > 0 ? 2 * before * after / (before + after) : 0;
+  };
   const runners = from.order.map(({ number }) => {
     const rankFrom = from.order.findIndex((item) => item.number === number);
     const rankTo = to.order.findIndex((item) => item.number === number);
-    const behind = (1 - t) * rankFrom * spacingFrom + t * rankTo * spacingTo;
-    // At the start the field is abreast across the track; afterwards up to 3 wide.
-    const abreast = (rank: number) => (from.order.length > 1 ? (rank * 2.6) / (from.order.length - 1) : 0);
-    const laneFrom = from.source === "start" ? abreast(rankFrom) : rankFrom % 3;
-    const laneTo = to.source === "start" ? abreast(rankTo) : rankTo % 3;
-    return { number, remaining: leaderRemaining + behind, lane: (1 - t) * laneFrom + t * laneTo };
+    const nextIndex = Math.min(index + 1, checkpoints.length - 1);
+    const y0 = at(index, number), y1 = at(nextIndex, number);
+    const slope = span > 0 ? (y0 - y1) / span : 0;
+    const m0 = Math.min(velocity(index, number), Math.max(0, 3 * slope));
+    const m1 = Math.min(velocity(nextIndex, number), Math.max(0, 3 * slope));
+    const u = rawT, u2 = u * u, u3 = u2 * u;
+    const remaining = span > 0
+      ? (2 * u3 - 3 * u2 + 1) * y0 - (u3 - 2 * u2 + u) * span * m0 + (-2 * u3 + 3 * u2) * y1 - (u3 - u2) * span * m1
+      : y1;
+    const startRank = checkpoints[0].order.findIndex((item) => item.number === number);
+    const startLane = checkpoints[0].order.length > 1 ? startRank * 2.6 / (checkpoints[0].order.length - 1) : 0;
+    const baseLane = startRank % 3;
+    const merge = smooth(Math.min(1, travelled / Math.min(250, geometry.distance * .2)));
+    // Keep a horse's lane independent of rank; a gaining horse moves out briefly
+    // to pass, then returns smoothly. All of this remains illustrative.
+    const passing = from.source !== "start" && rankTo < rankFrom ? Math.sin(Math.PI * u) ** 2 * .65 : 0;
+    return { number, remaining, lane: startLane * (1 - merge) + baseLane * merge + passing };
   });
   return { leaderRemaining, runners, checkpoint: index };
 }
