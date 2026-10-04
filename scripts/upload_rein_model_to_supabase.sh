@@ -44,6 +44,9 @@ jq -e '.ok == true' <<<"${BROKER_RESPONSE}" >/dev/null
 base="rein/models/v4/${MODEL_VERSION}"
 upload "${base}/bundle.tar.gz" "${MODEL_BUNDLE}" "application/gzip"
 upload "${base}/manifest.json" "${MODEL_MANIFEST}" "application/json"
+if [[ -n "${MODEL_PROFILE:-}" ]]; then
+  upload "${base}/history-profile.json.gz" "${MODEL_PROFILE}" "application/gzip"
+fi
 
 bundle_sha="$(sha256sum "${MODEL_BUNDLE}" | cut -d' ' -f1)"
 bundle_size="$(stat -c '%s' "${MODEL_BUNDLE}")"

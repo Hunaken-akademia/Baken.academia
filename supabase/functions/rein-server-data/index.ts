@@ -106,6 +106,16 @@ Deno.serve(async req => {
    const active = checked(await admin.from("rein_nar_model_releases").select("report,activated_at").eq("id",true).maybeSingle());
    return json({analysis,active});
   }
+  if (action === "jra-profile") {
+   if (who !== "production" && who !== "preview") return json({error:"REIN reader required"},403);
+   const model = checked(await admin.from("rein_model_versions").select("manifest_path,history_through,metrics").eq("status","ready").single());
+   const sha = model.metrics?.historyRefresh?.profileSha;
+   if (typeof sha !== "string" || !/^[a-f0-9]{64}$/.test(sha)) return json({signed_url:null});
+   const path = model.manifest_path.replace(/manifest\.json$/, "history-profile.json.gz");
+   if (!/^rein\/models\/v4\/rein-role-v4-[a-f0-9]{7,40}\/history-profile\.json\.gz$/.test(path)) return json({error:"Invalid profile path"},400);
+   const download = checked(await admin.storage.from("baken-archive").createSignedUrl(path,600));
+   return json({signed_url:download.signedUrl,sha,dateTo:model.history_through});
+  }
   if (action === "nar-profile") {
    const release = checked(await admin.from("rein_nar_model_releases").select("report,activated_at").eq("id",true).maybeSingle());
    const analysis = release ? {report:release.report,updated_at:release.activated_at} : null;

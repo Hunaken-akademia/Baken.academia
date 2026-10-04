@@ -6,9 +6,12 @@ const GITHUB_ISSUER = "https://token.actions.githubusercontent.com"
 const AUDIENCE = "rein-supabase-model-v1"
 const REPOSITORY = "Hunaken-akademia/Baken.academia"
 const REF = "refs/heads/main"
-const WORKFLOW_REF = `${REPOSITORY}/.github/workflows/rein-role-model-to-supabase.yml@${REF}`
+const WORKFLOW_REFS = new Set([
+  `${REPOSITORY}/.github/workflows/rein-role-model-to-supabase.yml@${REF}`,
+  `${REPOSITORY}/.github/workflows/rein-augment-market-model.yml@${REF}`,
+])
 const BUCKET = "baken-archive"
-const PATH_PATTERN = /^rein\/models\/v4\/(rein-role-v4-[0-9a-f]{7,40})\/(?:bundle\.tar\.gz|manifest\.json)$/
+const PATH_PATTERN = /^rein\/models\/v4\/(rein-role-v4-[0-9a-f]{7,40})\/(?:bundle\.tar\.gz|manifest\.json|history-profile\.json\.gz)$/
 const JRA_HISTORY_PATH = "jra/2019-01-01_2026-09-18/jra-backfill-result.tar.gz"
 const JWKS = createRemoteJWKSet(new URL(`${GITHUB_ISSUER}/.well-known/jwks`))
 
@@ -26,7 +29,7 @@ async function authorize(req: Request) {
     issuer: GITHUB_ISSUER,
     audience: AUDIENCE,
   })
-  if (payload.repository !== REPOSITORY || payload.ref !== REF || payload.workflow_ref !== WORKFLOW_REF) {
+  if (payload.repository !== REPOSITORY || payload.ref !== REF || !WORKFLOW_REFS.has(String(payload.workflow_ref ?? ""))) {
     throw new Error("GitHub Actions claims are not authorized")
   }
   return payload
@@ -49,6 +52,19 @@ Deno.serve(async (req: Request) => {
     const body = await req.json()
     const action = String(body.action ?? "")
     if (action === "health") return json({ ok: true, repository: claims.repository, ref: claims.ref })
+
+    if (action === "current") {
+      const { data: model, error } = await supabase.from("rein_model_versions")
+        .select("version,manifest_path,trained_through,history_through,artifact_sha256,metrics")
+        .eq("status", "ready").single()
+      if (error || !model) throw error ?? new Error("Active model missing")
+      const storage = supabase.storage.from(BUCKET)
+      const path = model.manifest_path.replace(/manifest\.json$/, "bundle.tar.gz")
+      if (!PATH_PATTERN.test(path)) return json({ error: "Invalid active path" }, 400)
+      const { data: signed, error: signError } = await storage.createSignedUrl(path, 600)
+      if (signError) throw signError
+      return json({ model, bundle_url: signed.signedUrl })
+    }
 
     if (action === "activate") {
       const version = String(body.version ?? "")

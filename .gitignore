@@ -19,3 +19,7 @@ artifacts/*
 # Local build state and Supabase CLI scratch
 *.tsbuildinfo
 supabase/.temp/
+
+# Local frozen model bundle used for accuracy research
+.second-third-audit/
+.nar-dataset/

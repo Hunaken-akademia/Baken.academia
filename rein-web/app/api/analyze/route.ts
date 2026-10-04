@@ -43,7 +43,7 @@ const sharedCache = getCache({ namespace: "rein-analysis-v1" });
 const publicCacheHeaders = {
   "Cache-Control": "private, no-store",
 };
-const ROLE_CACHE_VERSION = "2026-09-26-market-top4-v1";
+const ROLE_CACHE_VERSION = "2026-10-05-history-refresh-v1";
 // Last complete prediction generated before the start time, kept for post-start review.
 const PRESTART_KEY = "prestart-confidence-v2";
 
@@ -704,7 +704,7 @@ async function analyze(request: NextRequest) {
           win_odds: horse.odds,
         })),
       };
-      const modelCacheKey = `role:${ROLE_CACHE_VERSION}:${createHash("sha256")
+      const modelCacheKey = `role:${ROLE_CACHE_VERSION}:${history.meta.dateTo}:${createHash("sha256")
         .update(JSON.stringify(modelPayload))
         .digest("hex")}`;
       type RoleScore = {

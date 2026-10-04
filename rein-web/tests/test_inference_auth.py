@@ -55,5 +55,29 @@ class AuthTests(unittest.TestCase):
             self.assertEqual(json.loads(instance.wfile.getvalue()), {'error': 'Unauthorized'})
 
 
+
+
+class RuntimeRefreshTests(unittest.TestCase):
+    def test_warm_runtime_checks_registry_after_five_minutes_without_redownloading_unchanged_bundle(self):
+        runtime=object()
+        with patch.object(rein_score,'_runtime',runtime), patch.object(rein_score,'_runtime_version','v1'), patch.object(rein_score,'_runtime_checked_at',100), patch.object(rein_score.time,'monotonic',return_value=200), patch.object(rein_score,'_request_registry',return_value={'model':{'version':'v1'}}) as registry, patch.object(rein_score,'_request_bundle') as download:
+            self.assertIs(rein_score.get_runtime('token'),runtime)
+            registry.assert_not_called()
+            with patch.object(rein_score.time,'monotonic',return_value=401):
+                self.assertIs(rein_score.get_runtime('token'),runtime)
+            registry.assert_called_once()
+            download.assert_not_called()
+
+    def test_new_version_replaces_loaded_runtime_only_after_successful_load(self):
+        import tempfile
+        old,new=object(),object()
+        with tempfile.TemporaryDirectory() as folder:
+            destination=Path(folder)/'rein-runtime'/'v2'
+            destination.mkdir(parents=True);(destination/'schema.json').write_text('{}')
+            fake=SimpleNamespace(ReinRuntime=SimpleNamespace(load=lambda *args:new))
+            with patch.dict(sys.modules,{'rein_augmented_runtime':fake}), patch.object(rein_score,'_runtime',old), patch.object(rein_score,'_runtime_version','v1'), patch.object(rein_score,'_runtime_checked_at',0), patch.object(rein_score.time,'monotonic',return_value=400), patch.object(rein_score.tempfile,'gettempdir',return_value=folder), patch.object(rein_score,'_request_registry',return_value={'model':{'version':'v2'}}), patch.object(rein_score,'_request_bundle',return_value=({},b'checked')):
+                self.assertIs(rein_score.get_runtime('token'),new)
+                self.assertEqual(rein_score._runtime_version,'v2')
+
 if __name__ == '__main__':
     unittest.main()

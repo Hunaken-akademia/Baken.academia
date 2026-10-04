@@ -7,6 +7,7 @@ import sys
 import tarfile
 import tempfile
 import threading
+import time
 import urllib.request
 import urllib.error
 from http.server import BaseHTTPRequestHandler
@@ -19,6 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 BROKER_URL = "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/vercel-rein-model"
 _runtime: Any = None
+_runtime_version: str | None = None
+_runtime_checked_at = 0.0
+RUNTIME_CHECK_SECONDS = 300
 _runtime_lock = threading.Lock()
 # Fluid compute sends concurrent requests to one instance. Each score() builds several
 # full-history frames, so parallel scoring exhausted the 2 GB instance (OOM kills in
@@ -41,7 +45,7 @@ def authorize(token: str) -> None:
         raise jwt.InvalidTokenError("Unauthorized project")
 
 
-def _request_bundle(token: str) -> tuple[dict, bytes]:
+def _request_registry(token: str) -> dict:
     if not token:
         raise RuntimeError("VERCEL_OIDC_TOKEN is unavailable")
     request = urllib.request.Request(
@@ -54,6 +58,11 @@ def _request_bundle(token: str) -> tuple[dict, bytes]:
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")[:1000]
         raise RuntimeError(f"REIN broker returned {error.code}: {detail}") from error
+    return registry
+
+
+def _request_bundle(token: str, registry: dict | None = None) -> tuple[dict, bytes]:
+    registry = registry or _request_registry(token)
     with urllib.request.urlopen(registry["bundle_url"], timeout=40) as response:
         bundle = response.read()
     expected = registry["model"]["artifact_sha256"]
@@ -72,25 +81,32 @@ def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
 
 
 def get_runtime(token: str) -> Any:
-    global _runtime
-    if _runtime is not None:
+    global _runtime, _runtime_version, _runtime_checked_at
+    if _runtime is not None and time.monotonic() - _runtime_checked_at < RUNTIME_CHECK_SECONDS:
         return _runtime
     with _runtime_lock:
-        if _runtime is not None:
+        if _runtime is not None and time.monotonic() - _runtime_checked_at < RUNTIME_CHECK_SECONDS:
             return _runtime
         from rein_augmented_runtime import ReinRuntime
 
-        registry, bundle = _request_bundle(token)
+        registry = _request_registry(token)
         version = registry["model"]["version"]
+        if _runtime is not None and version == _runtime_version:
+            _runtime_checked_at = time.monotonic()
+            return _runtime
+        _, bundle = _request_bundle(token, registry)
         destination = Path(tempfile.gettempdir()) / "rein-runtime" / version
-        if not (destination / "schema.json").is_file():
-            shutil.rmtree(destination.parent, ignore_errors=True)
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            archive_path = destination.parent / "bundle.tar.gz"
-            archive_path.write_bytes(bundle)
-            with tarfile.open(archive_path, "r:gz") as archive:
-                _safe_extract(archive, destination.parent)
-        _runtime = ReinRuntime.load(destination, version)
+        with _inference_lock:
+            if not (destination / "schema.json").is_file():
+                shutil.rmtree(destination.parent, ignore_errors=True)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                archive_path = destination.parent / "bundle.tar.gz"
+                archive_path.write_bytes(bundle)
+                with tarfile.open(archive_path, "r:gz") as archive:
+                    _safe_extract(archive, destination.parent)
+            loaded = ReinRuntime.load(destination, version)
+            _runtime, _runtime_version = loaded, version
+            _runtime_checked_at = time.monotonic()
         return _runtime
 
 

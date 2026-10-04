@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { serverData } from "./server-snapshots";
 import { readFile } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
 import path from "node:path";
@@ -54,12 +56,28 @@ export type HistoryScore = {
   }[];
 };
 
-let cached: Promise<HistoryBundle> | undefined;
+let cached: { until: number; value: Promise<HistoryBundle> } | undefined;
 
 export function loadHistory(): Promise<HistoryBundle> {
-  cached ??= readFile(path.join(process.cwd(), "data", "history-profile.json.gz"))
-    .then((value) => JSON.parse(gunzipSync(value).toString("utf8")) as HistoryBundle);
-  return cached;
+  if (cached && cached.until > Date.now()) return cached.value;
+  const value = (async () => {
+    const published = await serverData<{ signed_url: string | null; sha?: string; dateTo?: string }>("jra-profile");
+    let bytes: Buffer;
+    if (published.signed_url) {
+      const response = await fetch(published.signed_url, { cache: "no-store", signal: AbortSignal.timeout(20_000) });
+      if (!response.ok) throw new Error("JRA history download failed");
+      bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length > 16_000_000 || createHash("sha256").update(bytes).digest("hex") !== published.sha) throw new Error("JRA history checksum mismatch");
+    } else {
+      bytes = await readFile(path.join(process.cwd(), "data", "history-profile.json.gz"));
+    }
+    const profile = JSON.parse(gunzipSync(bytes, { maxOutputLength: 120_000_000 }).toString("utf8")) as HistoryBundle;
+    if (!profile.meta?.version || !profile.horse || !profile.jockey || (published.dateTo && profile.meta.dateTo !== published.dateTo)) throw new Error("JRA history profile is invalid");
+    return profile;
+  })();
+  cached = { until: Date.now() + 300_000, value };
+  value.catch(() => { if (cached?.value === value) cached = undefined; });
+  return value;
 }
 
 const cleanId = (value: string) => value.replace(/^0+/, "") || "0";

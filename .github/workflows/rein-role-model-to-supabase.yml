@@ -7,6 +7,9 @@ on:
         description: "JRA result backfill workflow run ID"
         required: true
         default: "35414533165"
+  workflow_run:
+    workflows: ["REIN daily race capture"]
+    types: [completed]
   push:
     branches: [main]
     paths:
@@ -31,6 +34,7 @@ concurrency:
 
 jobs:
   build-and-publish:
+    if: github.event_name != 'workflow_run' && !contains(github.event.head_commit.message, '[history-refresh]')
     runs-on: ubuntu-latest
     timeout-minutes: 55
     env:
@@ -80,4 +84,32 @@ jobs:
             ${{ env.MODEL_BUNDLE }}
             ${{ env.MODEL_MANIFEST }}
             artifacts/rein-role-model-v4/build-result.json
+          retention-days: 30
+
+
+  refresh-history:
+    if: contains(github.event.head_commit.message, '[history-refresh]') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-rein-model"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Add completed races while preserving model coefficients
+        id: refresh
+        run: python -u scripts/refresh_rein_history.py
+      - name: Publish updated immutable history bundle
+        if: steps.refresh.outputs.changed == 'true'
+        run: bash scripts/upload_rein_model_to_supabase.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rein-history-refresh-${{ github.run_id }}
+          path: artifacts/rein-history-refresh/summary.json
+          if-no-files-found: warn
           retention-days: 30

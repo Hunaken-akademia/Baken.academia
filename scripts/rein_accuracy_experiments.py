@@ -104,18 +104,25 @@ def nar_dataset():
 
 def jra_dataset():
     from rein_eight_year_recall import jra_predictions
-    d=jra_predictions().reset_index(drop=True)
+    cache=ROOT/'.second-third-audit/jra/current-role-predictions.parquet'
+    d=(pd.read_parquet(cache) if cache.exists() else jra_predictions()).reset_index(drop=True)
     f=pd.read_parquet(ROOT/'.second-third-audit/jra/batch-features.parquet').reset_index(drop=True)
     d['race_date']=pd.to_datetime(d.race_date).dt.strftime('%Y-%m-%d')
     # Keep only inputs computed by deployed full-frame implementation.
     schema=json.loads(next((ROOT/'.second-third-audit/jra').glob('*/schema.json')).read_text())
     second=json.loads((ROOT/'rein-web/api/models/second_joint_v5.schema.json').read_text())
     columns=list(dict.fromkeys(schema['feature_order']+schema['role_feature_order']['third']+second['feature_order']))
+    # Deployed first-model legacy adapter treats an unchanged body weight as NaN.
+    # New candidates use the full frame where zero is retained.
+    legacy=f[schema['feature_order']].copy()
+    legacy['horse_weight_change']=legacy.horse_weight_change.replace(0,np.nan)
+    root=next((ROOT/'.second-third-audit/jra').glob('*/schema.json')).parent
+    d['first']=lgb.Booster(model_file=str(root/'models/first.txt')).predict(legacy,num_threads=2)
     return d,f[columns],{role:d[role].to_numpy() for role in ROLES}
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--league',choices=['jra','nar'],required=True);parser.add_argument('--output-dir',type=Path,required=True);args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--league',choices=['jra','nar'],required=True);parser.add_argument('--output-dir',type=Path,required=True);parser.add_argument('--reuse-candidates',action='store_true');args=parser.parse_args()
     d,f,base=jra_dataset() if args.league=='jra' else nar_dataset()
     d['distance_band']=np.where(d.distance_m<1400,'short',np.where(d.distance_m<=1800,'mile','long'))
     train=d.race_date.lt('2025-01-01').to_numpy();eligible=d.race_date.ge('2025-01-01').to_numpy()
@@ -127,13 +134,37 @@ def main():
         y=d.finish_position.eq(target).astype(int)
         for name,cfg in configs.items():
             print('TRAIN',args.league,role,name,flush=True)
-            model=lgb.LGBMClassifier(**cfg,learning_rate=.03,n_jobs=2,verbosity=-1,random_state=20261005,max_bin=127)
-            model.fit(f.loc[train],y.loc[train]);predictions[name]=model.predict_proba(f)[:,1]
-            model.booster_.save_model(str(args.output_dir/f'{role}-{name}.txt'))
+            path=args.output_dir/f'{role}-{name}.txt'
+            if args.reuse_candidates and path.exists():
+                booster=lgb.Booster(model_file=str(path))
+                if booster.feature_name()!=list(f.columns):raise ValueError('Cached candidate input mismatch')
+                predictions[name]=booster.predict(f,num_threads=2)
+            else:
+                model=lgb.LGBMClassifier(**cfg,learning_rate=.03,n_jobs=2,verbosity=-1,random_state=20261005,max_bin=127)
+                model.fit(f.loc[train],y.loc[train]);predictions[name]=model.predict_proba(f)[:,1]
+                model.booster_.save_model(str(path))
             for weight in [.25,.5]:
                 a=predictions[name];b=base[role]
                 aa=a/pd.Series(a).groupby(d.race_id).transform('sum').to_numpy();bb=b/pd.Series(b).groupby(d.race_id).transform('sum').to_numpy()
                 predictions[f'{name}-blend-{weight}']=(1-weight)*bb+weight*aa
+        if args.league=='jra':
+            print('TRAIN',args.league,role,'rank-top5',flush=True)
+            path=args.output_dir/f'{role}-rank-top5.txt'
+            if args.reuse_candidates and path.exists():
+                ranker=lgb.Booster(model_file=str(path))
+                if ranker.feature_name()!=list(f.columns):raise ValueError('Cached ranker input mismatch')
+            else:
+                ordered=d.loc[train].race_id.to_numpy()
+                groups=d.loc[train].groupby('race_id',sort=False).size().to_numpy()
+                if len(np.unique(ordered))!=len(groups) or not np.array_equal(ordered,np.repeat(d.loc[train].race_id.drop_duplicates().to_numpy(),groups)):
+                    raise ValueError('Ranking rows must be contiguous per race')
+                fitted=lgb.LGBMRanker(n_estimators=400,num_leaves=15,min_child_samples=300,reg_lambda=15,learning_rate=.03,n_jobs=2,verbosity=-1,random_state=20261005,max_bin=127,lambdarank_truncation_level=6)
+                fitted.fit(f.loc[train],y.loc[train],group=groups)
+                ranker=fitted.booster_;ranker.save_model(str(path))
+            score=ranker.predict(f,num_threads=2)
+            predictions['rank-top5']=score
+            ar=ranks(d,score).to_numpy();br=ranks(d,base[role]).to_numpy()
+            for weight in [.25,.5]:predictions[f'rank-top5-blend-{weight}']=-((1-weight)*br+weight*ar)
         result=evaluate(d.loc[eligible].reset_index(drop=True),{name:np.asarray(values)[eligible] for name,values in predictions.items()},target)
         report['roles'][role]=result
         (args.output_dir/'report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
