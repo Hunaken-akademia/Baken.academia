@@ -25,7 +25,21 @@ function moduleUrl(name){const source=fs.readFileSync(path.join(web,'lib',name+'
  for(const tab of ['展開','馬の詳細','騎手','結果','予想']) {
    await page.getByRole('tab',{name:tab,exact:true}).click();
    assert.equal(await page.getByRole('tab',{name:tab,exact:true}).getAttribute('aria-selected'),'true');
-   if(tab==='展開') {await page.getByTestId('race-replay').waitFor();await page.getByRole('button',{name:'再生',exact:true}).click();await page.getByRole('button',{name:'一時停止',exact:true}).click();}
+   if(tab==='展開') {
+     const explorer=page.getByTestId('pace-explorer');await explorer.waitFor();
+     assert.equal(await explorer.locator('tbody tr').count(),12);
+     for(const scenario of ['lone','steady','duel','sustain','closers']) {
+       await explorer.locator(`[data-scenario="${scenario}"]`).click();
+       assert.equal(await explorer.locator(`[data-scenario="${scenario}"]`).getAttribute('aria-pressed'),'true');
+       await page.getByTestId('formation-controls').getByRole('button',{name:'条件・序盤',exact:true}).waitFor();
+     }
+     await explorer.locator('[data-scenario="lone"]').click();
+     const leaders=explorer.getByRole('group',{name:'前へ行く馬',exact:true});
+     for(const button of await leaders.locator('[aria-pressed="true"]').all()) await button.click();
+     await leaders.getByRole('button',{name:'3 検証馬3',exact:true}).click();
+     assert.equal(await page.locator('[data-formation-horse]').first().getAttribute('data-formation-horse'),'3');
+     await explorer.locator('[data-scenario="baseline"]').click();
+     await page.getByTestId('race-replay').waitFor();await page.getByRole('button',{name:'再生',exact:true}).click();await page.getByRole('button',{name:'一時停止',exact:true}).click();}
    if(tab==='馬の詳細') {await page.getByLabel('詳細を見る馬').selectOption('3');await page.getByText('定例重賞・過去傾向').waitFor();}
    if(tab==='騎手') {await page.getByLabel('騎手・馬を検索').fill('検証騎手3');assert.equal(await page.locator('details').count(),1);await page.getByText('12.5%',{exact:true}).waitFor();}
    if(tab==='予想') {const panel=page.getByRole('region',{name:'着順別の穴馬適性'}); for(const role of ['1着','2着','3着']) {await panel.getByRole('button',{name:role+'の穴',exact:true}).click(); await panel.getByLabel('穴馬の人気条件').selectOption('10');assert.equal(await panel.getByRole('button').count(),6);await panel.getByText(role+'適性 全頭中10位',{exact:true}).waitFor();} await panel.getByLabel('穴馬の人気条件').selectOption('4');}

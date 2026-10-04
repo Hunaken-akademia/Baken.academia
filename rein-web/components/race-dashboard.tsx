@@ -24,7 +24,7 @@ import { raceProgress } from "@/lib/race-progress";
 import { reasonViews } from "@/lib/feature-labels";
 import { longshotRoleOrder } from "@/lib/longshot-roles";
 import { roleOrder, type RoleKey, type Picks, type MarkPick } from "@/lib/marks";
-import { RaceFormationMap } from "@/components/race-formation-map";
+import { PaceScenarioExplorer } from "@/components/pace-scenario-explorer";
 import { JockeyProfiles } from "@/components/jockey-profiles";
 import { RaceReplay } from "@/components/race-replay";
 import { PredictionJournal, HorseNotebook } from "@/components/prediction-journal";
@@ -1137,7 +1137,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           </details>
         </TabsContent>
         <TabsContent value="formation">
-          <RaceFormationMap horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
+          <PaceScenarioExplorer key={data.race.raceId} roleReady={rolesReady} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
           <RaceReplay horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} picks={data.picks} roleReady={rolesReady} />
           <RaceShapeReference data={data} />
         </TabsContent>
