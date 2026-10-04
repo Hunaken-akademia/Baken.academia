@@ -33,3 +33,21 @@ test('transient fetch retries once; optional failure does not block; required fa
     await assert.rejects(fetchSource('https://example.com/card','出馬表'),/出馬表の取得に失敗/);
   }finally{globalThis.fetch=original;console.warn=warn;}
 });
+
+test('next race follows start times even when race numbers are out of order',()=>{
+  const races=[{number:4,start:'12:30',status:'次レース'},{number:5,start:' 12:10 ',status:'発売前'},{number:6,start:'12:10',status:'発売前'},{number:3,start:'12:05',status:'確定'}];
+  const now=new Date('2026-10-04T03:00:00Z');
+  const progress=raceProgress(races,now);
+  assert.equal(progress.nextRace,5);
+  assert.equal(progress.races[0].status,'発売前');
+  assert.equal(progress.races[3].status,'確定');
+  assert.equal(raceProgress(progress.races,new Date('2026-10-04T03:10:00Z')).nextRace,4);
+  assert.equal(races[0].status,'次レース');
+});
+test('invalid times never become next race and final start clears the next label',()=>{
+  const races=[{number:1,start:'24:10',status:'発売前'},{number:2,start:'12:60',status:'発売前'},{number:12,start:'20:50',status:'次レース'}];
+  const progress=raceProgress(races,new Date('2026-10-04T11:50:00Z'));
+  assert.equal(progress.nextRace,13);
+  assert.equal(progress.nextStart,'--:--');
+  assert.ok(progress.races.every(race=>race.status!=='次レース'));
+});

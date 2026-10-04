@@ -210,6 +210,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
   const staleRetry = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedRace = useRef("");
   const analysisRequest = useRef(0);
+  const scheduleRequest = useRef(0);
   const visitCache = useRef(new Map<string, Analysis>());
   const danger = useMemo(
     () => area === "nar" ? undefined : data?.horses.find((h) => h.popularity > 0 && h.popularity <= 3 && h.score < 78),
@@ -217,6 +218,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
   );
 
   async function loadSchedule(day: ScheduleDay = scheduleDay, background = false) {
+    const serial = ++scheduleRequest.current;
     if (!background) {
       setLoading(true);
       setError("");
@@ -227,21 +229,26 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
       const result = (await response.json()) as Schedule & { error?: string };
       if (!response.ok)
         throw new Error(result.error || "開催情報を取得できませんでした");
-      setSchedule(result);
+      if (serial !== scheduleRequest.current) return;
+      const venues = scheduleDay === "today" && !historicalDate
+        ? result.venues.map(item => ({ ...item, ...raceProgress(item.races) }) as Venue)
+        : result.venues;
+      setSchedule({ ...result, venues });
       setVenue((current) =>
         current
-          ? result.venues.find((item) => item.eventId === current.eventId) ||
+          ? venues.find((item) => item.eventId === current.eventId) ||
             null
           : null,
       );
     } catch (value) {
+      if (serial !== scheduleRequest.current) return;
       setError(
         value instanceof Error
           ? value.message
           : "開催情報を取得できませんでした",
       );
     } finally {
-      if (!background) setLoading(false);
+      if (serial === scheduleRequest.current && !background) setLoading(false);
     }
   }
 
@@ -291,21 +298,27 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
   useEffect(() => {
     if (showCalendar) return;
     void loadSchedule(scheduleDay);
-    const refresh = () => {
-      if (document.visibilityState === "visible") void loadSchedule(scheduleDay, true);
-    };
-    const timer = setInterval(refresh, 300_000);
-    const clock = setInterval(() => {
-      if (scheduleDay !== "today") return;
+    const updateProgress = () => {
+      if (scheduleDay !== "today" || historicalDate) return;
+      const now = new Date();
       const update = (item: Venue) =>
-        ({ ...item, ...raceProgress(item.races) }) as Venue;
+        ({ ...item, ...raceProgress(item.races, now) }) as Venue;
       setSchedule((current) =>
         current ? { ...current, venues: current.venues.map(update) } : null,
       );
       setVenue((current) => (current ? update(current) : null));
-    }, 15_000);
+    };
+    const refresh = () => {
+      if (document.visibilityState === "visible") {
+        updateProgress();
+        void loadSchedule(scheduleDay, true);
+      }
+    };
+    const timer = setInterval(refresh, 300_000);
+    const clock = setInterval(updateProgress, 15_000);
     document.addEventListener("visibilitychange", refresh);
     return () => {
+      scheduleRequest.current++;
       clearInterval(timer);
       clearInterval(clock);
       document.removeEventListener("visibilitychange", refresh);
