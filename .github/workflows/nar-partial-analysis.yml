@@ -22,7 +22,7 @@ on:
     # Monday 04:17 JST; daily archives and live snapshots remain independent.
     - cron: "17 19 * * 0"
   workflow_run:
-    workflows: ["NAR licensed eight-year backfill with all final odds", "NAR licensed eight-year results backfill"]
+    workflows: ["NAR licensed eight-year backfill with all final odds", "NAR licensed eight-year results backfill", "REIN daily race capture"]
     types: [completed]
 
 permissions:
@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
   analyze:
-    if: "!contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
+    if: "!contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -289,5 +289,30 @@ jobs:
         with:
           name: rein-accuracy-nar-20261005
           path: artifacts/rein-accuracy-nar
+          if-no-files-found: warn
+          retention-days: 30
+
+
+  refresh-profile:
+    if: contains(github.event.head_commit.message, '[nar-history-refresh]') || (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture' && (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+      SUPABASE_SERVER_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/rein-server-data"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Update exact history aggregates without refitting released coefficients
+        run: python -u scripts/refresh_nar_profile.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nar-profile-refresh-${{ github.run_id }}
+          path: artifacts/nar-profile-refresh/summary.json
           if-no-files-found: warn
           retention-days: 30

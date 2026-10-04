@@ -78,9 +78,42 @@ Deno.serve(async req => {
   }
 
   if (who === "github-nar-analysis") {
+   if (action === "nar-history-current") {
+    const release = checked(await admin.from("rein_nar_model_releases").select("report").eq("id",true).single());
+    const report = release.report, sha = report.profileSha, stateSha = report.profileRefresh?.stateSha;
+    if (!/^[a-f0-9]{64}$/.test(sha ?? "")) return json({error:"Invalid current profile"},400);
+    let state_url = null;
+    if (/^[a-f0-9]{64}$/.test(stateSha ?? "")) state_url = checked(await admin.storage.from("baken-archive").createSignedUrl(`nar/profile-state/${stateSha}.json.gz`,600)).signedUrl;
+    return json({profileSha:sha,stateSha,state_url,dateTo:report.profileRefresh?.historyThrough ?? report.coverage.date_to});
+   }
+   if (action === "nar-daily-download") {
+    if (typeof b.path !== "string" || !/^daily\/nar\/20\d{2}\/20\d{2}-\d{2}-\d{2}\.tar\.gz$/.test(b.path)) return json({error:"Invalid daily archive"},400);
+    const signed = checked(await admin.storage.from("baken-archive").createSignedUrl(b.path,600));
+    return json({signed_url:signed.signedUrl});
+   }
+   if (action === "publish-nar-history") {
+    const release = checked(await admin.from("rein_nar_model_releases").select("report,activated_at").eq("id",true).single());
+    const old = release.report;
+    if (b.previousSha !== old.profileSha) return json({error:"Profile advanced during refresh"},409);
+    if (!/^[a-f0-9]{64}$/.test(b.profileSha ?? "") || !/^[a-f0-9]{64}$/.test(b.stateSha ?? "") || !dateValid(b.meta?.dateTo) || b.meta.dateTo <= (old.profileRefresh?.historyThrough ?? old.coverage.date_to)) return json({error:"Invalid history update"},400);
+    for (const [path,sha] of [[`nar/profiles/${b.profileSha}.json.gz`,b.profileSha],[`nar/profile-state/${b.stateSha}.json.gz`,b.stateSha]]) {
+     const object = checked(await admin.storage.from("baken-archive").download(path));
+     if (object.size>16_000_000) return json({error:"History object too large"},413);
+     const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256",await object.arrayBuffer()))].map(v=>v.toString(16).padStart(2,"0")).join("");
+     if (digest !== sha) return json({error:"History checksum mismatch"},400);
+    }
+    const report = {...old,profileSha:b.profileSha,profileRefresh:{historyThrough:b.meta.dateTo,previousHistoryThrough:old.profileRefresh?.historyThrough ?? old.coverage.date_to,stateSha:b.stateSha,coefficientsUnchanged:true,meta:b.meta}};
+    // Only the history pointer changes. The released coefficients and audit
+    // coverage are retained verbatim; concurrent release changes are rejected.
+    const update = checked(await admin.from("rein_nar_model_releases").update({report,activated_at:new Date().toISOString()}).eq("id",true).eq("report->>profileSha",b.previousSha).eq("activated_at",release.activated_at).select("id"));
+    if (update.length!==1) return json({error:"Concurrent history update"},409);
+    return json({published:true});
+   }
    if (action === "nar-profile-upload") {
     if (typeof b.sha !== "string" || !/^[a-f0-9]{64}$/.test(b.sha)) return json({error:"Invalid profile"},400);
-    const upload = checked(await admin.storage.from("baken-archive").createSignedUploadUrl(`nar/profiles/${b.sha}.json.gz`,{upsert:true}));
+    if (b.kind !== undefined && !["profile","state"].includes(b.kind)) return json({error:"Invalid profile kind"},400);
+    const prefix = b.kind === "state" ? "nar/profile-state" : "nar/profiles";
+    const upload = checked(await admin.storage.from("baken-archive").createSignedUploadUrl(`${prefix}/${b.sha}.json.gz`,{upsert:true}));
     return json({signed_url:upload.signedUrl});
    }
    if (action !== "publish-nar-analysis") return json({error:"Forbidden action"},403);
