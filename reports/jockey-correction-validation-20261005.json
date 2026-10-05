@@ -562,7 +562,9 @@
             }
           }
         },
-        "gate": "keep_current"
+        "gate": "keep_current",
+        "validSharedComparison": false,
+        "note": "Old evaluator reselected current_recipe for this role. Do not use as a strict shared-setting comparison; extended-v2 forces the chosen common setting."
       },
       "third": {
         "comparisons": {

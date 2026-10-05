@@ -49,3 +49,15 @@ def test_ranks_preserve_rows_and_break_ties_deterministically():
     rr=ranks(d,np.ones(len(d)))
     assert list(rr.index)==list(d.index)
     assert np.array_equal(rr.to_numpy(),d.horse_number.to_numpy())
+
+
+def test_shared_candidate_is_measured_even_when_one_role_ties_baseline_in_h1():
+    d=fixture()
+    base=-np.tile(np.arange(1,9),len(d)//8)
+    shared=np.where(d.race_date.le('2025-06-30'),base,-base)
+    predictions=dict(current_recipe=base,shared=shared,popularity=base)
+    assert evaluate(d,predictions,1)['selected']=='current_recipe'
+    forced=evaluate(d,predictions,1,forced='shared')
+    assert forced['selected']=='shared'
+    assert forced['comparisons']['confirmation2025H2']['all']['net']<0
+    assert forced['gate']=='keep_current'
