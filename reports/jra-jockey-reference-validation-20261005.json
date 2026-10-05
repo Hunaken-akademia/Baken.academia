@@ -1,0 +1,71 @@
+{
+  "meta": {
+    "version": "jockey-reference-v1",
+    "league": "jra",
+    "dateFrom": "2019-01-05",
+    "dateTo": "2026-09-13",
+    "starts": 346656,
+    "races": 25713,
+    "jockeys": 175,
+    "definition": "出走取消・除外は除く。中止・失格は出走数に含む。各率は平滑化なしの実績。得意条件の予測補正は未採用。"
+  },
+  "temporalAudit": {
+    "venueSurface": {
+      "2025": {
+        "starts": 7214,
+        "top3": 2074,
+        "top3Rate": 0.2874965345162185,
+        "riderTrainingBaseline": 0.2435232565856093
+      },
+      "2026": {
+        "starts": 5198,
+        "top3": 1543,
+        "top3Rate": 0.2968449403616776,
+        "riderTrainingBaseline": 0.24153519698456646
+      }
+    },
+    "venueDistance": {
+      "2025": {
+        "starts": 6791,
+        "top3": 1913,
+        "top3Rate": 0.2816963628331615,
+        "riderTrainingBaseline": 0.244302811404425
+      },
+      "2026": {
+        "starts": 4738,
+        "top3": 1357,
+        "top3Rate": 0.28640776699029125,
+        "riderTrainingBaseline": 0.24354737757206404
+      }
+    },
+    "turn": {
+      "2025": {
+        "starts": 818,
+        "top3": 308,
+        "top3Rate": 0.3765281173594132,
+        "riderTrainingBaseline": 0.3049826394533224
+      },
+      "2026": {
+        "starts": 505,
+        "top3": 171,
+        "top3Rate": 0.33861386138613864,
+        "riderTrainingBaseline": 0.3066565353059487
+      }
+    },
+    "gate": {
+      "2025": {
+        "starts": 559,
+        "top3": 145,
+        "top3Rate": 0.259391771019678,
+        "riderTrainingBaseline": 0.23670376871235635
+      },
+      "2026": {
+        "starts": 481,
+        "top3": 102,
+        "top3Rate": 0.21205821205821207,
+        "riderTrainingBaseline": 0.2144214881650217
+      }
+    }
+  },
+  "decision": "Reference display only; rider/horse ability and popularity mix are not controlled. No prediction uplift claim."
+}

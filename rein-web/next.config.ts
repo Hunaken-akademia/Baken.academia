@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   // The history profile is fetched by prebuild into data/ and read at runtime through
   // process.cwd(), which file tracing cannot discover on its own. Declare it so the
   // bundle keeps serving REIN history adjustments and /api/internal/history-profile.
-  outputFileTracingIncludes: { "/**": ["./data/history-profile.json.gz"] },
+  outputFileTracingIncludes: { "/**": ["./data/history-profile.json.gz", "./data/*-jockey-reference.json.gz.b64"] },
   async headers() {
     return [{ source: "/:path*", headers: [
       { key: "X-Content-Type-Options", value: "nosniff" },

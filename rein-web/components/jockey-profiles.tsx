@@ -1,55 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import {useEffect,useMemo,useState} from 'react';
+import {JOCKEY_GROUPS,conditionLabel,jockeyContext,jockeyInterval,jockeyPercent,type JockeyProfile,type JockeyResponse,type JockeyCounts} from '@/lib/jockey-reference';
 
-type JockeyHorse = {
-  number: number;
-  name: string;
-  jockey?: string;
-  style: string;
-  weightCarried?: number;
-  historyFactors?: Array<{ label: string; samples: number; wins?: number; top3?: number; winRate?: number; top3Rate?: number; averageFinish?: number }>;
-};
+type Factor={label:string;samples:number;wins?:number;top3?:number;winRate?:number;top3Rate?:number;averageFinish?:number};
+type JockeyHorse={number:number;name:string;jockey?:string;jockeyId?:string;style:string;gate?:number;weightCarried?:number;odds?:number|null;popularity?:number;historyFactors?:Factor[]};
+const percent=(v:number|null|undefined)=>v!=null&&Number.isFinite(v)?`${v.toFixed(1)}%`:'未取得';
+const factor=(horse:JockeyHorse,label:string)=>horse.historyFactors?.find(f=>f.label===label);
+const counts=(profile:JockeyProfile|null|undefined,group='all',key='')=>profile?.groups[group]?.[key];
+const rate=(profile:JockeyProfile|null|undefined,index:1|2|3,group='all',key='')=>jockeyPercent(counts(profile,group,key),index);
 
-// These factors describe the jockey across all conditions. A horse's running
-// style must not be presented as the jockey's personal tactical preference.
-export function JockeyProfiles({ horses, dateFrom, dateTo }: { horses: JockeyHorse[]; dateFrom?: string; dateTo?: string }) {
-  const [query, setQuery] = useState("");
-  const groups = new Map<string, JockeyHorse[]>();
-  for (const horse of [...horses].sort((a, b) => a.number - b.number)) {
-    const key = horse.jockey?.trim() || `未取得-${horse.number}`;
-    groups.set(key, [...(groups.get(key) ?? []), horse]);
-  }
-  const visible = [...groups.entries()].filter(([name, mounts]) => `${name} ${mounts.map((horse) => horse.name).join(" ")}`.includes(query.trim()));
-  const percent = (value?: number) => value != null && Number.isFinite(value) ? `${value.toFixed(1)}%` : "未取得";
-  return (
-    <section className="min-w-0 rounded-2xl border border-slate-700 bg-[#0c192a] p-4 sm:p-5">
-      <h2 className="text-xl font-bold">騎手の成績・騎乗馬</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-400">騎手名を開くと、履歴全体の成績と今回の騎乗馬を確認できます。馬の脚質は騎手自身の特徴とは別に表示しています。</p>
-      <p className="mt-1 text-xs leading-5 text-slate-500">{dateFrom && dateTo ? `モデル履歴：${dateFrom}〜${dateTo}。` : "履歴期間は未取得。"}各保存予想に含まれる集計値を表示します。競馬場・距離別や人気に対する成績は未集計です。</p>
-      <input type="search" aria-label="騎手・馬を検索" placeholder="騎手名・馬名で検索" value={query} onChange={(event) => setQuery(event.target.value)} className="my-4 min-h-11 w-full rounded-lg border border-slate-600 bg-[#101f32] px-3 text-sm" />
-      <div className="space-y-3">
-        {visible.map(([key, mounts]) => {
-          const horse = mounts[0];
-          const factor = horse.historyFactors?.find((item) => item.label === "騎手傾向");
-          return <details key={key} className="rounded-xl border border-slate-700 bg-black/10" open={query.trim() ? true : undefined}>
-            <summary className="cursor-pointer px-4 py-3">
-              <span className="font-bold text-cyan-200">{horse.jockey || "騎手未取得"}</span>
-              <span className="ml-2 text-xs text-slate-400">{mounts.map((mount) => `${mount.number} ${mount.name}`).join(" / ")}</span>
-              <span className="mt-1 block text-xs text-slate-500">{factor ? `${factor.samples.toLocaleString()}走・勝率 ${percent(factor.winRate)}・3着内率 ${percent(factor.top3Rate)}` : "成績データ未取得"}</span>
-            </summary>
-            <div className="border-t border-slate-800 p-4">
-              <div className="grid grid-cols-3 gap-2">
-                {[["出走数", factor ? `${factor.samples.toLocaleString()}走` : "未取得"], ["勝率", percent(factor?.winRate)], ["3着内率", percent(factor?.top3Rate)]].map(([label, value]) => <div key={label} className="rounded-lg bg-[#101f32] p-3"><p className="text-[11px] text-slate-400">{label}</p><p className="mt-1 text-base font-bold sm:text-xl">{value}</p></div>)}
-              </div>
-              {factor && factor.samples < 30 && <p className="mt-3 text-xs text-amber-200">出走数が少ないため参考値です。</p>}
-              <p className="mt-3 text-xs leading-5 text-slate-400">騎乗する馬の能力・人気・条件も成績に影響します。この成績だけで騎手の優劣や今回の勝率は決まりません。</p>
-              {mounts.map((mount) => <div key={mount.number} className="mt-3 rounded-lg border border-slate-800 p-3 text-sm"><p className="font-semibold">{mount.number} {mount.name}</p><p className="mt-1 text-slate-400">馬の近走脚質：{mount.style || "未取得"}{mount.weightCarried != null ? `・斤量 ${mount.weightCarried}kg` : ""}</p></div>)}
-            </div>
-          </details>;
-        })}
-        {!visible.length && <p className="py-6 text-center text-sm text-slate-400">該当する騎手・馬がいません。</p>}
-      </div>
-    </section>
-  );
+export function JockeyProfiles({horses,dateFrom,dateTo,title='',course='',league='jra'}:{horses:JockeyHorse[];dateFrom?:string;dateTo?:string;title?:string;course?:string;league?:'jra'|'nar'}){
+ const [query,setQuery]=useState(''),[sort,setSort]=useState('number'),[reference,setReference]=useState<JockeyResponse|null>(null),[error,setError]=useState(false),[retry,setRetry]=useState(0);
+ const riders=useMemo(()=>JSON.stringify({riders:horses.map(h=>({number:h.number,...(/^\d+$/.test(h.jockeyId??'')?{id:h.jockeyId}:{}),name:h.jockey??''}))}),[horses]);
+ useEffect(()=>{const controller=new AbortController();setReference(null);setError(false);fetch(league==='nar'?'/api/nar/jockey-reference':'/api/analyze/jockey-reference',{method:'POST',headers:{'content-type':'application/json'},body:riders,signal:controller.signal}).then(async r=>{if(!r.ok)throw new Error('Unavailable');const body=await r.json() as JockeyResponse;if(!body.meta||!body.profiles)throw new Error('Invalid');return body;}).then(body=>{if(!controller.signal.aborted)setReference(body);}).catch(()=>{if(!controller.signal.aborted)setError(true);});return()=>controller.abort();},[riders,league,retry]);
+ const context=useMemo(()=>jockeyContext(title,course),[title,course]);
+ const lookup=(h:JockeyHorse)=>reference?.profiles[String(h.number)];
+ const value=(h:JockeyHorse)=>{const p=lookup(h),all=counts(p),f=factor(h,'騎手傾向');switch(sort){case 'popularity':return h.popularity&&h.popularity>0?-h.popularity:null;case 'horseWin':return factor(h,'通算成績')?.winRate??null;case 'horseTop3':return factor(h,'通算成績')?.top3Rate??null;case 'wins':return all?.[1]??f?.wins??null;case 'win':return rate(p,1)??f?.winRate??null;case 'top2':return rate(p,2);case 'top3':return rate(p,3)??f?.top3Rate??null;case 'condition':return rate(p,3,'venueDistance',context.venueDistance);default:return -h.number;}};
+ const visible=horses.filter(h=>`${h.jockey??''} ${h.name}`.includes(query.trim())).slice().sort((a,b)=>{const av=value(a),bv=value(b);return av==null?bv==null?a.number-b.number:1:bv==null?-1:bv-av||a.number-b.number;});
+ const groups=new Map<string,JockeyHorse[]>();for(const h of visible){const key=h.jockeyId||h.jockey?.trim()||`未取得-${h.number}`;groups.set(key,[...(groups.get(key)??[]),h]);}
+ return <section className="min-w-0 rounded-2xl border border-slate-700 bg-[#0c192a] p-4 sm:p-5">
+ <h2 className="text-xl font-bold">騎手の条件別成績・比較</h2>
+ <p className="mt-2 text-sm leading-6 text-slate-300">競馬場・芝ダート・距離・回り・枠を切り替え、騎手の実績を今回の条件と比較できます。</p>
+ <p className="mt-2 text-xs leading-5 text-slate-400">{reference?`条件別参考履歴：${reference.meta.dateFrom}〜${reference.meta.dateTo}。${reference.meta.races.toLocaleString()}レース・${reference.meta.jockeys}人。`:dateFrom&&dateTo?`保存予想のモデル履歴：${dateFrom}〜${dateTo}。`:''}馬の通算は保存予想内の集計、騎手の条件別集計は明記した履歴期間全体の参考値です。過去レースでは予想当時の数値ではありません。</p>
+ <p className="mt-1 text-xs leading-5 text-slate-400">騎乗馬の能力・人気・厩舎も成績に影響します。騎手の技術だけを表す値ではなく、今回の着順適性への追加補正は行っていません。</p>
+ {error?<div role="status" className="mt-3 text-xs text-amber-200">条件別履歴を取得できませんでした。保存予想の通算値を表示します。<button type="button" onClick={()=>setRetry(v=>v+1)} className="ml-2 min-h-10 underline">再取得</button></div>:!reference?<p role="status" className="mt-3 text-xs text-slate-400">条件別履歴を読み込み中…</p>:null}
+ <div className="my-4 grid gap-3 sm:grid-cols-2"><input type="search" aria-label="騎手・馬を検索" placeholder="騎手名・馬名で検索" value={query} onChange={e=>setQuery(e.target.value)} className="min-h-11 w-full rounded-lg border border-slate-600 bg-[#101f32] px-3 text-sm"/><label className="flex items-center gap-2 text-xs text-slate-300">並べ替え<select aria-label="騎手比較の並べ替え" value={sort} onChange={e=>setSort(e.target.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-600 bg-[#101f32] px-2 text-sm">{[['number','馬番順'],['popularity','人気順'],['horseWin','馬の勝率順'],['horseTop3','馬の3着内率順'],['wins','騎手勝利数順'],['win','騎手勝率順'],['top2','騎手連対率順'],['top3','騎手3着内率順'],['condition','今回の場・芝ダート・距離の3着内率順']].map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label></div>
+ <div className="mb-5 overflow-x-auto rounded-xl border border-slate-700"><table className="w-full min-w-[790px] text-left text-xs"><caption className="p-3 text-left font-bold">出走馬・騎手の比較（横にスクロール）</caption><thead className="bg-[#101f32]"><tr>{['馬・騎手','人気','馬の通算','騎手通算','勝率','連対率','3着内率','今回の場・芝ダート・距離'].map(t=><th scope="col" key={t} className="whitespace-nowrap p-3">{t}</th>)}</tr></thead><tbody>{visible.map(h=>{const p=lookup(h),all=counts(p),f=factor(h,'騎手傾向'),horse=factor(h,'通算成績'),current=counts(p,'venueDistance',context.venueDistance);return <tr key={h.number} className="border-t border-slate-700"><th scope="row" className="whitespace-nowrap p-3 text-left"><p>{h.number} {h.name}</p><p className="mt-1 font-normal text-cyan-200">{h.jockey||'未取得'}</p></th><td className="p-3">{h.popularity||'—'}</td><td className="whitespace-nowrap p-3">{horse?`${horse.samples}走`:'未取得'}<p className="mt-1">勝 {percent(horse?.winRate)} / 3内 {percent(horse?.top3Rate)}</p></td><td className="whitespace-nowrap p-3">{all?`${all[0].toLocaleString()}走・${all[1]}勝`:f?`${f.samples}走`:'未取得'}</td><td className="p-3">{percent(rate(p,1)??f?.winRate)}</td><td className="p-3">{percent(rate(p,2))}</td><td className="p-3">{percent(rate(p,3)??f?.top3Rate)}</td><td className="whitespace-nowrap p-3">{context.venueDistance?conditionLabel('venueDistance',context.venueDistance):'条件未取得'}<p className="mt-1">{current?`${current[0]}走・3着内 ${percent(jockeyPercent(current,3))}`:'該当実績なし'}</p>{current&&current[0]<30?<p className="mt-1 text-amber-200">少数・参考</p>:null}</td></tr>;})}</tbody></table></div>
+ <div className="space-y-3">{[...groups.entries()].map(([key,mounts])=>{const h=mounts[0],p=lookup(h),all=counts(p),f=factor(h,'騎手傾向');return <details key={key} className="rounded-xl border border-slate-700 bg-black/10" open={query.trim()?true:undefined}><summary className="cursor-pointer px-4 py-3"><span className="font-bold text-cyan-200">{h.jockey||'騎手未取得'}</span><span className="ml-2 text-xs text-slate-400">{mounts.map(m=>`${m.number} ${m.name}`).join(' / ')}</span><span className="mt-1 block text-xs text-slate-400">{all||f?`${(all?.[0]??f?.samples??0).toLocaleString()}走・勝率 ${percent(rate(p,1)??f?.winRate)}・3着内率 ${percent(rate(p,3)??f?.top3Rate)}`:'成績データ未取得'}</span></summary><div className="border-t border-slate-800 p-4">{p?<JockeyConditions profile={p} context={context} mounts={mounts}/>:<p className="text-xs text-slate-400">この騎手の条件別実績はありません。</p>}{mounts.map(m=><p key={m.number} className="mt-3 text-xs leading-5 text-slate-400">{m.number} {m.name}：馬の脚質 {m.style||'未取得'}{m.weightCarried!=null?`・斤量 ${m.weightCarried}kg`:''}</p>)}</div></details>;})}{!visible.length?<p className="py-6 text-center text-sm text-slate-400">該当する騎手・馬がいません。</p>:null}</div>
+ </section>;
+}
+
+function JockeyConditions({profile,context,mounts}:{profile:JockeyProfile;context:Record<string,string>;mounts:JockeyHorse[]}){
+ const [group,setGroup]=useState('venueSurface'),[minimum,setMinimum]=useState(30),[sort,setSort]=useState('top3');
+ const rows=Object.entries(profile.groups[group]??{}).filter(([key,c])=>key!=='不明'&&c[0]>=minimum).sort((a,b)=>sort==='starts'?b[1][0]-a[1][0]||a[0].localeCompare(b[0]):(jockeyPercent(b[1],sort==='win'?1:sort==='top2'?2:3)??0)-(jockeyPercent(a[1],sort==='win'?1:sort==='top2'?2:3)??0)||b[1][0]-a[1][0]);
+ const total=counts(profile),top3=rate(profile,3);
+ return <>
+ <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[['出走数',`${total?.[0].toLocaleString()??'—'}走`],['勝率',percent(rate(profile,1))],['連対率',percent(rate(profile,2))],['3着内率',percent(top3)]].map(([label,v])=><div key={label} className="rounded-lg bg-[#101f32] p-3"><p className="text-[11px] text-slate-400">{label}</p><p className="mt-1 text-base font-bold">{v}</p></div>)}</div>
+ <div className="mt-4 rounded-xl border border-cyan-300/20 p-3"><p className="text-sm font-bold text-cyan-200">今回の条件</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{JOCKEY_GROUPS.filter(([key])=>key!=='gate').map(([key,label])=>{const c=counts(profile,key,context[key]);return <p key={key} className="text-xs leading-5 text-slate-300">{label}：{context[key]?conditionLabel(key,context[key]):'情報なし'} / {c?`${c[0]}走・3着内 ${percent(jockeyPercent(c,3))}`:'実績なし'}{c&&c[0]<30?'（少数・参考）':''}</p>;})}{mounts.map(h=>{const key=jockeyContext('','',h.gate).gate,c=counts(profile,'gate',key);return <p key={h.number} className="text-xs leading-5 text-slate-300">{h.number}番の枠：{key||'未取得'} / {c?`${c[0]}走・3着内 ${percent(jockeyPercent(c,3))}`:'実績なし'}</p>;})}</div></div>
+ <div className="mt-4 flex flex-wrap gap-2"><select aria-label="騎手の集計条件" value={group} onChange={e=>setGroup(e.target.value)} className="min-h-11 min-w-0 max-w-full rounded-lg border border-slate-600 bg-[#101f32] px-2 text-xs">{JOCKEY_GROUPS.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select><select aria-label="騎手実績の最低出走数" value={minimum} onChange={e=>setMinimum(Number(e.target.value))} className="min-h-11 rounded-lg border border-slate-600 bg-[#101f32] px-2 text-xs">{[0,30,50,100].map(n=><option key={n} value={n}>{n?`${n}走以上`:'少数もすべて表示'}</option>)}</select><select aria-label="条件別成績の並べ替え" value={sort} onChange={e=>setSort(e.target.value)} className="min-h-11 rounded-lg border border-slate-600 bg-[#101f32] px-2 text-xs">{[['top3','3着内率順'],['top2','連対率順'],['win','勝率順'],['starts','出走数順']].map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></div>
+ <div className="mt-3 max-h-96 overflow-auto rounded-lg border border-slate-700"><table className="w-full min-w-[560px] text-left text-xs"><caption className="p-3 text-left font-semibold">条件別実績・通算との差（横にスクロール）</caption><thead className="bg-[#101f32]"><tr>{['条件','出走 / 1・2・3着','勝率','連対率','3着内率','通算比 / 95%区間'].map(s=><th key={s} scope="col" className="whitespace-nowrap p-3">{s}</th>)}</tr></thead><tbody>{rows.map(([key,c])=>{const diff=(jockeyPercent(c,3)??0)-(top3??0),ci=jockeyInterval(c);return <tr key={key} className={`border-t border-slate-700 ${context[group]===key?'bg-cyan-300/10':''}`}><th scope="row" className="whitespace-nowrap p-3">{conditionLabel(group,key)}{context[group]===key?'・今回':''}{c[0]<30?<p className="mt-1 text-amber-200">少数・参考</p>:null}</th><td className="whitespace-nowrap p-3">{c[0]}走 / {c[1]}・{c[2]-c[1]}・{c[3]-c[2]}</td>{([1,2,3] as const).map(i=><td key={i} className="p-3">{percent(jockeyPercent(c,i))}</td>)}<td className="whitespace-nowrap p-3">{diff>=0?'+':''}{diff.toFixed(1)}ポイント<p className="mt-1 text-slate-400">{ci?`${ci[0].toFixed(1)}〜${ci[1].toFixed(1)}%`:'—'}</p></td></tr>;})}</tbody></table>{!rows.length?<p className="p-4 text-xs text-slate-400">指定した出走数を満たす実績がありません。</p>:null}</div>
+ <p className="mt-3 text-xs leading-5 text-slate-400">勝率＝1着、連対率＝2着以内、3着内率＝3着以内。区間は3着内率の幅の目安です。枠は馬番ではなく1〜8枠の区分で、距離は同じメートル数を集計しています。</p>
+ </>;
 }

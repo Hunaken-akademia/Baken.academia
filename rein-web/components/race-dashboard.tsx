@@ -65,6 +65,7 @@ type Horse = {
   weightChange?: number;
   pedigree?: string;
   jockey?: string;
+  jockeyId?: string;
   trainer?: string;
   age?: number;
   sex?: string;
@@ -1220,7 +1221,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
       </section>}
         </TabsContent>
         <TabsContent value="jockeys">
-          <JockeyProfiles horses={data.horses} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} />
+          <JockeyProfiles key={data.race.raceId} title={data.race.title} course={data.race.course} league={data.race.league} horses={data.horses} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} />
         </TabsContent>
         <TabsContent value="review">
       {data.review?.isFinished && (
