@@ -1,7 +1,8 @@
 // 展開ビュー: an animated, illustrative race preview built only from REIN outputs.
 // Positions at the start/corners come from the validated corner-position model
 // (lib/corner-reference.ts) or, where it does not apply, from recent running style.
-// The finish order is the 1着適性 ranking (same order as 本命・対抗). Gaps between
+// Baseline finish is the 1着適性 ranking; scenario finish is an explicitly
+// labelled heuristic candidate order. Gaps between
 // checkpoints, lanes and spacing are presentation only: no 馬身差 or path is claimed.
 
 import { courseStages, predictCorner, type MapHorse } from "./corner-reference";
@@ -137,7 +138,7 @@ export function buildReplay(input: {
   pace: string;
   league?: "jra" | "nar";
   roleReady: boolean;
-  scenario?: { label: string; positions: Record<number, Partial<Record<number, number | null>>> };
+  scenario?: { label: string; positions: Record<number, Partial<Record<number, number | null>>>; finish?: number[] };
 }): ReplayPlan | ReplayUnavailable {
   const { horses, title, course, raceId, pace } = input;
   if (/ばんえい/.test(course)) return { unavailable: "ばんえいは展開ビューの対象外です" };
@@ -145,6 +146,8 @@ export function buildReplay(input: {
   if (!input.roleReady) return { unavailable: "1着適性の評価が保留中のため、ゴールの並びを出せません。評価の取得後に表示します" };
   const finishOrder = roleOrder(horses, "first");
   if (finishOrder.length !== horses.length) return { unavailable: "1着適性が全頭そろっていないため展開ビューを表示できません" };
+  const finish = input.scenario?.finish ?? finishOrder.map(h=>h.number);
+  if(finish.length!==horses.length || new Set(finish).size!==horses.length || finish.some(n=>!horses.some(h=>h.number===n)))return {unavailable:"条件別の候補順が全頭そろっていません"};
   const geometry = replayGeometry(title, course);
   if ("unavailable" in geometry) return geometry;
 
@@ -185,20 +188,20 @@ export function buildReplay(input: {
     });
   }
   checkpoints.push({
-    id: "finish", label: "ゴール", remaining: 0, source: "first-ranking",
-    order: finishOrder.map((horse) => ({ number: horse.number, estimate: null })),
+    id: "finish", label: "ゴール", remaining: 0, source: input.scenario?.finish ? "scenario" : "first-ranking",
+    order: finish.map(number => ({number,estimate:null})),
   });
 
   const racing = PACE_SPACING[pace] ?? ({ "スロー寄り": 8, "平均寄り": 10, "ハイ寄り": 14, "途中から加速": 12, "前が苦しくなる": 14 }[pace] ?? 11);
   const spacing = checkpoints.map((checkpoint) =>
-    checkpoint.source === "start" ? 0 : checkpoint.source === "first-ranking" ? FINISH_SPACING : racing);
+    checkpoint.source === "start" ? 0 : checkpoint.id === "finish" ? FINISH_SPACING : racing);
 
   return {
     geometry,
     checkpoints,
     spacing,
     commentary: commentary(horses, checkpoints, pace, geometry),
-    finish: finishOrder.map((horse) => horse.number),
+    finish,
     cornerSource: input.scenario ? "scenario" : aiEligible ? "ai" : "style",
   };
 }
@@ -222,7 +225,7 @@ function commentary(
     const [lead, next] = firstRacing.order.map((item) => item.number);
     lines.push({
       checkpoint: 0, label: "スタート",
-      text: `${horses.length}頭がスタート。${name(lead)}${next ? `と${name(next)}` : ""}が前へ。1着適性1位の${name(winner)}は${rankOf(firstRacing, winner)}番手あたりから運ぶ想定です。`,
+      text: `${horses.length}頭がスタート。${name(lead)}${next ? `と${name(next)}` : ""}が前へ。${finish.source === "scenario" ? "この条件の候補先頭" : "1着適性1位"}の${name(winner)}は${rankOf(firstRacing, winner)}番手あたりから運ぶ想定です。`,
     });
   }
   checkpoints.forEach((checkpoint, index) => {

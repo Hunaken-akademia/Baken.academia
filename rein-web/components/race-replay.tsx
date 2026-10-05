@@ -33,7 +33,7 @@ export function RaceReplay({ horses, title, course, raceId, pace, league, picks,
   league?: "jra" | "nar";
   picks?: Picks;
   roleReady: boolean;
-  scenario?: { label: string; positions: Record<number, Partial<Record<number, number | null>>> };
+  scenario?: { label: string; positions: Record<number, Partial<Record<number, number | null>>>; finish?: number[] };
 }) {
   const plan = useMemo(
     () => buildReplay({ horses, title, course, raceId, pace, league, roleReady, scenario }),
@@ -208,7 +208,7 @@ export function RaceReplay({ horses, title, course, raceId, pace, league, picks,
                     >
                       {number}
                     </span>
-                    <span className="w-4 shrink-0 text-amber-300">{pickMark(picks, number)}</span>
+                    <span className="w-4 shrink-0 text-amber-300">{scenario ? "" : pickMark(picks, number)}</span>
                     <span className="min-w-0 truncate">{horse?.name}</span>
                   </li>
                 );
@@ -216,13 +216,13 @@ export function RaceReplay({ horses, title, course, raceId, pace, league, picks,
             </ol>
           </div>
           <div className="rounded-xl border border-slate-700 bg-black/10 p-3">
-            <p className="text-xs font-semibold text-slate-400">{scenario ? "ゴールの参考順（元の1着適性）" : "予想着順（1着適性順）"}</p>
+            <p className="text-xs font-semibold text-slate-400">{scenario ? "ゴールの参考順（選んだ展開条件）" : "予想着順（1着適性順）"}</p>
             {finished ? (
               <ol className="mt-2 space-y-1 text-sm">
                 {plan.finish.slice(0, 5).map((number, index) => (
                   <li key={number} className="flex min-w-0 gap-2">
-                    <span className="text-slate-400">{index + 1}着</span>
-                    <span className="text-amber-300">{pickMark(picks, number)}</span>
+                    <span className="text-slate-400">{scenario ? `候補${index+1}` : `${index+1}着`}</span>
+                    <span className="text-amber-300">{scenario ? "" : pickMark(picks, number)}</span>
                     <span className="min-w-0 truncate">{number} {byNumber.get(number)?.name}</span>
                   </li>
                 ))}
@@ -236,11 +236,11 @@ export function RaceReplay({ horses, title, course, raceId, pace, league, picks,
       <p className="border-t border-slate-800 px-4 py-3 text-xs leading-5 text-slate-400 sm:px-5">
         予想のイメージです。実際のレースのシミュレーションではありません。
         {plan.cornerSource === "scenario"
-          ? `途中の並びは「${scenario?.label}」と選んだ逃げ馬を置いた例です。条件別の着順補正は未検証のため`
+          ? `途中の並びは「${scenario?.label}」と選んだ逃げ馬を置いた例です。ゴールも脚質の相性を置いた参考候補順です。精度は未検証です。`
           : plan.cornerSource === "ai"
           ? "序盤・各コーナーの並びはAI位置取り予測（β、平均誤差約3番手）"
           : "途中の並びは近走の脚質"}
-        、ゴールの並びは1着適性順です。馬身差・進路・内外は表しません。コース形状と距離配分は概略です。
+        {!scenario && "、ゴールの並びは1着適性順です。"}馬身差・進路・内外は表しません。コース形状と距離配分は概略です。
       </p>
     </section>
   );

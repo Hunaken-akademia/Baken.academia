@@ -114,3 +114,11 @@ test('selected scenario owns early and corner orders while finish stays the vali
  assert.deepEqual(plan.finish,buildReplay(race).finish);
  assert.ok(replayFrame(plan,.5).runners.every(r=>Number.isFinite(r.remaining)));
 });
+
+test('conditional finish is the selected candidate order, validated as a whole field',()=>{
+ const finish=horses.map(h=>h.number).reverse(),scenario={label:'差しが届く展開',positions:{},finish};
+ const plan=buildReplay({...race,scenario});assert.deepEqual(plan.finish,finish);
+ assert.equal(plan.checkpoints.at(-1).source,'scenario');assert.equal(currentOrder(replayFrame(plan,1))[0],12);
+ assert.ok(plan.commentary[0].text.includes('この条件の候補先頭'));assert.ok(!plan.commentary[0].text.includes('1着適性1位'));
+ assert.ok('unavailable' in buildReplay({...race,scenario:{...scenario,finish:[1,1]}}));
+});

@@ -35,6 +35,15 @@ function moduleUrl(name){const source=fs.readFileSync(path.join(web,'lib',name+'
        await page.getByTestId('race-replay').getByText(/途中の並びは「/).waitFor();
        await page.getByTestId('formation-controls').getByRole('button',{name:'条件・序盤',exact:true}).waitFor();
      }
+     const near=page.getByTestId('replay-scenarios');
+     assert.equal(await near.getByRole('button').count(),6);
+     await near.locator('[data-replay-scenario="closers"]').click();
+     assert.equal(await explorer.locator('[data-scenario="closers"]').getAttribute('aria-pressed'),'true');
+     await near.getByText(/基本3位 → 条件1位/).waitFor();
+     await page.getByLabel('レースの進行位置').fill('1000');
+     await page.getByTestId('race-replay').getByText('候補1',{exact:true}).waitFor();
+     await near.locator('[data-replay-scenario="lone"]').click();
+     assert.equal(await page.getByLabel('レースの進行位置').inputValue(),'0');
      await explorer.locator('[data-scenario="lone"]').click();
      const leaders=explorer.getByRole('group',{name:'前へ行く馬',exact:true});
      for(const button of await leaders.locator('[aria-pressed="true"]').all()) await button.click();

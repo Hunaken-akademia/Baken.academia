@@ -1,4 +1,5 @@
 import { horseSequences, type MapHorse } from "./corner-reference";
+import {roleOrder} from "./marks";
 export const PACE_SCENARIOS = [
  {id:"baseline",label:"基本想定",flow:"近走の位置取り",premise:"近走の通過順から序盤の並びを確認。",watch:"逃げ候補の頭数と各馬の普段の位置。"},
  {id:"lone",label:"単騎逃げ・ゆったり",flow:"スロー寄り",premise:"選んだ馬がハナを取り、他の馬が競りかけずに落ち着く。",watch:"競りかけと後続の早めの進出。差し馬は位置取りも確認。"},
@@ -34,4 +35,22 @@ export function scenarioView(horses:ScenarioHorse[],id:PaceScenarioId,leaders:nu
   ordered.forEach((r,i)=>{r.positions[stage]=i+1;});
  }
  const warnings:string[]=[];if(id==="lone"&&chosen.size!==1)warnings.push("単騎逃げは先頭に立つ馬を1頭選んで比較してください。");if(id==="duel"&&chosen.size<2)warnings.push("逃げ争い激化は競り合う馬を2頭以上選ぶと比較しやすくなります。");if(rows.some(r=>chosen.has(r.horse.number)&&r.horse.style!=="逃げ"))warnings.push("普段は逃げ以外の馬を選んでいます。今回は前へ行く仮定です。");return {scenario,rows,warnings};
+}
+
+// A transparent scenario illustration, not fitted probabilities or model updates.
+export function scenarioRanking(horses:ScenarioHorse[],id:PaceScenarioId,leaders:number[],roleReady:boolean){
+ if(!roleReady)return [];
+ const base=roleOrder(horses,"first");if(base.length!==horses.length)return [];
+ const view=scenarioView(horses,id,leaders),chosen=new Set(leaders);
+ return base.map((horse,i)=>{
+  const row=view.rows.find(r=>r.horse.number===horse.number)!;
+  let shift=0;
+  if(id!=="baseline"){
+   shift=row.fit==="追い風"?-2:row.fit==="注意"?2:0;
+   if(id==="lone"&&chosen.has(horse.number))shift=-3;
+   if(id==="duel"&&chosen.has(horse.number))shift=3;
+   if(id==="closers")shift=row.fit==="追い風"?-3:row.fit==="注意"?3:0;
+  }
+  return {horse,baseRank:i+1,referenceScore:i+1+shift,shift,reason:row.reason};
+ }).sort((a,b)=>a.referenceScore-b.referenceScore||a.baseRank-b.baseRank).map((row,i)=>({...row,rank:i+1}));
 }
