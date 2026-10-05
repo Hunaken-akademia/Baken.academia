@@ -9,7 +9,7 @@ import { roleOrder } from "./marks";
 
 export type ReplayHorse = MapHorse & { firstProbability?: number; popularity: number };
 
-export type CheckpointSource = "start" | "ai" | "style" | "first-ranking";
+export type CheckpointSource = "start" | "ai" | "style" | "first-ranking" | "scenario";
 
 export type ReplayCheckpoint = {
   id: string;
@@ -38,7 +38,7 @@ export type ReplayPlan = {
   spacing: number[];
   commentary: Array<{ checkpoint: number; label: string; text: string }>;
   finish: number[];
-  cornerSource: "ai" | "style";
+  cornerSource: "ai" | "style" | "scenario";
 };
 
 export type ReplayUnavailable = { unavailable: string };
@@ -137,6 +137,7 @@ export function buildReplay(input: {
   pace: string;
   league?: "jra" | "nar";
   roleReady: boolean;
+  scenario?: { label: string; positions: Record<number, Partial<Record<number, number | null>>> };
 }): ReplayPlan | ReplayUnavailable {
   const { horses, title, course, raceId, pace } = input;
   if (/ばんえい/.test(course)) return { unavailable: "ばんえいは展開ビューの対象外です" };
@@ -154,6 +155,7 @@ export function buildReplay(input: {
   const estimateAt = (stage: number) =>
     new Map(horses.map((horse) => [horse.number, predictCorner(horse, stage, field, course)?.position ?? null] as const));
 
+  const scenarioOrder = (stage: number) => fillOrder(horses, new Map(horses.map(h => [h.number, input.scenario?.positions[h.number]?.[stage] ?? null])));
   const checkpoints: ReplayCheckpoint[] = [];
   checkpoints.push({
     id: "start", label: "スタート", remaining: geometry.distance, source: "start",
@@ -172,14 +174,14 @@ export function buildReplay(input: {
   if (earlyRemaining > firstCorner + 60) {
     checkpoints.push({
       id: "early", label: "序盤", remaining: Math.min(earlyRemaining, geometry.distance - 80),
-      source: aiEligible ? "ai" : "style",
-      order: aiEligible ? fillOrder(horses, estimateAt(0)) : styleOrder(horses),
+      source: input.scenario ? "scenario" : aiEligible ? "ai" : "style",
+      order: input.scenario ? scenarioOrder(0) : aiEligible ? fillOrder(horses, estimateAt(0)) : styleOrder(horses),
     });
   }
   for (const { stage, remaining } of cornerStages) {
     checkpoints.push({
-      id: `corner${stage}`, label: `${stage}角`, remaining, source: aiEligible ? "ai" : "style",
-      order: aiEligible ? fillOrder(horses, estimateAt(stage)) : styleOrder(horses),
+      id: `corner${stage}`, label: `${stage}角`, remaining, source: input.scenario ? "scenario" : aiEligible ? "ai" : "style",
+      order: input.scenario ? scenarioOrder(stage) : aiEligible ? fillOrder(horses, estimateAt(stage)) : styleOrder(horses),
     });
   }
   checkpoints.push({
@@ -187,7 +189,7 @@ export function buildReplay(input: {
     order: finishOrder.map((horse) => ({ number: horse.number, estimate: null })),
   });
 
-  const racing = PACE_SPACING[pace] ?? 11;
+  const racing = PACE_SPACING[pace] ?? ({ "スロー寄り": 8, "平均寄り": 10, "ハイ寄り": 14, "途中から加速": 12, "前が苦しくなる": 14 }[pace] ?? 11);
   const spacing = checkpoints.map((checkpoint) =>
     checkpoint.source === "start" ? 0 : checkpoint.source === "first-ranking" ? FINISH_SPACING : racing);
 
@@ -197,7 +199,7 @@ export function buildReplay(input: {
     spacing,
     commentary: commentary(horses, checkpoints, pace, geometry),
     finish: finishOrder.map((horse) => horse.number),
-    cornerSource: aiEligible ? "ai" : "style",
+    cornerSource: input.scenario ? "scenario" : aiEligible ? "ai" : "style",
   };
 }
 

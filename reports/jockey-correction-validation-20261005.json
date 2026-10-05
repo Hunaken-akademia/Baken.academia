@@ -1,0 +1,1356 @@
+{
+  "jra": {
+    "coverage": {
+      "races": 5741,
+      "runners": 79630
+    },
+    "historyPolicy": "Counts use only completed prior calendar dates; same-day outcomes excluded, including DNF starts as losses. Unknown/unsupported rows receive zero correction. Published all-years UI profiles are not used.",
+    "selection": "2025H1 only",
+    "confirmation": "2025H2",
+    "audit": "2026 retrospective, previously inspected",
+    "decision": "Research only. An offline pass additionally needs serving parity and prospective evidence before activation.",
+    "productionModelChanged": false,
+    "roles": {
+      "first": {
+        "comparisons": {
+          "selection2025H1": {
+            "all": {
+              "races": 1663,
+              "rescued": 4,
+              "lost": 2,
+              "net": 2,
+              "gain": 0.0012026458208057728,
+              "date_cluster_95ci": [
+                -0.0011270653533960026,
+                0.003701590451040842
+              ]
+            },
+            "pop4plus": {
+              "races": 543,
+              "rescued": 3,
+              "lost": 1,
+              "net": 2,
+              "gain": 0.003683241252302026,
+              "date_cluster_95ci": [
+                -0.0034071550255536627,
+                0.011561811697096403
+              ]
+            },
+            "pop10plus": {
+              "races": 73,
+              "rescued": 1,
+              "lost": 0,
+              "net": 1,
+              "gain": 0.0136986301369863,
+              "date_cluster_95ci": [
+                0.0,
+                0.04840692755155991
+              ]
+            }
+          },
+          "confirmation2025H2": {
+            "all": {
+              "races": 1667,
+              "rescued": 2,
+              "lost": 2,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.002371284487491744,
+                0.0023518008366493204
+              ]
+            },
+            "pop4plus": {
+              "races": 556,
+              "rescued": 1,
+              "lost": 2,
+              "net": -1,
+              "gain": -0.0017985611510791368,
+              "date_cluster_95ci": [
+                -0.007491340711328884,
+                0.003690207419634269
+              ]
+            },
+            "pop10plus": {
+              "races": 65,
+              "rescued": 0,
+              "lost": 1,
+              "net": -1,
+              "gain": -0.015384615384615385,
+              "date_cluster_95ci": [
+                -0.05,
+                0.0
+              ]
+            }
+          },
+          "retrospective2026": {
+            "all": {
+              "races": 2404,
+              "rescued": 2,
+              "lost": 4,
+              "net": -2,
+              "gain": -0.0008319467554076539,
+              "date_cluster_95ci": [
+                -0.0028513819480365287,
+                0.001243278530678559
+              ]
+            },
+            "pop4plus": {
+              "races": 824,
+              "rescued": 1,
+              "lost": 2,
+              "net": -1,
+              "gain": -0.0012135922330097086,
+              "date_cluster_95ci": [
+                -0.004981630993636535,
+                0.002509410288582183
+              ]
+            },
+            "pop10plus": {
+              "races": 96,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "gate": "keep_current"
+      },
+      "second": {
+        "comparisons": {
+          "selection2025H1": {
+            "all": {
+              "races": 1661,
+              "rescued": 15,
+              "lost": 10,
+              "net": 5,
+              "gain": 0.0030102347983142685,
+              "date_cluster_95ci": [
+                -0.001822962977293206,
+                0.008054897902201175
+              ]
+            },
+            "pop4plus": {
+              "races": 830,
+              "rescued": 12,
+              "lost": 5,
+              "net": 7,
+              "gain": 0.008433734939759036,
+              "date_cluster_95ci": [
+                0.0011975689768787784,
+                0.01587447478991596
+              ]
+            },
+            "pop10plus": {
+              "races": 134,
+              "rescued": 1,
+              "lost": 1,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.02142857142857143,
+                0.022556390977443608
+              ]
+            }
+          },
+          "confirmation2025H2": {
+            "all": {
+              "races": 1658,
+              "rescued": 6,
+              "lost": 15,
+              "net": -9,
+              "gain": -0.005428226779252111,
+              "date_cluster_95ci": [
+                -0.011127623227455174,
+                0.0
+              ]
+            },
+            "pop4plus": {
+              "races": 769,
+              "rescued": 3,
+              "lost": 8,
+              "net": -5,
+              "gain": -0.006501950585175552,
+              "date_cluster_95ci": [
+                -0.015405853393856783,
+                0.0024368806484112975
+              ]
+            },
+            "pop10plus": {
+              "races": 119,
+              "rescued": 0,
+              "lost": 2,
+              "net": -2,
+              "gain": -0.01680672268907563,
+              "date_cluster_95ci": [
+                -0.04099207424468229,
+                0.0
+              ]
+            }
+          },
+          "retrospective2026": {
+            "all": {
+              "races": 2399,
+              "rescued": 24,
+              "lost": 17,
+              "net": 7,
+              "gain": 0.0029178824510212586,
+              "date_cluster_95ci": [
+                -0.0016757963296716272,
+                0.007692385581206967
+              ]
+            },
+            "pop4plus": {
+              "races": 1159,
+              "rescued": 19,
+              "lost": 10,
+              "net": 9,
+              "gain": 0.007765314926660914,
+              "date_cluster_95ci": [
+                0.0,
+                0.015817223198594025
+              ]
+            },
+            "pop10plus": {
+              "races": 170,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "gate": "keep_current"
+      },
+      "third": {
+        "comparisons": {
+          "selection2025H1": {
+            "all": {
+              "races": 1661,
+              "rescued": 5,
+              "lost": 1,
+              "net": 4,
+              "gain": 0.002408187838651415,
+              "date_cluster_95ci": [
+                0.0,
+                0.005385996409335727
+              ]
+            },
+            "pop4plus": {
+              "races": 1023,
+              "rescued": 2,
+              "lost": 0,
+              "net": 2,
+              "gain": 0.0019550342130987292,
+              "date_cluster_95ci": [
+                0.0,
+                0.004892487699599985
+              ]
+            },
+            "pop10plus": {
+              "races": 201,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "confirmation2025H2": {
+            "all": {
+              "races": 1653,
+              "rescued": 3,
+              "lost": 3,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.0029976468735029974,
+                0.002979871204169853
+              ]
+            },
+            "pop4plus": {
+              "races": 982,
+              "rescued": 2,
+              "lost": 1,
+              "net": 1,
+              "gain": 0.0010183299389002036,
+              "date_cluster_95ci": [
+                -0.0021008955632726275,
+                0.004345392432307491
+              ]
+            },
+            "pop10plus": {
+              "races": 144,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "retrospective2026": {
+            "all": {
+              "races": 2394,
+              "rescued": 4,
+              "lost": 7,
+              "net": -3,
+              "gain": -0.0012531328320802004,
+              "date_cluster_95ci": [
+                -0.004141044581783117,
+                0.0012771664160818326
+              ]
+            },
+            "pop4plus": {
+              "races": 1385,
+              "rescued": 2,
+              "lost": 5,
+              "net": -3,
+              "gain": -0.0021660649819494585,
+              "date_cluster_95ci": [
+                -0.006598240469208211,
+                0.001534365368706394
+              ]
+            },
+            "pop10plus": {
+              "races": 222,
+              "rescued": 1,
+              "lost": 0,
+              "net": 1,
+              "gain": 0.0045045045045045045,
+              "date_cluster_95ci": [
+                0.0,
+                0.014637750811005629
+              ]
+            }
+          }
+        },
+        "gate": "keep_current"
+      }
+    },
+    "uniform": {
+      "selected": "gate-uniform-signed-0.1",
+      "first": {
+        "comparisons": {
+          "selection2025H1": {
+            "all": {
+              "races": 1663,
+              "rescued": 1,
+              "lost": 1,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.0017720023626698169,
+                0.0017932395496753268
+              ]
+            },
+            "pop4plus": {
+              "races": 543,
+              "rescued": 1,
+              "lost": 1,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.00539592650204161,
+                0.0055149597822554425
+              ]
+            },
+            "pop10plus": {
+              "races": 73,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "confirmation2025H2": {
+            "all": {
+              "races": 1667,
+              "rescued": 1,
+              "lost": 2,
+              "net": -1,
+              "gain": -0.0005998800239952009,
+              "date_cluster_95ci": [
+                -0.002513917978393395,
+                0.001215085294736803
+              ]
+            },
+            "pop4plus": {
+              "races": 556,
+              "rescued": 1,
+              "lost": 1,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.005319148936170213,
+                0.0053005878858000555
+              ]
+            },
+            "pop10plus": {
+              "races": 65,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "retrospective2026": {
+            "all": {
+              "races": 2404,
+              "rescued": 2,
+              "lost": 4,
+              "net": -2,
+              "gain": -0.0008319467554076539,
+              "date_cluster_95ci": [
+                -0.002863073614607357,
+                0.000877922395142672
+              ]
+            },
+            "pop4plus": {
+              "races": 824,
+              "rescued": 1,
+              "lost": 2,
+              "net": -1,
+              "gain": -0.0012135922330097086,
+              "date_cluster_95ci": [
+                -0.005882526155338461,
+                0.002564102564102564
+              ]
+            },
+            "pop10plus": {
+              "races": 96,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "gate": "keep_current"
+      },
+      "second": {
+        "comparisons": {
+          "selection2025H1": {
+            "all": {
+              "races": 1661,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            },
+            "pop4plus": {
+              "races": 830,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            },
+            "pop10plus": {
+              "races": 134,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "confirmation2025H2": {
+            "all": {
+              "races": 1658,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            },
+            "pop4plus": {
+              "races": 769,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            },
+            "pop10plus": {
+              "races": 119,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "retrospective2026": {
+            "all": {
+              "races": 2399,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            },
+            "pop4plus": {
+              "races": 1159,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            },
+            "pop10plus": {
+              "races": 170,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "gate": "keep_current"
+      },
+      "third": {
+        "comparisons": {
+          "selection2025H1": {
+            "all": {
+              "races": 1661,
+              "rescued": 5,
+              "lost": 1,
+              "net": 4,
+              "gain": 0.002408187838651415,
+              "date_cluster_95ci": [
+                0.0,
+                0.005385996409335727
+              ]
+            },
+            "pop4plus": {
+              "races": 1023,
+              "rescued": 2,
+              "lost": 0,
+              "net": 2,
+              "gain": 0.0019550342130987292,
+              "date_cluster_95ci": [
+                0.0,
+                0.004892487699599985
+              ]
+            },
+            "pop10plus": {
+              "races": 201,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "confirmation2025H2": {
+            "all": {
+              "races": 1653,
+              "rescued": 3,
+              "lost": 3,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.0029976468735029974,
+                0.002979871204169853
+              ]
+            },
+            "pop4plus": {
+              "races": 982,
+              "rescued": 2,
+              "lost": 1,
+              "net": 1,
+              "gain": 0.0010183299389002036,
+              "date_cluster_95ci": [
+                -0.0021008955632726275,
+                0.004345392432307491
+              ]
+            },
+            "pop10plus": {
+              "races": 144,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "retrospective2026": {
+            "all": {
+              "races": 2394,
+              "rescued": 4,
+              "lost": 7,
+              "net": -3,
+              "gain": -0.0012531328320802004,
+              "date_cluster_95ci": [
+                -0.004141044581783117,
+                0.0012771664160818326
+              ]
+            },
+            "pop4plus": {
+              "races": 1385,
+              "rescued": 2,
+              "lost": 5,
+              "net": -3,
+              "gain": -0.0021660649819494585,
+              "date_cluster_95ci": [
+                -0.006598240469208211,
+                0.001534365368706394
+              ]
+            },
+            "pop10plus": {
+              "races": 222,
+              "rescued": 1,
+              "lost": 0,
+              "net": 1,
+              "gain": 0.0045045045045045045,
+              "date_cluster_95ci": [
+                0.0,
+                0.014637750811005629
+              ]
+            }
+          }
+        },
+        "gate": "keep_current"
+      }
+    }
+  },
+  "nar": {
+    "coverage": {
+      "races": 26301,
+      "runners": 266225
+    },
+    "historyPolicy": "Counts use only completed prior calendar dates; same-day outcomes excluded, including DNF starts as losses. Unknown/unsupported rows receive zero correction. Published all-years UI profiles are not used.",
+    "selection": "2025H1 only",
+    "confirmation": "2025H2",
+    "audit": "2026 retrospective, previously inspected",
+    "decision": "Research only. An offline pass additionally needs serving parity and prospective evidence before activation.",
+    "productionModelChanged": false,
+    "roles": {
+      "first": {
+        "comparisons": {
+          "selection2025H1": {
+            "all": {
+              "races": 7128,
+              "rescued": 70,
+              "lost": 54,
+              "net": 16,
+              "gain": 0.002244668911335578,
+              "date_cluster_95ci": [
+                -0.0008335764660788687,
+                0.005148852966860654
+              ]
+            },
+            "pop4plus": {
+              "races": 1697,
+              "rescued": 35,
+              "lost": 30,
+              "net": 5,
+              "gain": 0.0029463759575721863,
+              "date_cluster_95ci": [
+                -0.006687439765735044,
+                0.011764705882352941
+              ]
+            },
+            "pop10plus": {
+              "races": 50,
+              "rescued": 1,
+              "lost": 0,
+              "net": 1,
+              "gain": 0.02,
+              "date_cluster_95ci": [
+                0.0,
+                0.061224489795918366
+              ]
+            }
+          },
+          "confirmation2025H2": {
+            "all": {
+              "races": 7938,
+              "rescued": 61,
+              "lost": 59,
+              "net": 2,
+              "gain": 0.0002519526329050139,
+              "date_cluster_95ci": [
+                -0.0022919427809630893,
+                0.0030494544781087913
+              ]
+            },
+            "pop4plus": {
+              "races": 1827,
+              "rescued": 25,
+              "lost": 31,
+              "net": -6,
+              "gain": -0.003284072249589491,
+              "date_cluster_95ci": [
+                -0.01078298528471263,
+                0.004948457273828763
+              ]
+            },
+            "pop10plus": {
+              "races": 68,
+              "rescued": 0,
+              "lost": 1,
+              "net": -1,
+              "gain": -0.014705882352941176,
+              "date_cluster_95ci": [
+                -0.047619047619047616,
+                0.0
+              ]
+            }
+          },
+          "retrospective2026": {
+            "all": {
+              "races": 11199,
+              "rescued": 108,
+              "lost": 95,
+              "net": 13,
+              "gain": 0.001160817930172337,
+              "date_cluster_95ci": [
+                -0.001522707591292306,
+                0.0036509216764362834
+              ]
+            },
+            "pop4plus": {
+              "races": 2555,
+              "rescued": 53,
+              "lost": 44,
+              "net": 9,
+              "gain": 0.0035225048923679062,
+              "date_cluster_95ci": [
+                -0.0037540915758789346,
+                0.010805847368050821
+              ]
+            },
+            "pop10plus": {
+              "races": 93,
+              "rescued": 0,
+              "lost": 1,
+              "net": -1,
+              "gain": -0.010752688172043012,
+              "date_cluster_95ci": [
+                -0.03260869565217391,
+                0.0
+              ]
+            }
+          }
+        },
+        "gate": "keep_current"
+      },
+      "second": {
+        "comparisons": {
+          "selection2025H1": {
+            "all": {
+              "races": 7120,
+              "rescued": 72,
+              "lost": 64,
+              "net": 8,
+              "gain": 0.0011235955056179776,
+              "date_cluster_95ci": [
+                -0.002450274362122491,
+                0.0050663019036478185
+              ]
+            },
+            "pop4plus": {
+              "races": 2869,
+              "rescued": 42,
+              "lost": 36,
+              "net": 6,
+              "gain": 0.0020913210177762286,
+              "date_cluster_95ci": [
+                -0.003771029930500594,
+                0.008364703072759109
+              ]
+            },
+            "pop10plus": {
+              "races": 144,
+              "rescued": 3,
+              "lost": 1,
+              "net": 2,
+              "gain": 0.013888888888888888,
+              "date_cluster_95ci": [
+                -0.013605442176870748,
+                0.04196542893725989
+              ]
+            }
+          },
+          "confirmation2025H2": {
+            "all": {
+              "races": 7925,
+              "rescued": 69,
+              "lost": 68,
+              "net": 1,
+              "gain": 0.00012618296529968455,
+              "date_cluster_95ci": [
+                -0.0031772365590202346,
+                0.0034409921648071076
+              ]
+            },
+            "pop4plus": {
+              "races": 3109,
+              "rescued": 44,
+              "lost": 36,
+              "net": 8,
+              "gain": 0.002573174654229656,
+              "date_cluster_95ci": [
+                -0.003909171678660229,
+                0.009561964083878131
+              ]
+            },
+            "pop10plus": {
+              "races": 153,
+              "rescued": 2,
+              "lost": 3,
+              "net": -1,
+              "gain": -0.006535947712418301,
+              "date_cluster_95ci": [
+                -0.03727879995312317,
+                0.020836975524475502
+              ]
+            }
+          },
+          "retrospective2026": {
+            "all": {
+              "races": 11181,
+              "rescued": 119,
+              "lost": 95,
+              "net": 24,
+              "gain": 0.0021464985242822645,
+              "date_cluster_95ci": [
+                -0.00018336346502297287,
+                0.004571681164279821
+              ]
+            },
+            "pop4plus": {
+              "races": 4513,
+              "rescued": 65,
+              "lost": 65,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.004570645615404392,
+                0.0048417360427719484
+              ]
+            },
+            "pop10plus": {
+              "races": 192,
+              "rescued": 1,
+              "lost": 0,
+              "net": 1,
+              "gain": 0.005208333333333333,
+              "date_cluster_95ci": [
+                0.0,
+                0.016218419506462974
+              ]
+            }
+          }
+        },
+        "gate": "keep_current"
+      },
+      "third": {
+        "comparisons": {
+          "selection2025H1": {
+            "all": {
+              "races": 7110,
+              "rescued": 164,
+              "lost": 123,
+              "net": 41,
+              "gain": 0.0057665260196905765,
+              "date_cluster_95ci": [
+                0.0012476470442337215,
+                0.01021314323515833
+              ]
+            },
+            "pop4plus": {
+              "races": 3931,
+              "rescued": 114,
+              "lost": 84,
+              "net": 30,
+              "gain": 0.007631645891630628,
+              "date_cluster_95ci": [
+                0.0012543353904958363,
+                0.013889246481290763
+              ]
+            },
+            "pop10plus": {
+              "races": 247,
+              "rescued": 4,
+              "lost": 3,
+              "net": 1,
+              "gain": 0.004048582995951417,
+              "date_cluster_95ci": [
+                -0.016195977749251175,
+                0.02575947005038249
+              ]
+            }
+          },
+          "confirmation2025H2": {
+            "all": {
+              "races": 7919,
+              "rescued": 149,
+              "lost": 148,
+              "net": 1,
+              "gain": 0.00012627857052658164,
+              "date_cluster_95ci": [
+                -0.003962294105856723,
+                0.004494204149402789
+              ]
+            },
+            "pop4plus": {
+              "races": 4424,
+              "rescued": 107,
+              "lost": 98,
+              "net": 9,
+              "gain": 0.002034358047016275,
+              "date_cluster_95ci": [
+                -0.004088237927817416,
+                0.008257686088102614
+              ]
+            },
+            "pop10plus": {
+              "races": 257,
+              "rescued": 5,
+              "lost": 2,
+              "net": 3,
+              "gain": 0.011673151750972763,
+              "date_cluster_95ci": [
+                -0.0077235100581404086,
+                0.03265491651205936
+              ]
+            }
+          },
+          "retrospective2026": {
+            "all": {
+              "races": 11188,
+              "rescued": 201,
+              "lost": 207,
+              "net": -6,
+              "gain": -0.0005362888809438684,
+              "date_cluster_95ci": [
+                -0.004033622785171123,
+                0.002854603158284012
+              ]
+            },
+            "pop4plus": {
+              "races": 6218,
+              "rescued": 140,
+              "lost": 143,
+              "net": -3,
+              "gain": -0.00048247024766806047,
+              "date_cluster_95ci": [
+                -0.005984820873696478,
+                0.004763733123607835
+              ]
+            },
+            "pop10plus": {
+              "races": 345,
+              "rescued": 7,
+              "lost": 3,
+              "net": 4,
+              "gain": 0.011594202898550725,
+              "date_cluster_95ci": [
+                -0.003087384259259259,
+                0.02727772227772225
+              ]
+            }
+          }
+        },
+        "gate": "keep_current"
+      }
+    },
+    "uniform": {
+      "selected": "combined-uniform-signed-0.35",
+      "first": {
+        "comparisons": {
+          "selection2025H1": {
+            "all": {
+              "races": 7128,
+              "rescued": 18,
+              "lost": 15,
+              "net": 3,
+              "gain": 0.00042087542087542086,
+              "date_cluster_95ci": [
+                -0.0011196876264197362,
+                0.0019890747741218157
+              ]
+            },
+            "pop4plus": {
+              "races": 1697,
+              "rescued": 8,
+              "lost": 8,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.004731632033113685,
+                0.004698355981448393
+              ]
+            },
+            "pop10plus": {
+              "races": 50,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "confirmation2025H2": {
+            "all": {
+              "races": 7938,
+              "rescued": 14,
+              "lost": 18,
+              "net": -4,
+              "gain": -0.0005039052658100278,
+              "date_cluster_95ci": [
+                -0.0019254595859653802,
+                0.0009115178280026106
+              ]
+            },
+            "pop4plus": {
+              "races": 1827,
+              "rescued": 4,
+              "lost": 12,
+              "net": -8,
+              "gain": -0.004378762999452655,
+              "date_cluster_95ci": [
+                -0.00854725232934018,
+                0.0
+              ]
+            },
+            "pop10plus": {
+              "races": 68,
+              "rescued": 0,
+              "lost": 1,
+              "net": -1,
+              "gain": -0.014705882352941176,
+              "date_cluster_95ci": [
+                -0.04838709677419355,
+                0.0
+              ]
+            }
+          },
+          "retrospective2026": {
+            "all": {
+              "races": 11199,
+              "rescued": 22,
+              "lost": 23,
+              "net": -1,
+              "gain": -8.92936869363336e-05,
+              "date_cluster_95ci": [
+                -0.0012535031287743746,
+                0.0010932908352150495
+              ]
+            },
+            "pop4plus": {
+              "races": 2555,
+              "rescued": 7,
+              "lost": 7,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.0027889837854172136,
+                0.0030570231307918702
+              ]
+            },
+            "pop10plus": {
+              "races": 93,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "gate": "keep_current"
+      },
+      "second": {
+        "comparisons": {
+          "selection2025H1": {
+            "all": {
+              "races": 7120,
+              "rescued": 29,
+              "lost": 29,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.0022194787166054,
+                0.0020936227234083582
+              ]
+            },
+            "pop4plus": {
+              "races": 2869,
+              "rescued": 21,
+              "lost": 14,
+              "net": 7,
+              "gain": 0.0024398745207389336,
+              "date_cluster_95ci": [
+                -0.001979738210070995,
+                0.0064820486555564796
+              ]
+            },
+            "pop10plus": {
+              "races": 144,
+              "rescued": 0,
+              "lost": 0,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "confirmation2025H2": {
+            "all": {
+              "races": 7925,
+              "rescued": 24,
+              "lost": 31,
+              "net": -7,
+              "gain": -0.0008832807570977918,
+              "date_cluster_95ci": [
+                -0.002844989824373618,
+                0.001019803957937989
+              ]
+            },
+            "pop4plus": {
+              "races": 3109,
+              "rescued": 15,
+              "lost": 13,
+              "net": 2,
+              "gain": 0.000643293663557414,
+              "date_cluster_95ci": [
+                -0.003183826360056917,
+                0.0038927565760457873
+              ]
+            },
+            "pop10plus": {
+              "races": 153,
+              "rescued": 1,
+              "lost": 0,
+              "net": 1,
+              "gain": 0.006535947712418301,
+              "date_cluster_95ci": [
+                0.0,
+                0.02054794520547945
+              ]
+            }
+          },
+          "retrospective2026": {
+            "all": {
+              "races": 11181,
+              "rescued": 51,
+              "lost": 47,
+              "net": 4,
+              "gain": 0.0003577497540470441,
+              "date_cluster_95ci": [
+                -0.0013288037617451606,
+                0.0020900781964963205
+              ]
+            },
+            "pop4plus": {
+              "races": 4513,
+              "rescued": 25,
+              "lost": 31,
+              "net": -6,
+              "gain": -0.0013294925769997785,
+              "date_cluster_95ci": [
+                -0.004715449361946337,
+                0.0019477889504229534
+              ]
+            },
+            "pop10plus": {
+              "races": 192,
+              "rescued": 1,
+              "lost": 1,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.015625,
+                0.015230368797265088
+              ]
+            }
+          }
+        },
+        "gate": "keep_current"
+      },
+      "third": {
+        "comparisons": {
+          "selection2025H1": {
+            "all": {
+              "races": 7110,
+              "rescued": 72,
+              "lost": 45,
+              "net": 27,
+              "gain": 0.0037974683544303796,
+              "date_cluster_95ci": [
+                0.0011141789977493408,
+                0.006825486928590483
+              ]
+            },
+            "pop4plus": {
+              "races": 3931,
+              "rescued": 47,
+              "lost": 33,
+              "net": 14,
+              "gain": 0.0035614347494276268,
+              "date_cluster_95ci": [
+                -0.00025754779281596404,
+                0.007842742172313568
+              ]
+            },
+            "pop10plus": {
+              "races": 247,
+              "rescued": 4,
+              "lost": 2,
+              "net": 2,
+              "gain": 0.008097165991902834,
+              "date_cluster_95ci": [
+                -0.01119827001356852,
+                0.028574355971896937
+              ]
+            }
+          },
+          "confirmation2025H2": {
+            "all": {
+              "races": 7919,
+              "rescued": 66,
+              "lost": 52,
+              "net": 14,
+              "gain": 0.0017678999873721429,
+              "date_cluster_95ci": [
+                -0.0008708311554881101,
+                0.004448610998448809
+              ]
+            },
+            "pop4plus": {
+              "races": 4424,
+              "rescued": 35,
+              "lost": 37,
+              "net": -2,
+              "gain": -0.0004520795660036166,
+              "date_cluster_95ci": [
+                -0.003974540764436693,
+                0.0031927023945267957
+              ]
+            },
+            "pop10plus": {
+              "races": 257,
+              "rescued": 1,
+              "lost": 2,
+              "net": -1,
+              "gain": -0.0038910505836575876,
+              "date_cluster_95ci": [
+                -0.01639344262295082,
+                0.008197564595560949
+              ]
+            }
+          },
+          "retrospective2026": {
+            "all": {
+              "races": 11188,
+              "rescued": 84,
+              "lost": 79,
+              "net": 5,
+              "gain": 0.000446907400786557,
+              "date_cluster_95ci": [
+                -0.001801339308595518,
+                0.002711986982462484
+              ]
+            },
+            "pop4plus": {
+              "races": 6218,
+              "rescued": 53,
+              "lost": 62,
+              "net": -9,
+              "gain": -0.0014474107430041815,
+              "date_cluster_95ci": [
+                -0.005114805521491102,
+                0.0021039088211719315
+              ]
+            },
+            "pop10plus": {
+              "races": 345,
+              "rescued": 2,
+              "lost": 2,
+              "net": 0,
+              "gain": 0.0,
+              "date_cluster_95ci": [
+                -0.008310826408125577,
+                0.008621935419573443
+              ]
+            }
+          }
+        },
+        "gate": "keep_current"
+      }
+    }
+  }
+}

@@ -5,6 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { Tabs as TabsPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { ownsHorizontalGesture } from "@/lib/touch-scroll"
 
 type TabsProps = React.ComponentProps<typeof TabsPrimitive.Root> & {
   onSwipeBack?: () => void
@@ -32,7 +33,7 @@ function Tabs({
   return (
     <TabsPrimitive.Root
       ref={root}
-      style={{ touchAction: orientation === "horizontal" ? "pan-y pinch-zoom" : undefined, ...style }}
+      style={{ touchAction: orientation === "horizontal" ? "auto" : undefined, ...style }}
       value={selected}
       onValueChange={change}
       onTouchStart={(event) => {
@@ -41,7 +42,7 @@ function Tabs({
         const touch = event.touches[0]
         if (orientation !== "horizontal" || event.touches.length !== 1 ||
             touch.clientX < 24 || touch.clientX > window.innerWidth - 24 ||
-            (event.target as HTMLElement).closest("input,textarea,select,[data-no-swipe]")) return
+            ownsHorizontalGesture(event.target, root.current)) return
         start.current = { x: touch.clientX, y: touch.clientY, time: Date.now() }
       }}
       onTouchMove={(event) => {

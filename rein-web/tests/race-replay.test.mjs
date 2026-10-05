@@ -103,3 +103,14 @@ test('runners keep moving forward and do not jump lanes at checkpoints', () => {
     }
   }
 });
+
+test('selected scenario owns early and corner orders while finish stays the validated ranking', () => {
+ const positions = Object.fromEntries(horses.map(h => [h.number, Object.fromEntries([0,1,2,3,4].map(stage => [stage,13-h.number]))]));
+ const plan=buildReplay({...race,scenario:{label:'差しが届く展開',positions}});
+ assert.equal(plan.cornerSource,'scenario');
+ for(const checkpoint of plan.checkpoints.filter(c=>c.id!=='start'&&c.id!=='finish')) {
+  assert.equal(checkpoint.source,'scenario');assert.equal(checkpoint.order[0].number,12);
+ }
+ assert.deepEqual(plan.finish,buildReplay(race).finish);
+ assert.ok(replayFrame(plan,.5).runners.every(r=>Number.isFinite(r.remaining)));
+});

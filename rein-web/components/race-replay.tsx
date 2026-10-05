@@ -24,7 +24,7 @@ function pickMark(picks: Picks | undefined, number: number) {
   return hit ? { 本命: "◎", 対抗: "○", 穴候補: "☆" }[hit.role] : "";
 }
 
-export function RaceReplay({ horses, title, course, raceId, pace, league, picks, roleReady }: {
+export function RaceReplay({ horses, title, course, raceId, pace, league, picks, roleReady, scenario }: {
   horses: ReplayHorse[];
   title: string;
   course: string;
@@ -33,10 +33,11 @@ export function RaceReplay({ horses, title, course, raceId, pace, league, picks,
   league?: "jra" | "nar";
   picks?: Picks;
   roleReady: boolean;
+  scenario?: { label: string; positions: Record<number, Partial<Record<number, number | null>>> };
 }) {
   const plan = useMemo(
-    () => buildReplay({ horses, title, course, raceId, pace, league, roleReady }),
-    [horses, title, course, raceId, pace, league, roleReady],
+    () => buildReplay({ horses, title, course, raceId, pace, league, roleReady, scenario }),
+    [horses, title, course, raceId, pace, league, roleReady, scenario],
   );
   const [progress, setProgress] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -107,7 +108,7 @@ export function RaceReplay({ horses, title, course, raceId, pace, league, picks,
             {geometry.venue} {course}・{geometry.rightHanded ? "右回り" : "左回り"}・{horses.length}頭
           </p>
         </div>
-        <span className="rounded-full bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-200">{pace}想定</span>
+        <span className="rounded-full bg-amber-300/10 px-3 py-1 text-xs font-semibold text-amber-200">{scenario ? `${scenario.label}・${pace}` : `${pace}想定`}</span>
       </div>
       <div className="grid gap-4 px-4 pb-4 sm:px-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,.9fr)]">
         <div className="min-w-0">
@@ -215,7 +216,7 @@ export function RaceReplay({ horses, title, course, raceId, pace, league, picks,
             </ol>
           </div>
           <div className="rounded-xl border border-slate-700 bg-black/10 p-3">
-            <p className="text-xs font-semibold text-slate-400">予想着順（1着適性順）</p>
+            <p className="text-xs font-semibold text-slate-400">{scenario ? "ゴールの参考順（元の1着適性）" : "予想着順（1着適性順）"}</p>
             {finished ? (
               <ol className="mt-2 space-y-1 text-sm">
                 {plan.finish.slice(0, 5).map((number, index) => (
@@ -234,7 +235,9 @@ export function RaceReplay({ horses, title, course, raceId, pace, league, picks,
       </div>
       <p className="border-t border-slate-800 px-4 py-3 text-xs leading-5 text-slate-400 sm:px-5">
         予想のイメージです。実際のレースのシミュレーションではありません。
-        {plan.cornerSource === "ai"
+        {plan.cornerSource === "scenario"
+          ? `途中の並びは「${scenario?.label}」と選んだ逃げ馬を置いた例です。条件別の着順補正は未検証のため`
+          : plan.cornerSource === "ai"
           ? "序盤・各コーナーの並びはAI位置取り予測（β、平均誤差約3番手）"
           : "途中の並びは近走の脚質"}
         、ゴールの並びは1着適性順です。馬身差・進路・内外は表しません。コース形状と距離配分は概略です。

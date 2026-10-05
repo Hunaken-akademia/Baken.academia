@@ -20,18 +20,19 @@ test('touch navigation: left advances, right returns, with boundaries, vertical,
   const module = { exports: {} };
   const source = readFileSync(new URL('../components/ui/tabs.tsx', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
-  new Function('require', 'module', 'exports', compiled)(name => name === '@/lib/utils' ? { cn: (...values) => require('tailwind-merge').twMerge(require('clsx').clsx(values)) } : require(name), module, module.exports);
+  const scroll={exports:{}};const scrollCode=ts.transpileModule(readFileSync(new URL('../lib/touch-scroll.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;new Function('module','exports',scrollCode)(scroll,scroll.exports);
+  new Function('require', 'module', 'exports', compiled)(name => name === '@/lib/touch-scroll' ? scroll.exports : name === '@/lib/utils' ? { cn: (...values) => require('tailwind-merge').twMerge(require('clsx').clsx(values)) } : require(name), module, module.exports);
   const { Tabs, TabsList, TabsTrigger, TabsContent } = module.exports;
   const h = React.createElement;
   const root = createRoot(document.getElementById('app'));
   let backCount = 0;
   await React.act(async () => root.render(h(Tabs, { defaultValue: 'a', onSwipeBack: () => backCount++ },
     h(TabsList, null, ...['a', 'b', 'c'].map(value => h(TabsTrigger, { key: value, value }, value))),
-    ...['a', 'b', 'c'].map(value => h(TabsContent, { key: value, value }, value)))));
+    ...['a', 'b', 'c'].map(value => h(TabsContent, { key: value, value }, value,h('div',{'data-scroll-fixture':true,style:{overflowX:'auto'}},h('table',null,h('tbody',null,h('tr',null,h('td',null,'比較表'))))))))));
   const selected = () => document.querySelector('[role="tab"][aria-selected="true"]').textContent;
-  const swipe = async (x1, y1, x2, y2) => {
+  const swipe = async (x1, y1, x2, y2, source) => {
     await React.act(async () => {
-      const target = document.querySelector('[data-slot="tabs"]');
+      const target = source ?? document.querySelector('[data-slot="tabs"]');
       for (const [type, x, y] of [['touchstart', x1, y1], ['touchmove', x2, y2], ['touchend', x2, y2]]) {
         const event = new dom.window.Event(type, { bubbles: true, cancelable: true });
         Object.defineProperties(event, { touches: { value: type === 'touchend' ? [] : [{ clientX: x, clientY: y }] }, changedTouches: { value: [{ clientX: x, clientY: y }] } });
@@ -40,6 +41,9 @@ test('touch navigation: left advances, right returns, with boundaries, vertical,
     });
   };
   assert.equal(selected(), 'a');
+  const table=document.querySelector('[data-scroll-fixture]');Object.defineProperties(table,{scrollWidth:{value:900},clientWidth:{value:320}});
+  for(const left of [0,580]){table.scrollLeft=left;await swipe(250,100,100,100,table.querySelector('td'));assert.equal(selected(),'a');assert.equal(backCount,0);await swipe(100,100,250,100,table.querySelector('td'));assert.equal(selected(),'a');assert.equal(backCount,0);}
+  assert.equal(document.querySelector('[data-slot="tabs"]').style.touchAction,'auto');
   await swipe(250, 100, 100, 100); assert.equal(selected(), 'b'); assert.equal(backCount, 0);
   await swipe(250, 100, 100, 100); assert.equal(selected(), 'c');
   await swipe(250, 100, 100, 100); assert.equal(selected(), 'c');

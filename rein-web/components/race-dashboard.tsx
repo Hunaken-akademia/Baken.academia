@@ -21,12 +21,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { compactSelections } from "@/lib/tickets";
 import { raceProgress } from "@/lib/race-progress";
+import { ownsHorizontalGesture } from "@/lib/touch-scroll";
 import { reasonViews } from "@/lib/feature-labels";
 import { longshotRoleOrder } from "@/lib/longshot-roles";
 import { roleOrder, type RoleKey, type Picks, type MarkPick } from "@/lib/marks";
 import { PaceScenarioExplorer } from "@/components/pace-scenario-explorer";
 import { JockeyProfiles } from "@/components/jockey-profiles";
-import { RaceReplay } from "@/components/race-replay";
 import { PredictionJournal, HorseNotebook } from "@/components/prediction-journal";
 import { MarketRankMap } from "@/components/market-rank-map";
 import { PredictionDataStatus } from "@/components/prediction-data-status";
@@ -364,7 +364,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
   return (
     <main
       className="min-h-screen bg-[#07111f] text-slate-100"
-      style={{ touchAction: "pan-y pinch-zoom" }}
+      style={{ touchAction: "auto" }}
       onTouchStart={(event) => {
         pageSwipeStart.current = null;
         suppressPageClickUntil.current = 0;
@@ -375,9 +375,8 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
           event.touches.length !== 1 ||
           touch.clientX < 24 ||
           touch.clientX > window.innerWidth - 24 ||
-          target.closest(
-            '[data-slot="tabs"],input,textarea,select,[data-no-swipe]',
-          )
+          target.closest('[data-slot="tabs"]') ||
+          ownsHorizontalGesture(event.target, event.currentTarget)
         )
           return;
         pageSwipeStart.current = {
@@ -1138,8 +1137,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           </details>
         </TabsContent>
         <TabsContent value="formation">
-          <PaceScenarioExplorer key={data.race.raceId} roleReady={rolesReady} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
-          <RaceReplay horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} picks={data.picks} roleReady={rolesReady} />
+          <PaceScenarioExplorer picks={data.picks} key={data.race.raceId} roleReady={rolesReady} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
           <RaceShapeReference data={data} />
         </TabsContent>
         <TabsContent value="detail">

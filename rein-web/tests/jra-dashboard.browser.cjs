@@ -32,6 +32,7 @@ function moduleUrl(name){const source=fs.readFileSync(path.join(web,'lib',name+'
      for(const scenario of ['lone','steady','duel','sustain','closers']) {
        await explorer.locator(`[data-scenario="${scenario}"]`).click();
        assert.equal(await explorer.locator(`[data-scenario="${scenario}"]`).getAttribute('aria-pressed'),'true');
+       await page.getByTestId('race-replay').getByText(/途中の並びは「/).waitFor();
        await page.getByTestId('formation-controls').getByRole('button',{name:'条件・序盤',exact:true}).waitFor();
      }
      await explorer.locator('[data-scenario="lone"]').click();
@@ -39,10 +40,23 @@ function moduleUrl(name){const source=fs.readFileSync(path.join(web,'lib',name+'
      for(const button of await leaders.locator('[aria-pressed="true"]').all()) await button.click();
      await leaders.getByRole('button',{name:'3 検証馬3',exact:true}).click();
      assert.equal(await page.locator('[data-formation-horse]').first().getAttribute('data-formation-horse'),'3');
+     await page.getByLabel("レースの進行位置").fill("50");
+     await explorer.locator('[data-scenario="steady"]').click();
+     assert.equal(await page.getByLabel("レースの進行位置").inputValue(),"0");
      await explorer.locator('[data-scenario="baseline"]').click();
      await page.getByTestId('race-replay').waitFor();await page.getByRole('button',{name:'再生',exact:true}).click();await page.getByRole('button',{name:'一時停止',exact:true}).click();}
    if(tab==='馬の詳細') {await page.getByLabel('詳細を見る馬').selectOption('3');await page.getByText('定例重賞・過去傾向').waitFor();}
-   if(tab==='騎手') {await page.getByLabel('騎手・馬を検索').fill('検証騎手3');assert.equal(await page.locator('details').count(),1);await page.getByText('12.5%',{exact:true}).first().waitFor();await page.getByLabel('騎手の集計条件').selectOption('turn');await page.getByText('右回り',{exact:true}).first().waitFor();await page.getByLabel('騎手実績の最低出走数').selectOption('100');await page.getByText('指定した出走数を満たす実績がありません。').waitFor();await page.getByLabel('騎手実績の最低出走数').selectOption('0');await page.getByLabel('騎手・馬を検索').fill('');await page.getByLabel('騎手比較の並べ替え').selectOption('wins');assert.match(await page.getByRole('table').filter({has:page.getByText('出走馬・騎手の比較（横にスクロール）',{exact:true})}).locator('tbody tr').first().innerText(),/12 検証馬12/);await page.getByLabel('騎手・馬を検索').fill('検証騎手3');}
+   if(tab==='騎手') {
+ await page.setViewportSize({width:390,height:844});
+ const wrapper=page.getByRole('table').filter({has:page.getByText('出走馬・騎手の比較（横にスクロール）',{exact:true})}).locator('..');
+ await wrapper.evaluate(el=>{el.scrollLeft=0;el.scrollIntoView({block:'start'});});const box=await wrapper.boundingBox();const cdp=await page.context().newCDPSession(page);
+ const y=Math.max(20,box.y+100),x=box.x+box.width-35;
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+ for(let i=1;i<=6;i++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x-i*30,y}]});await page.waitForTimeout(30);}
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.waitForTimeout(100);
+ assert.ok(await wrapper.evaluate(el=>el.scrollLeft)>0,`native touch scroll moves table ${JSON.stringify(box)}`);
+ assert.equal(await page.getByRole('tab',{name:'騎手',exact:true}).getAttribute('aria-selected'),'true');await cdp.detach();await page.setViewportSize({width:1280,height:900});
+await page.getByLabel('騎手・馬を検索').fill('検証騎手3');assert.equal(await page.locator('details').count(),1);await page.getByText('12.5%',{exact:true}).first().waitFor();await page.getByLabel('騎手の集計条件').selectOption('turn');await page.getByText('右回り',{exact:true}).first().waitFor();await page.getByLabel('騎手実績の最低出走数').selectOption('100');await page.getByText('指定した出走数を満たす実績がありません。').waitFor();await page.getByLabel('騎手実績の最低出走数').selectOption('0');await page.getByLabel('騎手・馬を検索').fill('');await page.getByLabel('騎手比較の並べ替え').selectOption('wins');assert.match(await page.getByRole('table').filter({has:page.getByText('出走馬・騎手の比較（横にスクロール）',{exact:true})}).locator('tbody tr').first().innerText(),/12 検証馬12/);await page.getByLabel('騎手・馬を検索').fill('検証騎手3');}
    if(tab==='予想') {const panel=page.getByRole('region',{name:'着順別の穴馬適性'}); for(const role of ['1着','2着','3着']) {await panel.getByRole('button',{name:role+'の穴',exact:true}).click(); await panel.getByLabel('穴馬の人気条件').selectOption('10');assert.equal(await panel.getByRole('button').count(),6);await panel.getByText(role+'適性 全頭中10位',{exact:true}).waitFor();} await panel.getByLabel('穴馬の人気条件').selectOption('4');}
    if(tab==='結果') await page.getByText('確定結果の取得後に、全着順と保存した予想を比較できます。').waitFor();
    for (const width of [320,390,768,1280]) {await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width,tab+' width '+width);}
