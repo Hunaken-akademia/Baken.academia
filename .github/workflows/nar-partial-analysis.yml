@@ -357,11 +357,11 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python scripts/download_recall_archives.py
       - name: Evaluate role-specific and shared jockey corrections without publishing
-        run: python -u scripts/jockey_correction_experiments.py --league nar --output artifacts/jockey-corrections
+        run: python -u scripts/jockey_correction_experiments.py --league nar --extended --output artifacts/jockey-corrections-extended
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: nar-jockey-corrections-${{ github.run_id }}
-          path: artifacts/jockey-corrections
+          path: artifacts/jockey-corrections-extended
           if-no-files-found: warn
           retention-days: 30

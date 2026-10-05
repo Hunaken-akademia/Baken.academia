@@ -44,14 +44,14 @@ def paired(data,proposed,current,target,cut=1):
     return {'races':len(a),'rescued':int((aa&~bb).sum()),'lost':int((~aa&bb).sum()),'net':int(diff.sum()),'gain':float(diff.mean()) if len(diff) else None,'date_cluster_95ci':ci}
 
 
-def evaluate(data,predictions,target):
+def evaluate(data,predictions,target,forced=None):
     periods={'selection2025H1':data.race_date.between('2025-01-01','2025-06-30'),'confirmation2025H2':data.race_date.between('2025-07-01','2025-12-31'),'retrospective2026':data.race_date.ge('2026-01-01')}
     selection={name:metrics(data.loc[periods['selection2025H1']],score[periods['selection2025H1']],target) for name,score in predictions.items()}
     baseline=selection['current_recipe']
     eligible=[name for name,z in selection.items() if name!='popularity' and z['all']['top5']['hits']>=baseline['all']['top5']['hits'] and z['pop4plus']['top5']['hits']>=baseline['pop4plus']['top5']['hits']]
     def key(name):
         z=selection[name]['all'];return (z['top5']['hits'],z['top3']['hits'],z['top1']['hits'],name=='current_recipe')
-    selected=max(eligible,key=key)
+    selected=forced if forced is not None else max(eligible,key=key)
     out={'selected':selected,'selection':selection,'periods':{},'comparisons':{},'segments':{}}
     for period,mask in periods.items():
         out['periods'][period]={name:metrics(data.loc[mask],predictions[name][mask],target) for name in dict.fromkeys(['current_recipe',selected,'popularity'])}
