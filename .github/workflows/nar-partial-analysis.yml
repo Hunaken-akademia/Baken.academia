@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
   analyze:
-    if: "!contains(github.event.head_commit.message, '[jockey-reference]') && !contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
+    if: "!contains(github.event.head_commit.message, '[jockey-correction]') && !contains(github.event.head_commit.message, '[jockey-reference]') && !contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -338,4 +338,30 @@ jobs:
         with:
           name: nar-jockey-reference-${{ github.run_id }}
           path: artifacts/jockey-reference
+          retention-days: 30
+
+  jockey-correction:
+    if: contains(github.event.head_commit.message, '[jockey-correction]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+      OPENBLAS_NUM_THREADS: '2'
+      OMP_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python scripts/download_recall_archives.py
+      - name: Evaluate role-specific and shared jockey corrections without publishing
+        run: python -u scripts/jockey_correction_experiments.py --league nar --output artifacts/jockey-corrections
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nar-jockey-corrections-${{ github.run_id }}
+          path: artifacts/jockey-corrections
+          if-no-files-found: warn
           retention-days: 30
