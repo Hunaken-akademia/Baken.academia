@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
   analyze:
-    if: "!contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
+    if: "!contains(github.event.head_commit.message, '[jockey-reference]') && !contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -315,4 +315,27 @@ jobs:
           name: nar-profile-refresh-${{ github.run_id }}
           path: artifacts/nar-profile-refresh/summary.json
           if-no-files-found: warn
+          retention-days: 30
+
+  jockey-reference:
+    if: contains(github.event.head_commit.message, '[jockey-reference]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Read licensed saved NAR history
+        run: python scripts/download_recall_archives.py
+      - name: Build exact descriptive jockey condition profiles and temporal audit
+        run: python -u scripts/build_jockey_reference.py --league nar --output artifacts/jockey-reference
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nar-jockey-reference-${{ github.run_id }}
+          path: artifacts/jockey-reference
           retention-days: 30
