@@ -65,14 +65,14 @@ jobs:
       SUFFIX: ${{ matrix.suffix }}
       PERIOD: ${{ matrix.period }}
       SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
-      ARCHIVE_DATASET: "nar-results-win-odds-popularity-v3"
+      ARCHIVE_DATASET: "nar-all-bet-odds-v1"
     steps:
       - uses: actions/checkout@v4
       - id: archive
         name: Skip if verified archive already exists in Supabase
         run: |
-          # Reuse the authorized namespace and all completed v2 result rows.
-          export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v2/${YEAR}/${PERIOD}.tar.gz"
+          # Resume full-odds archives; results-only v2 archives are not completeness evidence.
+          export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v1/${YEAR}/${PERIOD}.tar.gz"
           bash scripts/check_supabase_archive.sh
       - uses: actions/setup-python@v5
         if: steps.archive.outputs.exists != 'true'
@@ -81,7 +81,7 @@ jobs:
           cache: pip
       - if: steps.archive.outputs.exists != 'true'
         run: pip install -r requirements.txt
-      - name: Fetch NAR results with win odds and popularity
+      - name: Fetch NAR results and all final bet odds
         if: steps.archive.outputs.exists != 'true'
         run: >-
           python -m baken_academia.nar_backfill
@@ -89,17 +89,18 @@ jobs:
           --start-day "$START_DAY" --end-day "$END_DAY"
           --output "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.parquet"
           --min-delay 3 --max-delay 3
-          --permission-confirmed --continue-on-error
+          --permission-confirmed --continue-on-error --include-all-bet-odds
       - name: Package verified NAR result archive
         if: steps.archive.outputs.exists != 'true'
         run: |
-          tar -czf "nar-${PERIOD}.tar.gz" "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.parquet" "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.audit.json"
+          python -c 'import json, os; from pathlib import Path; p=Path("data/raw/nar") / ("nar-"+os.environ["YEAR"]+"-"+os.environ["MONTH_PADDED"]+"-"+os.environ["SUFFIX"]+".audit.json"); a=json.loads(p.read_text()); assert a["all_bet_odds_requested"] and not a["errors"] and not a["odds_errors"]; assert a["odds_pages"] == a["races"] * len(a["bet_types"]), a'
+          tar -czf "nar-${PERIOD}.tar.gz" data/raw/nar/*.parquet data/raw/nar/*.audit.json data/raw/nar/odds-pages data/raw/nar/events
           test -s "nar-${PERIOD}.tar.gz"
       - name: Archive verified chunk directly to Supabase
         if: steps.archive.outputs.exists != 'true'
         run: |
           export ARCHIVE_FILE="nar-${PERIOD}.tar.gz"
-          export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v2/${YEAR}/${PERIOD}.tar.gz"
+          export ARCHIVE_OBJECT_PATH="nar/archive/all-bets/v1/${YEAR}/${PERIOD}.tar.gz"
           bash scripts/upload_archive_to_supabase.sh
       - name: Request rolling NAR analysis after a new chunk
         if: steps.archive.outputs.exists != 'true' && success()
