@@ -355,6 +355,17 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
       setActiveHorse(null);
     } else setVenue(null);
   };
+  const detailVenue = venue ?? schedule?.venues.find(item =>
+    item.races.some(race => race.raceId === data?.race.raceId));
+  const orderedRaces = [...(detailVenue?.races ?? [])].sort((a, b) => a.number - b.number);
+  const currentRaceIndex = orderedRaces.findIndex(race => race.raceId === data?.race.raceId);
+  const previousRace = currentRaceIndex > 0 ? orderedRaces[currentRaceIndex - 1] : undefined;
+  const nextRace = currentRaceIndex >= 0 ? orderedRaces[currentRaceIndex + 1] : undefined;
+  const navigateRace = (race: Race | undefined) => {
+    if (!race || loading) return;
+    void analyze(race);
+    window.scrollTo({ top: 0, behavior: "auto" });
+  };
   const showBack = Boolean(venue || data);
   const pageSwipeStart = useRef<{ x: number; y: number; time: number } | null>(
     null,
@@ -551,6 +562,32 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
           <RaceScreen venue={venue} day={historicalDate ? "past" : scheduleDay} loading={loading} onAnalyze={analyze} />
         )}
         {data && (
+          <>
+          <nav aria-label="前後のレースへ移動" className="mb-4 flex items-center gap-2 rounded-2xl border border-slate-700 bg-[#0c192a] p-2 sm:p-3">
+            <Button
+              variant="outline"
+              disabled={loading || !previousRace}
+              onClick={() => navigateRace(previousRace)}
+              aria-label={previousRace ? `前のレース・${previousRace.number}R` : "前のレースはありません"}
+              className="min-h-11 min-w-24 shrink-0 border-slate-600 bg-transparent text-slate-100 hover:bg-slate-800"
+            >
+              <ArrowLeft aria-hidden="true" className="size-4" />
+              {previousRace ? `${previousRace.number}R` : "前のレース"}
+            </Button>
+            <span className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-cyan-200">
+              {detailVenue?.name} {currentRaceIndex >= 0 ? `${orderedRaces[currentRaceIndex].number}R` : ""}
+            </span>
+            <Button
+              variant="outline"
+              disabled={loading || !nextRace}
+              onClick={() => navigateRace(nextRace)}
+              aria-label={nextRace ? `次のレース・${nextRace.number}R` : "次のレースはありません"}
+              className="min-h-11 min-w-24 shrink-0 border-slate-600 bg-transparent text-slate-100 hover:bg-slate-800"
+            >
+              {nextRace ? `${nextRace.number}R` : "次のレース"}
+              <ChevronRight aria-hidden="true" className="size-4" />
+            </Button>
+          </nav>
           <AnalysisScreen
             data={data}
             activeHorse={activeHorse}
@@ -564,6 +601,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
               )
             }
           />
+          </>
         )}
       </div>
     </main>
