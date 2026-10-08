@@ -1,13 +1,12 @@
 {
-  "requested_at": "2026-09-28T02:25:11.909339+00:00",
+  "requested_at": "2026-10-08T01:07:26.736Z",
   "state": "requested",
-  "reason": "Resume six-lane backfill with result-page data; skip auxiliary odds requests and reuse verified Supabase archives",
-  "collection_scope": "results_win_odds_popularity",
-  "include_all_bet_odds": false,
-  "resume_from": "verified_supabase_v2_archives",
+  "reason": "Resume previously stopped all-bet odds collection; skip completed original full-odds archives",
+  "collection_scope": "all_bet_odds",
+  "include_all_bet_odds": true,
+  "resume_from": "verified_supabase_v1_full_odds_archives",
   "max_parallel": 6,
   "parser_version": 2,
-  "supersedes_run": 36369038815,
   "do_not_resume_run": 36251291777,
   "storage": "supabase"
 }
