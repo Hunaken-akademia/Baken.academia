@@ -91,6 +91,11 @@ jobs:
           --min-delay 3 --max-delay 3
           --permission-confirmed --continue-on-error --include-all-bet-odds
       - name: Package verified NAR result archive
+        if: steps.archive.outputs.exists != 'true' && env.ARCHIVE_DATASET == 'nar-results-win-odds-popularity-v3'
+        run: |
+          tar -czf "nar-${PERIOD}.tar.gz" "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.parquet" "data/raw/nar/nar-${YEAR}-${MONTH_PADDED}-${SUFFIX}.audit.json"
+          test -s "nar-${PERIOD}.tar.gz"
+      - name: Package verified NAR all-bet archive
         if: steps.archive.outputs.exists != 'true'
         run: |
           python -c 'import json, os; from pathlib import Path; p=Path("data/raw/nar") / ("nar-"+os.environ["YEAR"]+"-"+os.environ["MONTH_PADDED"]+"-"+os.environ["SUFFIX"]+".audit.json"); a=json.loads(p.read_text()); assert a["all_bet_odds_requested"] and not a["errors"] and not a["odds_errors"]; assert a["odds_pages"] == a["races"] * len(a["bet_types"]), a'
