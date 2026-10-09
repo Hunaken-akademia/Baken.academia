@@ -25,6 +25,9 @@ import { ownsHorizontalGesture } from "@/lib/touch-scroll";
 import { reasonViews } from "@/lib/feature-labels";
 import { longshotRoleOrder } from "@/lib/longshot-roles";
 import { roleOrder, type RoleKey, type Picks, type MarkPick } from "@/lib/marks";
+import type { Horse } from "@/lib/horse-types";
+import { HorseComparison } from "@/components/horse-comparison";
+import { HorseConditionDetails } from "@/components/horse-condition-details";
 import { PaceScenarioExplorer } from "@/components/pace-scenario-explorer";
 import { JockeyProfiles } from "@/components/jockey-profiles";
 import { PredictionJournal, HorseNotebook } from "@/components/prediction-journal";
@@ -35,63 +38,6 @@ import { ReinCloudProvider } from "@/components/rein-cloud-provider";
 import type { NarReference } from "@/lib/nar-validation";
 import type { JraRaceReference } from "@/lib/jra-reference";
 
-type HistoryFactor = {
-  label: string;
-  samples: number;
-  impact: number;
-  wins?: number;
-  top3?: number;
-  winRate?: number;
-  top3Rate?: number;
-  averageFinish?: number;
-};
-type Horse = {
-  probabilityKind?: "ranking-share";
-  horseId?: string;
-  number: number;
-  gate?: number;
-  name: string;
-  score: number;
-  odds: number | null;
-  popularity: number;
-  mark: string;
-  style: string;
-  verdict: string;
-  historyAdjustment?: number;
-  historySamples?: number;
-  positives: string[];
-  cautions: string[];
-  weight?: number;
-  weightChange?: number;
-  pedigree?: string;
-  jockey?: string;
-  jockeyId?: string;
-  trainer?: string;
-  age?: number;
-  sex?: string;
-  weightCarried?: number;
-  earlyPosition?: number | null;
-  recentPositions?: string[];
-  mapPositions?: string[];
-  paceAdjustment?: number;
-  marketScore?: number;
-  reinScore?: number;
-  firstProbability?: number;
-  secondProbability?: number;
-  thirdProbability?: number;
-  firstSuitability?: number;
-  secondSuitability?: number;
-  thirdSuitability?: number;
-  marketFirstProbability?: number | null;
-  reinMarketFirstProbability?: number | null;
-  historyFactors?: HistoryFactor[];
-  parameterFactors?: HistoryFactor[];
-  roleReasons?: {
-    first?: Array<{ feature: string; contribution: number }>;
-    second?: Array<{ feature: string; contribution: number }>;
-    third?: Array<{ feature: string; contribution: number }>;
-  };
-};
 type TicketTier = {
   group: "本線" | "対抗" | "穴";
   points: number;
@@ -928,7 +874,7 @@ function AnalysisScreen({
   onBack: () => void;
   onHorse: (horse: Horse) => void;
 }) {
-  return <ReinCloudProvider enabled={!!activeHorse}><AnalysisScreenContent data={data} activeHorse={activeHorse} danger={danger} loading={loading} onRetry={onRetry} onBack={onBack} onHorse={onHorse} /></ReinCloudProvider>;
+  return <ReinCloudProvider enabled={!!activeHorse}><AnalysisScreenContent key={data.race.raceId} data={data} activeHorse={activeHorse} danger={danger} loading={loading} onRetry={onRetry} onBack={onBack} onHorse={onHorse} /></ReinCloudProvider>;
 }
 
 function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, onBack, onHorse }: {
@@ -940,6 +886,12 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
   onBack: () => void;
   onHorse: (horse: Horse) => void;
 }) {
+  const [analysisTab, setAnalysisTab] = useState("prediction");
+  const analysisNav = useRef<HTMLDivElement>(null);
+  const changeAnalysisTab = (tab: string) => {
+    setAnalysisTab(tab);
+    requestAnimationFrame(() => analysisNav.current?.scrollIntoView({ block: "start" }));
+  };
   const finishers = data.review?.finishers ?? [];
   const guide = courseGuide(data.race);
   const insights = raceInsights(data);
@@ -965,7 +917,9 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
         </Badge>
       </div>
       {data.model && (
-        <section className="mb-4 flex flex-wrap gap-x-4 gap-y-1 rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-2 text-xs text-slate-400">
+        <details className="mb-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-2 text-xs text-slate-400">
+          <summary className="cursor-pointer py-1 font-semibold text-cyan-200">データの集計期間・予想の情報</summary>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 pb-2">
           <span className="font-semibold text-cyan-300">{data.race.league === "nar" ? data.model.release?.validatedRanking ? "地方専用・全量履歴 接続済み" : "地方の取得済み履歴・暫定版" : "8年履歴 接続済み"}</span>
           <span>
             {data.model.races.toLocaleString()}レース・
@@ -973,10 +927,10 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           </span>
           {data.model.overallPolicy && <span>{data.model.overallPolicy}</span>}
           <span>{data.model.strategy}</span>
-          {data.race.league === "nar" && <span>履歴：{data.model.dateFrom}〜{data.model.dateTo}</span>}
+          <span>履歴：{data.model.dateFrom}〜{data.model.dateTo}</span>
           {data.model.markPolicy && <span>印：{data.model.markPolicy}</span>}
           {data.prediction ? <span>{data.prediction.label}</span> : <span>{data.model.snapshotPolicy}</span>}
-        </section>
+        </div></details>
       )}
       {held.length > 0 && (
         <section className="mb-4 rounded-xl border border-amber-400/30 bg-amber-400/[.07] p-3 text-sm text-amber-100">
@@ -1021,15 +975,16 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           </CardContent>
         </Card>
       </section>
-      <Tabs key={data.race.raceId} defaultValue="prediction" onSwipeBack={onBack}>
-        <TabsList aria-label="レースの情報" className="sticky top-0 z-20 mb-4 grid h-auto min-h-12 w-full grid-cols-5 border border-slate-700 bg-[#0c192a] shadow-lg">
-          {[["prediction", "予想"], ["formation", "展開"], ["detail", "馬の詳細"], ["jockeys", "騎手"], ["review", "結果"]].map(([value, label]) => (
+      <div ref={analysisNav} />
+      <Tabs value={analysisTab} onValueChange={changeAnalysisTab} onSwipeBack={onBack}>
+        <TabsList aria-label="レースの情報" className="sticky top-0 z-20 mb-4 grid h-auto min-h-24 w-full grid-cols-3 border border-slate-700 bg-[#0c192a] shadow-lg sm:min-h-12 sm:grid-cols-6">
+          {[["prediction", "予想"], ["comparison", "比較"], ["formation", "展開"], ["detail", "馬の詳細"], ["jockeys", "騎手"], ["review", "結果"]].map(([value, label]) => (
             <TabsTrigger key={value} value={value} className="min-h-11 px-1 text-[11px] sm:text-sm">{label}</TabsTrigger>
           ))}
         </TabsList>
         <TabsContent value="prediction">
           <PickCards data={data} onHorse={onHorse} />
-        <div className="grid min-w-0 grid-cols-1 gap-4">
+        <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-3">
           <RaceConfidenceCard confidence={data.confidence} nar={data.race.league === "nar"} reference={data.narReference} />
           <Card className="border-slate-700 bg-[#0c192a] text-white">
             <CardContent className="flex gap-3 p-4">
@@ -1058,7 +1013,10 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
             </CardContent>
           </Card>
         </div>
-          <RaceIntelligence data={data} insights={insights} />
+          <details className="my-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4">
+            <summary className="cursor-pointer text-sm font-semibold">レース全体の分析・データ状況を見る</summary>
+            <RaceIntelligence data={data} insights={insights} />
+          </details>
           <h2 className="mb-3 text-lg font-bold">1〜3着適性</h2>
           {rolesReady ? (
             <RoleRankings horses={data.horses} onHorse={onHorse} />
@@ -1127,8 +1085,8 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
               );
             })}
           </div>
-          {rolesReady && <MarketReinComparison data={data} horses={listHorses} />}
-          {rankingReady && <OverallAssessment data={data} insights={insights} onHorse={onHorse} />}
+          {rolesReady && <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">人気とREINの評価差を見る</summary><MarketReinComparison data={data} horses={listHorses} /></details>}
+          {rankingReady && <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">総合評価の詳しい見方</summary><OverallAssessment data={data} insights={insights} onHorse={onHorse} /></details>}
           <details className="mt-5 rounded-xl border border-slate-700 bg-[#0c192a] p-4">
             <summary className="cursor-pointer font-bold">参考買い目を開く</summary>
             <div className="mt-4">
@@ -1174,6 +1132,10 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
             </div>
           </details>
         </TabsContent>
+        <TabsContent value="comparison" forceMount className="data-[state=inactive]:hidden">
+          <HorseComparison horses={data.horses} rolesReady={rolesReady} overallReady={rankingReady} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} league={data.race.league} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
+          <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">全頭の全項目を一覧で見る</summary><DetailedComparison data={data} horses={listHorses} /></details>
+        </TabsContent>
         <TabsContent value="formation">
           <PaceScenarioExplorer picks={data.picks} key={data.race.raceId} roleReady={rolesReady} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
           <RaceShapeReference data={data} />
@@ -1193,12 +1155,12 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
               </CardContent>
             </Card>
           ) : (
-            <div className="rounded-2xl border border-dashed border-slate-700 bg-[#0c192a] p-8 text-center text-slate-400">
-              全頭評価か着順適性から馬を選ぶと詳細診断を表示します
+            <div className="rounded-2xl border border-slate-700 bg-[#0c192a] p-4">
+              <p className="mb-3 text-sm text-slate-400">馬を選ぶと、当日情報・条件別成績・評価の根拠を確認できます。</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{[...data.horses].sort((a, b) => a.number - b.number).map(horse => <button key={horse.number} type="button" onClick={() => onHorse(horse)} className="min-h-11 rounded-lg border border-slate-700 px-3 py-2 text-left text-xs text-slate-200"><span className="mr-2 font-bold text-cyan-200">{horse.number}</span>{horse.name}</button>)}</div>
             </div>
           )}
-          <DetailedComparison data={data} horses={listHorses} />
-          <ConditionReferenceRankings data={data} />
+          <details className="my-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">条件別の参考ランキングを見る</summary><ConditionReferenceRankings data={data} /></details>
       <section className="mb-5 rounded-2xl border border-cyan-400/20 bg-[#0c192a] p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -2305,7 +2267,6 @@ function HorseDetails({ horse, data }: { horse: Horse; data: Analysis }) {
     value === undefined ? "未取得" : `${(value * 100).toFixed(1)}%`;
   return (
     <div>
-      <HorseNotebook horseId={horse.horseId} name={horse.name} />
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-lg font-bold sm:text-xl">
@@ -2329,31 +2290,6 @@ function HorseDetails({ horse, data }: { horse: Horse; data: Analysis }) {
         <span className="mr-2 font-bold text-cyan-300">REIN一言メモ</span>
         {horseMemo(horse, data)}
       </div>
-      {rolesReady ? (
-        <>
-          <MarketReinPanel horse={horse} horses={horses} />
-          <ParameterRadar horse={horse} horses={horses} />
-        </>
-      ) : null}
-      <section className="mt-4 rounded-xl border border-slate-800 bg-black/10 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="font-semibold text-slate-200">詳細データ</p>
-            <p className="mt-1 text-xs text-slate-500">モデル出力と当日情報を分けて表示</p>
-          </div>
-          <Badge className="bg-white/10 text-slate-300">{overallRank ? `総合 ${overallRank}位 / ${horses.length}頭` : "総合順位 保留"}</Badge>
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Metric label={horse.probabilityKind ? "1着評価シェア" : "1着推定確率"} value={rolesReady ? probability(horse.firstProbability) : "保留"} />
-          <Metric label={horse.probabilityKind ? "2着評価シェア" : "2着推定確率"} value={rolesReady ? probability(horse.secondProbability) : "保留"} />
-          <Metric label={horse.probabilityKind ? "3着評価シェア" : "3着推定確率"} value={rolesReady ? probability(horse.thirdProbability) : "保留"} />
-          <Metric label="従来方式の総合評価点" value={overallRank ? `${horse.reinScore ?? horse.score}pt` : "保留"} />
-          <Metric label="コース評価" value={`${parameters[3].value}pt`} />
-          <Metric label="近走状態" value={`${parameters[4].value}pt`} />
-          <Metric label="市場評価" value={horse.popularity > 0 ? `${horse.marketScore ?? "－"}pt` : "未発表"} />
-          <Metric label="履歴母数" value={`${horse.historySamples ?? 0}走`} />
-        </div>
-      </section>
       {rolesReady ? (
         <div className="mt-4 grid grid-cols-3 gap-2">
           <Metric label="1着適性" value={`${horse.firstSuitability ?? 0}pt`} />
@@ -2424,24 +2360,39 @@ function HorseDetails({ horse, data }: { horse: Horse; data: Analysis }) {
           )}
         </div>
       </div>
-      {horse.parameterFactors?.length || horse.historyFactors?.length ? (
-        <div className="mt-3 rounded-xl border border-slate-700 p-4">
-          <div className="mb-3">
-            <p className="text-sm font-semibold">{data.race.league === "nar" ? "取得済み地方履歴" : "8年履歴"}・項目別成績</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              通算・近走・芝ダ・距離・競馬場は馬自身、騎手・厩舎は該当人物の集計です。
-            </p>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {(horse.parameterFactors ?? horse.historyFactors ?? []).map((item) => (
-              <HistoryFactorCard key={item.label} item={item} relativeReference={data.race.league === "nar"} />
-            ))}
-          </div>
-          <p className="mt-3 text-[11px] leading-5 text-slate-600">
-            1〜2走は参考値です。母数が少ない項目だけで評価を決めず、着順適性・騎手・厩舎・枠傾向と合わせて総合評価しています。
-          </p>
-        </div>
+      <HorseConditionDetails horse={horse} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} />
+      <details className="mt-4 rounded-xl border border-slate-700 p-4">
+        <summary className="cursor-pointer text-sm font-semibold">評価の根拠・能力パラメーターを詳しく見る</summary>
+      {rolesReady ? (
+        <>
+          <MarketReinPanel horse={horse} horses={horses} />
+          <ParameterRadar horse={horse} horses={horses} />
+        </>
       ) : null}
+      <section className="mt-4 rounded-xl border border-slate-800 bg-black/10 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-slate-200">詳細データ</p>
+            <p className="mt-1 text-xs text-slate-500">モデル出力と当日情報を分けて表示</p>
+          </div>
+          <Badge className="bg-white/10 text-slate-300">{overallRank ? `総合 ${overallRank}位 / ${horses.length}頭` : "総合順位 保留"}</Badge>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Metric label={horse.probabilityKind ? "1着評価シェア" : "1着推定確率"} value={rolesReady ? probability(horse.firstProbability) : "保留"} />
+          <Metric label={horse.probabilityKind ? "2着評価シェア" : "2着推定確率"} value={rolesReady ? probability(horse.secondProbability) : "保留"} />
+          <Metric label={horse.probabilityKind ? "3着評価シェア" : "3着推定確率"} value={rolesReady ? probability(horse.thirdProbability) : "保留"} />
+          <Metric label="従来方式の総合評価点" value={overallRank ? `${horse.reinScore ?? horse.score}pt` : "保留"} />
+          <Metric label="コース評価" value={`${parameters[3].value}pt`} />
+          <Metric label="近走状態" value={`${parameters[4].value}pt`} />
+          <Metric label="市場評価" value={horse.popularity > 0 ? `${horse.marketScore ?? "－"}pt` : "未発表"} />
+          <Metric label="履歴母数" value={`${horse.historySamples ?? 0}走`} />
+        </div>
+      </section>
+      </details>
+      <details className="mt-4 rounded-xl border border-slate-700 p-4">
+        <summary className="cursor-pointer text-sm font-semibold">この馬のメモ</summary>
+        <HorseNotebook horseId={horse.horseId} name={horse.name} />
+      </details>
       {horse.trainer || horse.pedigree ? (
         <p className="mt-3 text-xs leading-5 text-slate-500">
           調教師：{horse.trainer || "取得中"}
@@ -2449,35 +2400,6 @@ function HorseDetails({ horse, data }: { horse: Horse; data: Analysis }) {
           血統：{horse.pedigree || "取得中"}
         </p>
       ) : null}
-    </div>
-  );
-}
-
-function HistoryFactorCard({ item, relativeReference = false }: { item: HistoryFactor; relativeReference?: boolean }) {
-  const reliability = item.samples >= 50
-    ? { label: "母数十分", style: "bg-emerald-400/10 text-emerald-300" }
-    : item.samples >= 10
-      ? { label: "参考可", style: "bg-amber-400/10 text-amber-300" }
-      : { label: "少数参考", style: "bg-slate-700 text-slate-300" };
-  const signed = `${item.impact > 0 ? "+" : ""}${item.impact}`;
-  return (
-    <div className="rounded-xl border border-slate-800 bg-black/10 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="font-semibold text-slate-200">{item.label}</p>
-        <Badge className={reliability.style}>{reliability.label}</Badge>
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-        <div><p className="text-[10px] text-slate-500">母数</p><p className="mt-0.5 text-sm font-bold">{item.samples}走</p></div>
-        <div><p className="text-[10px] text-slate-500">勝利</p><p className="mt-0.5 text-sm font-bold">{item.wins ?? "－"}勝</p></div>
-        <div><p className="text-[10px] text-slate-500">3着内</p><p className="mt-0.5 text-sm font-bold">{item.top3 ?? "－"}回</p></div>
-        <div><p className="text-[10px] text-slate-500">勝率</p><p className="mt-0.5 text-sm font-bold text-cyan-300">{item.winRate ?? "－"}%</p></div>
-        <div><p className="text-[10px] text-slate-500">3着内率</p><p className="mt-0.5 text-sm font-bold text-cyan-300">{item.top3Rate ?? "－"}%</p></div>
-        <div><p className="text-[10px] text-slate-500">平均着順</p><p className="mt-0.5 text-sm font-bold">{item.averageFinish ?? "－"}着</p></div>
-      </div>
-      <div className="mt-3 flex items-center justify-between border-t border-slate-800 pt-2 text-xs">
-        <span className="text-slate-500">{relativeReference ? "履歴の参考評価" : "参考評価"}</span>
-        <span className={item.impact >= 0 ? "font-bold text-cyan-300" : "font-bold text-rose-300"}>{signed}{relativeReference ? "pt" : ""}</span>
-      </div>
     </div>
   );
 }
