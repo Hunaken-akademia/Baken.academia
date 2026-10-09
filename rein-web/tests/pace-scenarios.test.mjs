@@ -5,7 +5,7 @@ import ts from 'typescript';
 const compile=n=>ts.transpileModule(readFileSync(new URL(`../lib/${n}.ts`,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
 const uri=c=>`data:text/javascript;base64,${Buffer.from(c).toString('base64')}`;
 const corner=compile('corner-reference').replace('"./corner-reference-model.json"',JSON.stringify(uri(`export default ${readFileSync(new URL('../lib/corner-reference-model.json',import.meta.url),'utf8')}`)));
-const {scenarioView,escapeCandidates,scenarioRanking}=await import(uri(compile('pace-scenarios').replace('"./corner-reference"',JSON.stringify(uri(corner))).replace('"./marks"',JSON.stringify(uri(compile('marks'))))));
+const {scenarioView,escapeCandidates,scenarioRanking,scenarioLeaders,scenarioComparison}=await import(uri(compile('pace-scenarios').replace('"./corner-reference"',JSON.stringify(uri(corner))).replace('"./marks"',JSON.stringify(uri(compile('marks'))))));
 const horses=[{number:1,name:'逃げ',style:'逃げ',popularity:1,mapPositions:['1-1-1-2']},{number:2,name:'先行',style:'先行',popularity:2,mapPositions:['2-2-2-3']},{number:3,name:'差し',style:'差し',popularity:8,mapPositions:['7-6-4-2']},{number:4,name:'不明',style:'不明',popularity:4,mapPositions:[]}];
 test('different pace assumptions change fit independently from popularity and model ranks',()=>{
  const before=JSON.stringify(horses),slow=scenarioView(horses,'lone',[1]),fast=scenarioView(horses,'duel',[1,2]);
@@ -28,4 +28,16 @@ test('conditional candidate rank changes for front and closer scenarios without 
  assert.deepEqual(scenarioRanking(h,'baseline',[1],true).map(r=>r.horse.number),[1,2,3,4]);
  assert.equal(JSON.stringify(h),before);assert.deepEqual(scenarioRanking(h,'lone',[1],false),[]);
  assert.deepEqual(scenarioRanking(h.map((v,i)=>({...v,firstProbability:i===0?undefined:v.firstProbability})),'lone',[1],true),[]);
+});
+test('six-column comparison uses reproducible per-scenario leaders and actual post-sort rank deltas',()=>{
+ const h=horses.map((h,i)=>({...h,firstProbability:.3-i*.04})),before=JSON.stringify(h),columns=scenarioComparison(h,[2,1],true);
+ assert.equal(columns.length,6);assert.deepEqual(columns[1].leaders,[2]);assert.deepEqual(columns[3].leaders,[2,1]);
+ for(const col of columns){assert.deepEqual(col.ranking,scenarioRanking(h,col.scenario.id,scenarioLeaders(h,col.scenario.id,[2,1]),true));assert.deepEqual(col.ranking.map(r=>r.rank),[1,2,3,4]);}
+ assert.equal(columns[5].ranking[0].horse.number,3);assert.equal(columns[5].ranking[0].baseRank-columns[5].ranking[0].rank,2);
+ assert.equal(JSON.stringify(h),before);
+ assert.deepEqual(scenarioRanking(h,'lone',[1,2],true),[]);assert.deepEqual(scenarioRanking(h,'duel',[1],true),[]);
+ assert.deepEqual(scenarioRanking(h.map((v,i)=>i?v:{...v,firstProbability:NaN}),'baseline',[],true),[]);
+ assert.deepEqual(scenarioRanking(h.map((v,i)=>i?v:{...v,firstProbability:1.01}),'baseline',[],true),[]);
+ const noFront=h.map(h=>({...h,style:'差し',mapPositions:['8-8-8-7']}));
+ assert.deepEqual(scenarioComparison(noFront,[],true)[3].ranking,[]);
 });

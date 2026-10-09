@@ -29,6 +29,7 @@ import type { Horse } from "@/lib/horse-types";
 import { HorseComparison } from "@/components/horse-comparison";
 import { HorseConditionDetails } from "@/components/horse-condition-details";
 import { PaceScenarioExplorer } from "@/components/pace-scenario-explorer";
+import { PreviousRaceComparison, RaceDayTrends } from "@/components/race-context-panels";
 import { JockeyProfiles } from "@/components/jockey-profiles";
 import { PredictionJournal, HorseNotebook } from "@/components/prediction-journal";
 import { MarketRankMap } from "@/components/market-rank-map";
@@ -1137,6 +1138,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">全頭の全項目を一覧で見る</summary><DetailedComparison data={data} horses={listHorses} /></details>
         </TabsContent>
         <TabsContent value="formation">
+          <RaceDayTrends race={data.race} />
           <PaceScenarioExplorer picks={data.picks} key={data.race.raceId} roleReady={rolesReady} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
           <RaceShapeReference data={data} />
         </TabsContent>
@@ -2360,6 +2362,7 @@ function HorseDetails({ horse, data }: { horse: Horse; data: Analysis }) {
           )}
         </div>
       </div>
+      <PreviousRaceComparison horse={horse} race={data.race} />
       <HorseConditionDetails horse={horse} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} />
       <details className="mt-4 rounded-xl border border-slate-700 p-4">
         <summary className="cursor-pointer text-sm font-semibold">評価の根拠・能力パラメーターを詳しく見る</summary>
