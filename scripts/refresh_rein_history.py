@@ -2,7 +2,7 @@
 Runs only in the authorized model-publishing workflow. No model retraining.
 """
 from pathlib import Path
-import argparse, asyncio, hashlib, json, os, tarfile, urllib.request
+import argparse, asyncio, hashlib, json, os, tarfile, time, urllib.error, urllib.request
 from datetime import datetime,timedelta,timezone
 import pandas as pd
 from baken_academia import jra_backfill
@@ -13,11 +13,30 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def open_with_retry(request, timeout):
+    """Retry transient read failures without hiding permanent authentication errors."""
+    for attempt in range(5):
+        try:
+            return urllib.request.urlopen(request, timeout=timeout)
+        except urllib.error.HTTPError as error:
+            if error.code not in {408, 429, 500, 502, 503, 504} or attempt == 4:
+                raise
+            reason = f"HTTP {error.code}"
+        except (urllib.error.URLError, TimeoutError) as error:
+            if attempt == 4:
+                raise
+            reason = type(error).__name__
+        delay = 2 ** (attempt + 1)
+        # Never log request URLs or headers: signed URLs and tokens are credentials.
+        print(f"Transient history read failure ({reason}); retry {attempt + 1}/4 in {delay}s", flush=True)
+        time.sleep(delay)
+
+
 def broker(body):
     token_req=urllib.request.Request(os.environ['ACTIONS_ID_TOKEN_REQUEST_URL']+'&audience=rein-supabase-model-v1',headers={'Authorization':'Bearer '+os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
-    with urllib.request.urlopen(token_req,timeout=30) as r:token=json.load(r)['value']
+    with open_with_retry(token_req,timeout=30) as r:token=json.load(r)['value']
     req=urllib.request.Request(os.environ['SUPABASE_BROKER_URL'],data=json.dumps(body).encode(),headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'})
-    with urllib.request.urlopen(req,timeout=30) as r:return json.load(r)
+    with open_with_retry(req,timeout=30) as r:return json.load(r)
 
 
 def merge_history(base, fresh, start, end):
@@ -39,7 +58,7 @@ async def main():
     if start>end:
         summary['status']='unchanged';(out/'summary.json').write_text(json.dumps(summary,indent=2));return
     if (end-start).days>45:raise ValueError('History gap exceeds bounded refresh window')
-    with urllib.request.urlopen(active['bundle_url'],timeout=60) as r:bundle=r.read()
+    with open_with_retry(active['bundle_url'],timeout=60) as r:bundle=r.read()
     if hashlib.sha256(bundle).hexdigest()!=model['artifact_sha256']:raise ValueError('Active bundle checksum mismatch')
     archive=out/'active.tar.gz';archive.write_bytes(bundle)
     extracted=out/'base';extracted.mkdir(exist_ok=True)
