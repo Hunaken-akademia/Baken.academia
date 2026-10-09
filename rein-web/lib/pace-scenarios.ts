@@ -40,6 +40,9 @@ export function scenarioView(horses:ScenarioHorse[],id:PaceScenarioId,leaders:nu
 // A transparent scenario illustration, not fitted probabilities or model updates.
 export function scenarioRanking(horses:ScenarioHorse[],id:PaceScenarioId,leaders:number[],roleReady:boolean){
  if(!roleReady)return [];
+ if(horses.some(h=>typeof h.firstProbability!=="number"||!Number.isFinite(h.firstProbability)||h.firstProbability<0||h.firstProbability>1))return [];
+ const validLeaders=[...new Set(leaders.filter(n=>horses.some(h=>h.number===n)))];
+ if(id==="lone"&&validLeaders.length!==1||id==="duel"&&validLeaders.length<2)return [];
  const base=roleOrder(horses,"first");if(base.length!==horses.length)return [];
  const view=scenarioView(horses,id,leaders),chosen=new Set(leaders);
  return base.map((horse,i)=>{
@@ -53,4 +56,16 @@ export function scenarioRanking(horses:ScenarioHorse[],id:PaceScenarioId,leaders
   }
   return {horse,baseRank:i+1,referenceScore:i+1+shift,shift,reason:row.reason};
  }).sort((a,b)=>a.referenceScore-b.referenceScore||a.baseRank-b.baseRank).map((row,i)=>({...row,rank:i+1}));
+}
+
+// Explicit, reproducible assumptions for comparing mutually exclusive scenarios.
+export function scenarioLeaders(horses:ScenarioHorse[],id:PaceScenarioId,selected:number[]){
+ const chosen=[...new Set(selected.filter(n=>horses.some(h=>h.number===n)))];
+ const candidates=escapeCandidates(horses).map(h=>h.number);
+ if(id==="lone")return (chosen.length?chosen:candidates).slice(0,1);
+ if(id==="duel"&&chosen.length<2)return [...new Set([...chosen,...candidates])].slice(0,2);
+ return chosen;
+}
+export function scenarioComparison(horses:ScenarioHorse[],selected:number[],roleReady:boolean){
+ return PACE_SCENARIOS.map(scenario=>{const leaders=scenarioLeaders(horses,scenario.id,selected);return {scenario,leaders,ranking:scenarioRanking(horses,scenario.id,leaders,roleReady)};});
 }

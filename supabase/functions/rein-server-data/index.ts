@@ -163,6 +163,17 @@ Deno.serve(async req => {
    summaryCache.clear();
    return json({saved});
   }
+  if (action === "race-context") {
+   if (typeof b.raceId !== "string" || !["jra","nar"].includes(b.league) || !(b.league === "nar" ? /^20\d{8}(?:0[1-9]|1[0-2])$/ : /^\d{8}(?:0[1-9]|1[0-2])$/).test(b.raceId)) return json({error:"Invalid race"},400);
+   const targets = checked(await admin.from("rein_race_snapshots").select("race_id,race_date,payload,starts_at,slot").eq("race_id",b.raceId).in("slot",["live","preview"]).limit(2));
+   const target = targets.find((s:any)=>s.slot === "live") ?? targets[0];
+   if (!target) return json({error:"Snapshot unavailable"},404);
+   const rows = checked(await admin.from("rein_race_snapshots").select("race_id,race_date,starts_at,captured_at,is_final,race:payload->race,horses:payload->horses,review:payload->review").eq("race_date",target.race_date).eq("slot","live").like("race_id",b.raceId.slice(0,-2)+"%").lt("race_id",b.raceId).order("race_id").limit(11));
+   return json({
+    target:{raceId:target.race_id,date:target.race_date,course:target.payload.race.course,startsAt:target.starts_at?Date.parse(target.starts_at):null,horses:target.payload.horses.map((h:any)=>({number:h.number,horseId:h.horseId,name:h.name}))},
+    races:rows.map((r:any)=>({raceId:r.race_id,date:r.race_date,title:r.race?.title??"",course:r.race?.course??"",condition:r.race?.condition??"未取得",startsAt:r.starts_at?Date.parse(r.starts_at):null,capturedAt:r.captured_at,isFinished:r.is_final&&r.review?.isFinished===true,horses:(r.horses??[]).map((h:any)=>({number:h.number,gate:h.gate,style:h.style})),finishers:(r.review?.finishers??[]).map((f:any)=>({number:f.number,finish:f.finish}))})),
+   });
+  }
   if (action === "read") {
    if (!raceIdValid(b.raceId)||!["live","preview","prestart"].includes(b.slot)) return json({error:"Invalid race"},400);
    const snapshot = checked(await admin.from("rein_race_snapshots").select("payload,generated_at,starts_at,is_final,slot,captured_at").eq("race_id",b.raceId).eq("slot",b.slot).maybeSingle());
