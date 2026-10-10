@@ -22,7 +22,12 @@ function moduleUrl(name){const source=fs.readFileSync(path.join(web,'lib',name+'
  await new Promise(r=>server.listen(8150,'127.0.0.1',r));
  const {chromium}=require(require.resolve('playwright',{paths:[process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES]})),browser=await chromium.launch({headless:true,...(process.env.JRA_QA_CHROMIUM?{executablePath:process.env.JRA_QA_CHROMIUM}:{}),args:['--no-sandbox','--disable-dev-shm-usage']});
  try{const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];page.on('pageerror',e=>errors.push(String(e)));await page.goto('http://127.0.0.1:8150');await page.getByText(fixtureVenue).first().click();await page.getByText(fixtureName).first().click();await page.getByRole('tab', {name:'予想',exact:true}).waitFor();
+ await page.getByTestId('graded-history').waitFor();
  assert.equal(await page.getByTestId('race-replay').count(),0);
+ await page.getByTestId('graded-history').getByRole('button',{name:/この年をヒントに展開を比較/}).click();
+ assert.equal(await page.getByRole('tab',{name:'展開',exact:true}).getAttribute('aria-selected'),'true');
+ await page.getByText('参考にした過去開催',{exact:true}).waitFor();
+ await page.getByRole('tab',{name:'予想',exact:true}).click();
  for(const tab of ['展開','馬の詳細','騎手','結果','予想']) {
    await page.getByRole('tab',{name:tab,exact:true}).click();
    assert.equal(await page.getByRole('tab',{name:tab,exact:true}).getAttribute('aria-selected'),'true');
@@ -54,7 +59,7 @@ function moduleUrl(name){const source=fs.readFileSync(path.join(web,'lib',name+'
      assert.equal(await page.getByLabel("レースの進行位置").inputValue(),"0");
      await explorer.locator('[data-scenario="baseline"]').click();
      await page.getByTestId('race-replay').waitFor();await page.getByRole('button',{name:'再生',exact:true}).click();await page.getByRole('button',{name:'一時停止',exact:true}).click();}
-   if(tab==='馬の詳細') {await page.getByLabel('詳細を見る馬').selectOption('3');await page.getByText('定例重賞・過去傾向').waitFor();}
+   if(tab==='馬の詳細') {await page.getByLabel('詳細を見る馬').selectOption('3');assert.equal(await page.getByTestId('graded-history').count(),0);}
    if(tab==='騎手') {
  await page.setViewportSize({width:390,height:844});
  const wrapper=page.getByRole('table').filter({has:page.getByText('出走馬・騎手の比較（横にスクロール）',{exact:true})}).locator('..');

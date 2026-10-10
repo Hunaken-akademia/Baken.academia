@@ -28,6 +28,9 @@ import { roleOrder, type RoleKey, type Picks, type MarkPick } from "@/lib/marks"
 import type { Horse } from "@/lib/horse-types";
 import { HorseComparison } from "@/components/horse-comparison";
 import { HorseConditionDetails } from "@/components/horse-condition-details";
+import dynamic from "next/dynamic";
+const GradedRaceHistory = dynamic(() => import("@/components/graded-race-history").then(m => m.GradedRaceHistory), {loading: () => <p className="mb-5 p-4 text-sm text-slate-400">重賞の過去傾向を読み込み中…</p>});
+import type { PaceScenarioId } from "@/lib/pace-scenarios";
 import { PaceScenarioExplorer } from "@/components/pace-scenario-explorer";
 import { PreviousRaceComparison, RaceDayTrends } from "@/components/race-context-panels";
 import { JockeyProfiles } from "@/components/jockey-profiles";
@@ -888,6 +891,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
   onHorse: (horse: Horse) => void;
 }) {
   const [analysisTab, setAnalysisTab] = useState("prediction");
+  const [historicalScenario, setHistoricalScenario] = useState<{id:PaceScenarioId;label:string;version:number}|null>(null);
   const analysisNav = useRef<HTMLDivElement>(null);
   const changeAnalysisTab = (tab: string) => {
     setAnalysisTab(tab);
@@ -984,6 +988,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           ))}
         </TabsList>
         <TabsContent value="prediction">
+          {data.jraReference?.graded && <GradedRaceHistory graded={data.jraReference.graded} currentYear={data.race.raceId.length===10?2000+Number(data.race.raceId.slice(0,2)):Number(data.race.raceId.slice(0,4))} onSimulate={(id,label)=>{setHistoricalScenario(old=>({id,label,version:(old?.version??0)+1}));changeAnalysisTab("formation");}} />}
           <PickCards data={data} onHorse={onHorse} />
         <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-3">
           <RaceConfidenceCard confidence={data.confidence} nar={data.race.league === "nar"} reference={data.narReference} />
@@ -1138,8 +1143,8 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">全頭の全項目を一覧で見る</summary><DetailedComparison data={data} horses={listHorses} /></details>
         </TabsContent>
         <TabsContent value="formation">
+          <PaceScenarioExplorer picks={data.picks} initialScenario={historicalScenario?.id} historicalContext={historicalScenario?.label} key={`${data.race.raceId}:${historicalScenario?.version??0}`} roleReady={rolesReady} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
           <RaceDayTrends race={data.race} />
-          <PaceScenarioExplorer picks={data.picks} key={data.race.raceId} roleReady={rolesReady} horses={data.horses} title={data.race.title} course={data.race.course} raceId={data.race.raceId} pace={data.pace.label} league={data.race.league} />
           <RaceShapeReference data={data} />
         </TabsContent>
         <TabsContent value="detail">
@@ -1188,37 +1193,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
 
 
       </section>
-      {data.jraReference?.graded && <section className="mb-5 min-w-0 rounded-2xl border border-amber-400/25 bg-gradient-to-br from-[#151d2b] to-[#0c192a] p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-widest text-amber-300">定例重賞・過去傾向</p>
-            <h2 className="mt-1 break-words text-lg font-bold">{data.jraReference.graded.grade}・{data.jraReference.graded.name}</h2>
-          </div>
-          <Badge className="bg-amber-400/10 text-amber-200">当年を除く直近{data.jraReference.graded.editions}回</Badge>
-        </div>
-        <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {[
-            ["1番人気の勝利",data.jraReference.graded.favoriteWinRate],
-            ["1〜3番人気の勝利",data.jraReference.graded.top3PopularityWinRate],
-            ["6番人気以下の勝利",data.jraReference.graded.sixPlusWinRate],
-            ["10番人気以下が3着内",data.jraReference.graded.tenPlusPlacedRate],
-            ["1〜4枠の勝利",data.jraReference.graded.innerGateWinRate],
-          ].map(([label,value])=><div key={String(label)} className="min-w-0 rounded-xl border border-slate-800 bg-black/15 p-3">
-            <p className="text-xs text-slate-400">{String(label)}</p><p className="mt-1 text-xl font-bold text-white">{typeof value==="number"?`${(value*100).toFixed(1)}%`:"母数不足"}</p>
-          </div>)}
-        </div>
-        <p className="mt-3 text-sm leading-6 text-slate-300">勝ち馬が最初の通過地点で3番手以内：{typeof data.jraReference.graded.frontWinRate==="number"?`${(data.jraReference.graded.frontWinRate*100).toFixed(1)}%（通過順あり${data.jraReference.graded.frontSamples}回）`:"母数不足"}。</p>
-        {(data.jraReference.graded.venueChanges||data.jraReference.graded.courseChanges)&&<p className="mt-1 text-xs leading-5 text-amber-200">開催場・距離の変更年を含みます。各年の条件は下の一覧に併記しています。</p>}
-        <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {data.jraReference.graded.recent.map(edition=><div key={edition.date} className="min-w-0 rounded-xl border border-slate-800 bg-[#0b1727] p-3 text-xs leading-5">
-            <p className="font-bold text-slate-100">{edition.year}年・{edition.venue}</p>
-            <p className="text-slate-400">{edition.surface}{edition.distanceM}m・{edition.going}</p>
-            <p className="mt-1 text-slate-300">勝ち馬 {edition.winnerPopularity?`${edition.winnerPopularity}番人気`:"人気不明"}</p>
-            <p className="break-words text-slate-500">3着内人気 {edition.placedPopularities.length?edition.placedPopularities.join("・"):"不明"}</p>
-          </div>)}
-        </div>
-        <p className="mt-3 text-xs leading-5 text-slate-500">{data.jraReference.graded.yearFrom}〜{data.jraReference.graded.yearTo}年から集計。当年結果は含めません。過去傾向であり、今回の的中確率や買い推奨ではありません。</p>
-      </section>}
+
         </TabsContent>
         <TabsContent value="jockeys">
           <JockeyProfiles key={data.race.raceId} title={data.race.title} course={data.race.course} league={data.race.league} horses={data.horses} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} />
