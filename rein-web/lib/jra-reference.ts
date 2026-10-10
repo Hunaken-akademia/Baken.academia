@@ -1,19 +1,22 @@
 type Rate={samples:number;hits:number;rate:number|null};
 type Period={races:number;winners:number;favoriteWinner:Rate;top3PopularityWinner:Rate;tenPlusWinner:Rate;frontWinner:Rate};
 type Condition={kind:string;key:string;selection:Period;audit:Period};
-export type Edition={date:string;year:number;venue:string;grade:string;surface:string;distanceM:number;going:string;fieldSize:number;winnerPopularity:number|null;winnerGate:number|null;winnerFirstCorner:number|null;placedPopularities:number[];placedFirstCorners:number[]};
+export type Edition={officialName?:string;sourceUrl?:string;date:string;year:number;venue:string;grade:string;surface:string;distanceM:number;going:string;fieldSize:number;winnerPopularity:number|null;winnerGate:number|null;winnerFirstCorner:number|null;placedPopularities:number[];placedFirstCorners:number[]};
 type GradedRace={key:string;name:string;grades:string[];editions:Edition[]};
 export type JraReferenceData={version:string;periods:{selection:string;audit:string};coverage:{dateFrom:string;dateTo:string;races:number;racecourses:number};minimumRacesPerYear:number;conditions:Condition[];gradedRaces:GradedRace[];limitations:string[]};
 export type JraRaceReference=ReturnType<typeof jraReferenceForRace>;
 
 const venues=["札幌","函館","福島","新潟","東京","中山","中京","京都","阪神","小倉"];
 const pct=(value:number|null|undefined)=>typeof value==="number"?`${(value*100).toFixed(1)}%`:"母数不足";
-const rate=(hits:number,samples:number)=>samples?hits/samples:null;
+const rate=(hits:number,samples:number)=>samples>=5?hits/samples:null;
 export function jraRaceNameKey(value:string){
-  let text=value.normalize("NFKC").replace(/第\s*\d+\s*回/g,"").replace(/[（(]\s*(?:G|JPN)\s*(?:[123]|I{1,3})\s*[)）]/gi,"")
+  let text=value.normalize("NFKC").replace(/^(?:札幌|函館|福島|新潟|東京|中山|中京|京都|阪神|小倉)\s*\d{1,2}\s*R\s*/i,"").replace(/\s*(?:J[・･.]?\s*G|G|JPN)\s*(?:[123]|I{1,3})\s*$/i,"").replace(/第\s*\d+\s*回/g,"").replace(/[（(]\s*(?:J[・･.]?\s*G|G|JPN)\s*(?:[123]|I{1,3})\s*[)）]/gi,"")
+    .replace(/^(?:J[・･.]?\s*)?G\s*(?:[123]|I{1,3})\s*/i,"")
+    .replace(/^(?:農林水産省賞典|日刊スポーツ賞|スポーツニッポン賞|KBS京都賞|MBS賞|サンケイスポーツ杯|サンケイスポーツ賞|テレビ東京杯|テレビ西日本賞|フジテレビ賞|中日スポーツ賞|北海道新聞杯|報知杯|ローレル競馬場賞|産経賞|夕刊フジ賞|関西テレビ放送賞|読売)/,"")
+    .replace(/^朝日杯(?=セントライト)/,"").replace(/^ラジオNIKKEI杯(?=京都2歳)/,"")
     .replace(/天皇賞[（(](春|秋)[)）]/g,"天皇賞$1").replace(/東京優駿[（(]日本ダービー[)）]/g,"東京優駿").replace(/優駿牝馬[（(]オークス[)）]/g,"優駿牝馬").replace(/[（(][^()（）]*[)）]/g,"");
-  text=text.replaceAll("日本ダービー","東京優駿").replaceAll("オークス","優駿牝馬");
-  for(const [full,short] of [["アメリカジョッキークラブカップ","AJCC"],["ニュージーランドトロフィー","NZT"],["京王杯スプリングカップ","京王杯SC"],["フューチュリティステークス","FS"],["ジュベナイルフィリーズ","JF"],["ジュベナイルF","JF"],["フィリーズレビュー","FR"],["フューチュリティS","FS"],["アメリカJCC","AJCC"],["ステークス","S"],["カップ","C"]])text=text.replaceAll(full,short);
+  text=text.replaceAll("弥生賞ディープインパクト記念","弥生賞").replaceAll("日本ダービー","東京優駿").replaceAll("オークス","優駿牝馬");
+  for(const [full,short] of [["アメリカジョッキークラブカップ","AJCC"],["ニュージーランドトロフィー","NZT"],["ニュージーランドT","NZT"],["京王杯スプリングカップ","京王杯SC"],["京王杯スプリングC","京王杯SC"],["フューチュリティステークス","FS"],["ジュベナイルフィリーズ","JF"],["ジュベナイルF","JF"],["フィリーズレビュー","FR"],["フューチュリティS","FS"],["アメリカJCC","AJCC"],["ステークス","S"],["カップ","C"],["トロフィー","T"],["京成杯オータムH","京成杯オータムハンデキャップ"],["東スポ杯2歳S","東京スポーツ杯2歳S"]])text=text.replaceAll(full,short);
   return text.replace(/\s+/g,"").trim();
 }
 export function jraDistanceBand(distanceM:number){return distanceM<1400?"short":distanceM<=1800?"mile":distanceM<=2400?"middle":"long";}
@@ -32,7 +35,7 @@ function conditionDetail(entry:Condition|undefined){
 function gradedTrend(race:GradedRace|undefined,currentYear:number){
   if(!race)return null;
   const editions=race.editions.filter(item=>item.year<currentYear).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
-  if(editions.length<5)return null;
+  if(!editions.length)return null;
   const knownWinners=editions.filter(item=>item.winnerPopularity!==null),front=editions.filter(item=>item.winnerFirstCorner!==null),knownGates=editions.filter(item=>item.winnerGate!==null);
   const favorite=knownWinners.filter(item=>item.winnerPopularity===1).length;
   const top3=knownWinners.filter(item=>(item.winnerPopularity??99)<=3).length;
@@ -52,7 +55,25 @@ export function jraReferenceForRace(data:JraReferenceData,input:{raceName:string
   if(data.version!=="jra-condition-reference-v1"||!venues.includes(input.venue)||!input.distanceM)return null;
   const kinds=[{kind:"course",label:"競馬場"},{kind:"courseDistance",label:"距離"},{kind:"courseGoing",label:"今回の条件"}];
   const conditions=kinds.map(item=>{const key=jraConditionKey(input.venue,input.surface,input.distanceM,input.going,item.kind);return {...item,key,detail:conditionDetail(data.conditions.find(c=>c.kind===item.kind&&c.key===key))};});
-  const graded=gradedTrend(data.gradedRaces.find(r=>r.key===jraRaceNameKey(input.raceName)),input.year);
+  const graded=gradedTrend(data.gradedRaces.find(r=>r.key===jraGradedRaceKey(input.raceName,input.year)),input.year);
   return {version:data.version,auditPeriod:data.periods.audit,coverage:data.coverage,conditions,graded,
     validation:{summary:"追加候補4種（左右回り適性・道悪適性・馬場状態適性・近3走上がり）は、2025年の安定性と2026年の確認を1〜3着すべてでは満たさず、追加補正は見送り。条件別の数字は傾向表示に使用します。",note:"現行の競馬場・距離・馬場履歴は既存評価内で継続。表示値は確定人気による事後集計で、今回の的中確率・回収率ではありません。"}};
+}
+
+/** Display-only enrichment of saved cards; never recompute or mutate their prediction. */
+export function gradedHistoryForRace(data:JraReferenceData,race:{league?:string;title:string;raceId:string}) {
+  if(race.league==="nar"||data.version!=="jra-condition-reference-v1")return null;
+  const currentYear=/^\d{10}$/.test(race.raceId)?2000+Number(race.raceId.slice(0,2)):/^\d{12}$/.test(race.raceId)?Number(race.raceId.slice(0,4)):NaN;
+  if(!Number.isInteger(currentYear)||currentYear<2000||currentYear>2100)return null;
+  const graded=gradedTrend(data.gradedRaces.find(r=>r.key===jraGradedRaceKey(race.title,currentYear)),currentYear);
+  return graded?{graded,currentYear}:null;
+}
+
+/** JRA's 2025 renaming: reused names must be interpreted in the card's year. */
+export function jraGradedRaceKey(title:string,year:number) {
+ const key=jraRaceNameKey(title);
+ const reused:Record<string,string>={"愛知杯":"小倉牝馬S","東海S":"プロキオンS","プロキオンS":"東海S","府中牝馬S":"アイルランドT"};
+ if(year<2025&&reused[key])return reused[key];
+ const former:Record<string,string>={"アイルランドT府中牝馬S":"アイルランドT","京都牝馬S":"愛知杯","マーメイドS":"府中牝馬S","アーリントンC":"チャーチルダウンズC","小倉2歳S":"中京2歳S","小倉サマージャンプ":"小倉ジャンプS"};
+ return former[key]??key;
 }

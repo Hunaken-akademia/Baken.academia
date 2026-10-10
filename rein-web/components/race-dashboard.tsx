@@ -29,7 +29,8 @@ import type { Horse } from "@/lib/horse-types";
 import { HorseComparison } from "@/components/horse-comparison";
 import { HorseConditionDetails } from "@/components/horse-condition-details";
 import dynamic from "next/dynamic";
-const GradedRaceHistory = dynamic(() => import("@/components/graded-race-history").then(m => m.GradedRaceHistory), {loading: () => <p className="mb-5 p-4 text-sm text-slate-400">重賞の過去傾向を読み込み中…</p>});
+const GradedRaceHistory = dynamic(() => import("@/components/graded-race-history").then(m => m.SavedGradedRaceHistory), {loading: () => <p className="mb-5 p-4 text-sm text-slate-400">重賞の過去傾向を読み込み中…</p>});
+import { hasGradedRaceHistory } from "@/lib/graded-race-catalog";
 import type { PaceScenarioId } from "@/lib/pace-scenarios";
 import { PaceScenarioExplorer } from "@/components/pace-scenario-explorer";
 import { PreviousRaceComparison, RaceDayTrends } from "@/components/race-context-panels";
@@ -988,7 +989,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           ))}
         </TabsList>
         <TabsContent value="prediction">
-          {data.jraReference?.graded && <GradedRaceHistory graded={data.jraReference.graded} currentYear={data.race.raceId.length===10?2000+Number(data.race.raceId.slice(0,2)):Number(data.race.raceId.slice(0,4))} onSimulate={(id,label)=>{setHistoricalScenario(old=>({id,label,version:(old?.version??0)+1}));changeAnalysisTab("formation");}} />}
+          {hasGradedRaceHistory(data.race) && <GradedRaceHistory race={data.race} onSimulate={(id,label)=>{setHistoricalScenario(old=>({id,label,version:(old?.version??0)+1}));changeAnalysisTab("formation");}} />}
           <PickCards data={data} onHorse={onHorse} />
         <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-3">
           <RaceConfidenceCard confidence={data.confidence} nar={data.race.league === "nar"} reference={data.narReference} />

@@ -72,7 +72,8 @@ def parse_result(doc, edition, url):
     courses = doc.xpath("//div[contains(concat(' ',normalize-space(@class),' '),' course ')]")
     course = unicodedata.normalize("NFKC", text(courses[0])) if courses else ""
     distance = re.search(r"([\d,]+)メートル", course)
-    surface = "芝" if "芝" in course else "ダート" if "ダート" in course else None
+    categories = doc.xpath("//div[contains(concat(' ',normalize-space(@class),' '),' category ')]")
+    surface = "障害" if any("障害" in text(n) for n in categories) else "芝" if "芝" in course else "ダート" if "ダート" in course else None
     if not re.search(fr"回{re.escape(edition["venue"])}\d+日", value) or not distance or int(distance[1].replace(",", "")) != edition["distanceM"] or surface != edition["surface"]:
         raise ValueError("Result course mismatch")
     conditions = doc.xpath("//div[contains(concat(' ',normalize-space(@class),' '),' baba ')]//li[@class='turf' or @class='durt']//span[@class='txt']")
@@ -95,10 +96,10 @@ def parse_result(doc, edition, url):
         if finish not in ("1", "2", "3"):
             continue
         name, number, corners = cell("horse"), cell("num"), cell("corner")
-        if not name or not number or not corners:
+        if not name or not number:
             continue
-        positions = [int(text(li)) for li in corners[0].xpath(".//li") if text(li).isdigit()]
-        stages = [li.get("title", "") for li in corners[0].xpath(".//li") if text(li).isdigit()]
+        positions = [int(text(li)) for li in (corners[0].xpath(".//li") if corners else []) if text(li).isdigit()]
+        stages = [li.get("title", "") for li in (corners[0].xpath(".//li") if corners else []) if text(li).isdigit()]
         if any(n < 1 or n > field_size for n in positions):
             raise ValueError("Invalid passing order")
         runners.append({"finish": int(finish), "number": int(text(number[0])), "name": text(name[0]), "corners": positions, "stages": stages})
