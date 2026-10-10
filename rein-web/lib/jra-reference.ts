@@ -1,7 +1,7 @@
 type Rate={samples:number;hits:number;rate:number|null};
 type Period={races:number;winners:number;favoriteWinner:Rate;top3PopularityWinner:Rate;tenPlusWinner:Rate;frontWinner:Rate};
 type Condition={kind:string;key:string;selection:Period;audit:Period};
-type Edition={date:string;year:number;venue:string;grade:string;surface:string;distanceM:number;going:string;fieldSize:number;winnerPopularity:number|null;winnerGate:number|null;winnerFirstCorner:number|null;placedPopularities:number[];placedFirstCorners:number[]};
+export type Edition={date:string;year:number;venue:string;grade:string;surface:string;distanceM:number;going:string;fieldSize:number;winnerPopularity:number|null;winnerGate:number|null;winnerFirstCorner:number|null;placedPopularities:number[];placedFirstCorners:number[]};
 type GradedRace={key:string;name:string;grades:string[];editions:Edition[]};
 export type JraReferenceData={version:string;periods:{selection:string;audit:string};coverage:{dateFrom:string;dateTo:string;races:number;racecourses:number};minimumRacesPerYear:number;conditions:Condition[];gradedRaces:GradedRace[];limitations:string[]};
 export type JraRaceReference=ReturnType<typeof jraReferenceForRace>;
