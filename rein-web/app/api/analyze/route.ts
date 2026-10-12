@@ -32,6 +32,8 @@ import {
   snapshotTtlSeconds,
 } from "@/lib/analysis-cache";
 import { fetchSource } from "@/lib/source-fetch";
+import { ageTypeFromText } from "@/lib/odds-trends";
+import { captureOddsTrends } from "@/lib/odds-trends-server";
 import {
   failureCacheHeaders,
   readFailure,
@@ -297,6 +299,7 @@ async function storeAnalysis(response: Response, raceId: string, preview: boolea
     let persisted = false;
     try { persisted = (await saveSnapshot(body, preview)).saved; }
     catch (error) { console.error("REIN durable write failed", error instanceof Error ? error.message : "unknown"); }
+    if (persisted && !preview) waitUntil(captureOddsTrends(body).catch(() => { console.warn("REIN odds trend capture unavailable"); }));
     try {
       const ttl = snapshotTtlSeconds(meta);
       await Promise.all([
@@ -979,6 +982,7 @@ async function analyze(request: NextRequest) {
       jraReference,
       race: {
         title,
+        context: { ageType: ageTypeFromText(full) },
         course,
         condition: going,
         start,

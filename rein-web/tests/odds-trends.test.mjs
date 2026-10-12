@@ -1,0 +1,59 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const uri=code=>'data:text/javascript;base64,'+Buffer.from(code).toString('base64');
+const compile=p=>ts.transpileModule(readFileSync(new URL(p,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+const code=compile('../lib/odds-trends.ts').replace(/import catalog from "\.\/odds-trend-catalog.json";/,`const catalog=${readFileSync(new URL('../lib/odds-trend-catalog.json',import.meta.url),'utf8')};`);
+const core=await import(uri(code));
+const market=await import(uri(compile('../lib/odds-trend-market.ts')));
+const record=await import(uri(compile('../../supabase/functions/rein-odds-observations/records.ts')));
+const rule=id=>core.TREND_RULES.find(r=>r.id==='odds90-'+id);
+const horses=[1,2,3,4].map(number=>({number,gate:number<=2?1:number-1,odds:4}));
+const race={raceId:'2605040308',title:'東京8R サラ系3歳1勝クラス',course:'芝・左1600m',condition:'良',league:'jra'};
+test('fixed catalog matches exact grade, age and odds thresholds without expanding unknown conditions',()=>{
+ assert.equal(core.TREND_RULES.length,10);
+ assert.equal(core.ruleMatches(rule('4114'),{...race,title:'東京11R テスト GIII'},horses),false);
+ assert.equal(core.ruleMatches(rule('4114'),{...race,title:'東京11R テスト GⅡ'},horses),true);
+ assert.equal(core.ruleMatches(rule('4114'),{...race,title:'東京11R テスト J・GII'},horses),false);
+ assert.equal(core.ageTypeFromText('サラ系3歳以上 オープン'), '3歳以上');
+ assert.equal(core.ruleMatches(rule('43158'),{...race,title:'中山5R サラ系3歳以上1勝クラス'},horses),false);
+ assert.equal(core.ruleMatches(rule('43158'),{...race,title:'中山5R タイトルだけ'},horses),null);
+ assert.equal(core.ruleMatches(rule('9769'),race,horses.map((h,i)=>({...h,odds:i?10:3.5}))),true);
+ assert.equal(core.ruleMatches(rule('9769'),race,horses.map((h,i)=>({...h,odds:i?10:3.6}))),false);
+});
+test('PL benchmark preserves unordered probability mass and same-frame probabilities',()=>{
+ const trio=[[1,2,3],[1,2,4],[1,3,4],[2,3,4]].map(s=>core.selectionProbability(horses,'trio',s));
+ assert.ok(trio.every(p=>Math.abs(p-.25)<1e-12));
+ const three=horses.slice(0,3);assert.ok(Math.abs(core.selectionProbability(three,'bracket_quinella',[1,1])-1/3)<1e-12);
+ assert.ok(Math.abs(core.selectionProbability(three,'bracket_quinella',[1,2])-2/3)<1e-12);
+ const quotes=[{numbers:[4],odds:50},{numbers:[3],odds:20},{numbers:[1],odds:20},{numbers:[2],odds:25}];
+ assert.deepEqual(core.selectTrendTickets(rule('7354'),horses,quotes).map(q=>q.numbers),[[1],[3],[2]]);
+});
+test('market parsers preserve real combination headers and reject incomplete or wrong-race books',()=>{
+ const meta='<meta property="og:url" content="https://sports.yahoo.co.jp/keiba/race/odds/tfw/2605040308">';
+ const table='<table class="hr-tableLeftTop--oddsW"><thead><tr><th colspan="2">1－2</th></tr></thead><tbody><tr><th>3</th><td><p><span>7.0</span></p></td></tr><tr><th>4</th><td>****</td></tr></tbody></table>';
+ assert.deepEqual(market.parseYahooMarket(meta+table,'trio',race.raceId),[{numbers:[1,2,3],odds:7}]);
+ assert.equal(market.marketIsComplete(market.parseYahooMarket(meta+table,'trio',race.raceId),'trio',horses),false);
+ assert.throws(()=>market.parseYahooMarket(meta+table,'trio','2605040309'),/mismatch/);
+ const nar='<h4>2026年10月12日（月） 帯 広 第11競走 19:55発走</h4><table class="odd_ranking_table"><tr><th>組合せ</th><th>オッズ</th></tr><tr><td>11-2</td><td>7.5</td><td>1</td></tr></table>';
+ assert.deepEqual(market.parseNarQuinella(nar,'202610120311'),[{numbers:[2,11],odds:7.5}]);
+ assert.throws(()=>market.parseNarQuinella(nar,'202610120312'),/mismatch/);
+});
+test('observation timestamps reject preview, late, stale and invalid-roster writes',()=>{
+ const now=Date.parse('2026-10-13T03:00:00Z'),snapshot={race_id:race.raceId,slot:'live',starts_at:new Date(now+300000).toISOString(),payload:{horses}};
+ const item={ruleId:'odds90-683',state:'ready',fetchedAt:new Date(now-1000).toISOString(),selections:[{numbers:[1],odds:25}]};
+ const row=record.observationRecord(item,snapshot,now);assert.equal(row.stake_yen,100);assert.equal(row.payload.saved,true);
+ assert.throws(()=>record.observationRecord(item,{...snapshot,slot:'preview'},now));
+ assert.throws(()=>record.observationRecord(item,snapshot,now+300001));
+ assert.throws(()=>record.observationRecord({...item,fetchedAt:new Date(now-700000).toISOString()},snapshot,now));
+ assert.throws(()=>record.observationRecord({...item,selections:[{numbers:[18],odds:25}]},snapshot,now));
+});
+test('settlement uses actual payouts, leaves missing markets pending and excludes scratches/dead heats',()=>{
+ const row={payload:{roster:'1-2-3-4',bet:'trio',selections:[{numbers:[1,2,3],odds:8},{numbers:[1,2,4],odds:9}]}};
+ const body={horses,review:{isFinished:true,finishers:[{number:1,finish:1},{number:2,finish:2},{number:3,finish:3},{number:4,finish:4}],payouts:[{type:'3連複',selection:'3－2－1',payout:750}]}};
+ assert.deepEqual(record.settleObservation(row,body),{settlement_status:'settled',return_yen:750});
+ assert.equal(record.settleObservation(row,{...body,review:{...body.review,payouts:[{type:'単勝',selection:'1',payout:400}]}}),null);
+ assert.equal(record.settleObservation(row,{...body,scratched:[{number:4}]}).settlement_status,'excluded');
+ assert.equal(record.settleObservation(row,{...body,review:{...body.review,finishers:[{number:1,finish:1},{number:2,finish:1}]}}).settlement_status,'excluded');
+});

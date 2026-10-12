@@ -38,6 +38,7 @@ import { JockeyProfiles } from "@/components/jockey-profiles";
 import { PredictionJournal, HorseNotebook } from "@/components/prediction-journal";
 import { MarketRankMap } from "@/components/market-rank-map";
 import { PredictionDataStatus } from "@/components/prediction-data-status";
+import { OddsTrendPanel } from "@/components/odds-trend-panel";
 import { RaceCalendar } from "@/components/race-calendar";
 import { ReinCloudProvider } from "@/components/rein-cloud-provider";
 import type { NarReference } from "@/lib/nar-validation";
@@ -76,6 +77,7 @@ type Analysis = {
     raceId: string;
     startsAt?: number | null;
     dataTimes?: { odds?: string | null; card?: string | null };
+    context?: { ageType?: string };
   };
   prediction?: {
     phase: "preview" | "prestart" | "poststart" | "final";
@@ -981,6 +983,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           </CardContent>
         </Card>
       </section>
+      <OddsTrendPanel race={data.race} horses={data.horses} />
       <div ref={analysisNav} />
       <Tabs value={analysisTab} onValueChange={changeAnalysisTab} onSwipeBack={onBack}>
         <TabsList aria-label="レースの情報" className="sticky top-0 z-20 mb-4 grid h-auto min-h-24 w-full grid-cols-3 border border-slate-700 bg-[#0c192a] shadow-lg sm:min-h-12 sm:grid-cols-6">
