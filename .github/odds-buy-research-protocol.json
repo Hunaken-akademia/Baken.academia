@@ -1,0 +1,38 @@
+{
+  "version": "odds-buy-research-v1",
+  "frozen_at": "2026-10-12",
+  "scope": "JRA and NAR, all actually readable archived bet types; absent market is missing, never a loss",
+  "stake": "100 yen per selected ticket, max 3 tickets for odds bands and EV; fixed top-rank ranges also tested",
+  "jra_and_nar_win_periods": {
+    "discovery": "2019-2022",
+    "confirmation": "2023-2024",
+    "audit": "2025-2026"
+  },
+  "nar_auxiliary_periods": {
+    "discovery": "before 2026-07-01",
+    "confirmation": "2026-07-01 to 2026-08-31",
+    "audit": "from 2026-09-01"
+  },
+  "conditions": [
+    "venue",
+    "surface",
+    "distance",
+    "course direction and inner/outer when explicitly available",
+    "class",
+    "going",
+    "field size",
+    "favorite odds band",
+    "gap between first two favorites"
+  ],
+  "candidate_minimum": {
+    "discovery_races": 250,
+    "discovery_tickets": 500,
+    "discovery_hit_races": 20,
+    "confirmation_races": 100,
+    "audit_races": 100
+  },
+  "selection": "Discovery only. No test period chosen after ranking ROI. Multiplicity-adjusted daily-block profit tests; confirmation and audit both must exceed 100 percent. High payout concentration and removing largest payout are reported.",
+  "pre_start_limit": "Final odds are ex-post information, not a tradable timestamp backtest. The 5% return reduction is a stress test, not a proof of pre-start profitability.",
+  "settlement": "Actual official payouts including stake; cancellations and dead heat require dedicated handling and are excluded with counts. Refunds never treated as losses.",
+  "market_consistency": "Normalized inverse win odds and Plackett-Luce used only as a comparison model, never asserted true probabilities."
+}
