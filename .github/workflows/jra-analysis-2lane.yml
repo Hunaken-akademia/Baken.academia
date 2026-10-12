@@ -127,3 +127,29 @@ jobs:
           name: odds-buy-archive-probe-${{ github.run_id }}
           path: artifacts/odds-buy-probe
           retention-days: 30
+
+  odds-buy-research:
+    if: "github.event_name == 'push' && contains(github.event.head_commit.message, '[odds-buy-research]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pandas==2.3.3 pyarrow==19.0.1 numpy==2.4.6 lxml==6.0.2 aiohttp==3.13.0
+      - run: python -m unittest discover -s tests -p test_odds_buy_market.py -v
+      - run: python scripts/research_odds_buy.py --shard ${{ matrix.shard }} --shards 6 --workers 2
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: odds-buy-research-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: artifacts/odds-buy-shard-${{ matrix.shard }}
+          retention-days: 30
