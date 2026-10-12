@@ -15,12 +15,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: jra-post-analysis-two-lane
-  cancel-in-progress: true
+  group: ${{ contains(github.event.head_commit.message, '[odds-buy-metadata]') && 'odds-buy-metadata' || 'jra-post-analysis-two-lane' }}
+  cancel-in-progress: ${{ !contains(github.event.head_commit.message, '[odds-buy-metadata]') }}
 
 jobs:
   analyze:
-    if: "!contains(github.event.head_commit.message, '[odds-buy-probe]') && !contains(github.event.head_commit.message, '[odds-buy-research]')"
+    if: "!contains(github.event.head_commit.message, '[odds-buy-probe]') && !contains(github.event.head_commit.message, '[odds-buy-research]') && !contains(github.event.head_commit.message, '[odds-buy-metadata]')"
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -152,4 +152,24 @@ jobs:
         with:
           name: odds-buy-research-shard-${{ matrix.shard }}-${{ github.run_id }}
           path: artifacts/odds-buy-shard-${{ matrix.shard }}
+          retention-days: 30
+
+  odds-buy-metadata:
+    if: "github.event_name == 'push' && contains(github.event.head_commit.message, '[odds-buy-metadata]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pandas==2.3.3 pyarrow==19.0.1 numpy==2.4.6 lxml==6.0.2 aiohttp==3.13.0
+      - run: python scripts/export_odds_buy_metadata.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: odds-buy-canonical-metadata-${{ github.run_id }}
+          path: artifacts/odds-buy-metadata
           retention-days: 30
