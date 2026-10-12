@@ -1,4 +1,6 @@
 import { getCache } from "@vercel/functions";
+import { waitUntil } from "@vercel/functions";
+import { captureOddsTrends } from "./odds-trends-server";
 import { fetchSource } from "./source-fetch";
 import { serverData, storedSnapshot, saveSnapshot, claimCapture, releaseCapture } from "./server-snapshots";
 import { parseNarCard, parseNarResult, parseNarSchedule, narVenueCodes, narRaceKey, narUrl, narScheduleIndexUrl, type NarHorse } from "./nar-source";
@@ -42,8 +44,9 @@ export async function refreshNarRace(raceId:string, preview=false, expectedRelea
     // final market values or a newly trained model after the start.
     const prior=after&&!preview?await storedSnapshot(raceId,"prestart").catch(()=>({snapshot:null})):null;
     if(prior?.snapshot && prior.snapshot.payload.horses.map((h:NarHorse)=>h.number).sort().join()===card.horses.map(h=>h.number).sort().join()) {
-      const body={...prior.snapshot.payload,review:result??undefined,prediction:{...prior.snapshot.payload.prediction,phase:result?.isFinished?"final":"poststart",source:"prestart"},capture:{complete:true},race:{...prior.snapshot.payload.race,updated:new Date().toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"})}};
+      const body={...prior.snapshot.payload,horses:prior.snapshot.payload.horses as NarHorse[],review:result??undefined,prediction:{...prior.snapshot.payload.prediction,phase:result?.isFinished?"final":"poststart",source:"prestart"},capture:{complete:true},race:{...prior.snapshot.payload.race,updated:new Date().toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"})}};
       await saveSnapshot(body,false);
+      waitUntil(captureOddsTrends(body).catch(()=>{console.warn("NAR odds trend settlement unavailable");}));
       await narCache.set(`race:${raceId}:live`,JSON.stringify(body),{ttl:result?.isFinished?86400:300}).catch(()=>{});
       return body;
     }
@@ -76,6 +79,7 @@ export async function refreshNarRace(raceId:string, preview=false, expectedRelea
       confidence:signals?.confidence??null,picks:signals?.picks??selectPicks(horses,{roleModelReady:!!scored,marketReady:false}),tickets:[],review:result??undefined,
     };
     await saveSnapshot(body,preview);
+    if(!preview)waitUntil(captureOddsTrends(body).catch(()=>{console.warn("NAR odds trend capture unavailable");}));
     await narCache.set(`race:${raceId}:${preview?"preview":"live"}`,JSON.stringify(body),{ttl:result?.isFinished&&scored?86400:300}).catch(()=>{});
     return body;
   } finally {await releaseCapture(lock,lease.token).catch(()=>{});}
