@@ -20,6 +20,7 @@ concurrency:
 
 jobs:
   analyze:
+    if: "!contains(github.event.head_commit.message, '[odds-buy-probe]') && !contains(github.event.head_commit.message, '[odds-buy-research]')"
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -106,3 +107,23 @@ jobs:
           name: jra-analysis-venue-features
           path: reports/jra-venue-features-v2
           retention-days: 14
+
+  odds-buy-probe:
+    if: "github.event_name == 'push' && contains(github.event.head_commit.message, '[odds-buy-probe]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pandas==2.3.3 pyarrow==19.0.1
+      - run: python scripts/probe_odds_buy_archives.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: odds-buy-archive-probe-${{ github.run_id }}
+          path: artifacts/odds-buy-probe
+          retention-days: 30
