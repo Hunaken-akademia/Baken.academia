@@ -39,6 +39,7 @@ import { PredictionJournal, HorseNotebook } from "@/components/prediction-journa
 import { MarketRankMap } from "@/components/market-rank-map";
 import { PredictionDataStatus } from "@/components/prediction-data-status";
 import { OddsTrendPanel } from "@/components/odds-trend-panel";
+import { UpdateNotice } from "@/components/update-notice";
 import { RaceCalendar } from "@/components/race-calendar";
 import { ReinCloudProvider } from "@/components/rein-cloud-provider";
 import type { NarReference } from "@/lib/nar-validation";
@@ -423,6 +424,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
             </Badge>
           </div>
         </header>
+        <UpdateNotice />
         {error && (
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 p-3 text-sm text-rose-200">
             <AlertTriangle className="size-4 shrink-0" />
