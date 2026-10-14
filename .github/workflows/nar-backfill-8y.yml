@@ -140,4 +140,4 @@ jobs:
 
           next=$((current + 1))
           echo "Dispatching automatic retry ${next}/3. Existing Supabase archives will be verified and skipped."
-          gh workflow run nar-backfill-8y.yml --ref main -f auto_retry_attempt="${next}"
+          gh workflow run nar-backfill-8y.yml --repo "${GITHUB_REPOSITORY}" --ref main -f auto_retry_attempt="${next}"
