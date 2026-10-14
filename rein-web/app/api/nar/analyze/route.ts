@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { dateJst, serverData, storedSnapshot } from "@/lib/server-snapshots";
 import { narCache, refreshNarRace } from "@/lib/nar-live";
+import { withNarTickets } from "@/lib/nar-tickets";
 import { narRaceKey } from "@/lib/nar-source";
 import { isSnapshotFresh, metaFromBody } from "@/lib/analysis-cache";
 import { timingSafeEqual } from "node:crypto";
@@ -22,7 +23,7 @@ export async function GET(request:NextRequest) {
     if(snapshot&&!force){
       const meta=metaFromBody(snapshot,preview),stale=!meta||!isSnapshotFresh(meta,Date.now());
       if(stale)waitUntil(refreshNarRace(id,preview).catch(()=>null));
-      return NextResponse.json(snapshot,{headers:{...headers,"x-rein-persisted":"1","x-rein-stale":stale?"1":"0"}});
+      return NextResponse.json(withNarTickets(snapshot),{headers:{...headers,"x-rein-persisted":"1","x-rein-stale":stale?"1":"0"}});
     }
     // Bound requests to the server's actual schedule; arbitrary IDs cannot cause scraping.
     const {schedule}=await serverData<{schedule:{payload:{venues:Array<{races:Array<{raceId:string}>}>}}|null}>("schedule",{date:key.date,league:"nar"});
