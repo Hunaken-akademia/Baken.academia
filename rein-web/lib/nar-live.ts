@@ -8,6 +8,7 @@ import { loadNarRuntime, narRank } from "./nar-model";
 import { raceProgress } from "./race-progress";
 import { selectPicks } from "./marks";
 import { narReferenceSignals } from "./nar-validation";
+import { withNarTickets } from "./nar-tickets";
 
 export const narCache = getCache({namespace:"rein-nar-live-v2"});
 export async function refreshNarSchedule(date:string) {
@@ -44,7 +45,7 @@ export async function refreshNarRace(raceId:string, preview=false, expectedRelea
     // final market values or a newly trained model after the start.
     const prior=after&&!preview?await storedSnapshot(raceId,"prestart").catch(()=>({snapshot:null})):null;
     if(prior?.snapshot && prior.snapshot.payload.horses.map((h:NarHorse)=>h.number).sort().join()===card.horses.map(h=>h.number).sort().join()) {
-      const body={...prior.snapshot.payload,horses:prior.snapshot.payload.horses as NarHorse[],review:result??undefined,prediction:{...prior.snapshot.payload.prediction,phase:result?.isFinished?"final":"poststart",source:"prestart"},capture:{complete:true},race:{...prior.snapshot.payload.race,updated:new Date().toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"})}};
+      const body=withNarTickets({...prior.snapshot.payload,horses:prior.snapshot.payload.horses as NarHorse[],review:result??undefined,prediction:{...prior.snapshot.payload.prediction,phase:result?.isFinished?"final":"poststart",source:"prestart"},capture:{complete:true},race:{...prior.snapshot.payload.race,updated:new Date().toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"})}});
       await saveSnapshot(body,false);
       waitUntil(captureOddsTrends(body).catch(()=>{console.warn("NAR odds trend settlement unavailable");}));
       await narCache.set(`race:${raceId}:live`,JSON.stringify(body),{ttl:result?.isFinished?86400:300}).catch(()=>{});
@@ -73,11 +74,11 @@ export async function refreshNarRace(raceId:string, preview=false, expectedRelea
       && card.horses.every(h=>typeof h.weight==="number"&&h.weight>0)
       && card.horses.every(h=>h.odds!==null&&h.odds>0&&h.popularity>0);
     const model=runtime?{...runtime.profile.meta,version:`${runtime.model.version}:${runtime.sha.slice(0,12)}`,release:runtime.model.release,probabilityKind:"ranking-share",strategy:runtime.model.conditionValidation?"地方専用ハイブリッド＋検証済みの着順別・場別補正。順位モデルに当日人気とオッズは不使用":runtime.model.release?.validatedRanking?"地方専用ハイブリッド・当日人気とオッズは評価に不使用":"地方専用・当日人気とオッズは評価に不使用",overallPolicy:"1〜3着の相対順位を均等合成",markPolicy:signals?.reference?"本命・対抗は1着適性順。穴候補は地方の人気順位差を検証した参考条件":"1着適性順。市場モデル未検証のため穴の印は保留",snapshotPolicy:"サーバーで一括保存",provisional:!runtime.model.release?.validatedRanking,validation:comparison,roleModes:Object.fromEntries(Object.entries(runtime.model.roles).map(([k,v])=>[k,v.mode]))}:undefined;
-    const body={...card,race:{...card.race,updated:new Date(fetchedAt).toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"}),dataTimes:{card:fetchedAt,odds:card.horses.some(h=>h.odds!==null)?fetchedAt:null}},horses,model,pace,warnings,narReference:signals?.reference??null,
+    const body=withNarTickets({...card,race:{...card.race,updated:new Date(fetchedAt).toLocaleTimeString("ja-JP",{timeZone:"Asia/Tokyo",hour:"2-digit",minute:"2-digit"}),dataTimes:{card:fetchedAt,odds:card.horses.some(h=>h.odds!==null)?fetchedAt:null}},horses,model,pace,warnings,narReference:signals?.reference??null,
       prediction:{phase:preview?"preview":result?.isFinished?"final":after?"poststart":"prestart",source:after?"rebuilt":"live",generatedAt:fetchedAt,label:preview?"前日参考":after?"発走後・参考再計算":runtime?.model.release?.validatedRanking?"発走前・地方専用評価":"発走前・地方暫定"},
       evaluation:{roleModel:scored?"ready":"unavailable",overall:scored?"ready":"held",tickets:"held",held},capture:{complete},
       confidence:signals?.confidence??null,picks:signals?.picks??selectPicks(horses,{roleModelReady:!!scored,marketReady:false}),tickets:[],review:result??undefined,
-    };
+    });
     await saveSnapshot(body,preview);
     if(!preview)waitUntil(captureOddsTrends(body).catch(()=>{console.warn("NAR odds trend capture unavailable");}));
     await narCache.set(`race:${raceId}:${preview?"preview":"live"}`,JSON.stringify(body),{ttl:result?.isFinished&&scored?86400:300}).catch(()=>{});
