@@ -36,6 +36,8 @@ import type { PaceScenarioId } from "@/lib/pace-scenarios";
 import { PaceScenarioExplorer } from "@/components/pace-scenario-explorer";
 import { PreviousRaceComparison, RaceDayTrends } from "@/components/race-context-panels";
 import { JockeyProfiles } from "@/components/jockey-profiles";
+import { FavoriteEntries, FavoriteJockeyPicker, useFavorites } from "@/components/favorites";
+import { PerformanceDashboard } from "@/components/performance-dashboard";
 import { PredictionJournal, HorseNotebook } from "@/components/prediction-journal";
 import { MarketRankMap } from "@/components/market-rank-map";
 import { PredictionDataStatus } from "@/components/prediction-data-status";
@@ -474,6 +476,15 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
               setVenue(item);
             }}
             historicalDate={historicalDate}
+            onOpenRace={(raceId) => {
+              const owner = schedule?.venues.find((item) => item.races.some((race) => race.raceId === raceId));
+              if (!owner) return;
+              setError("");
+              setFailedRace(null);
+              setVenue(owner);
+              void analyze({ raceId });
+              window.scrollTo({ top: 0, behavior: "auto" });
+            }}
             showCalendar={showCalendar}
             onCalendar={() => {
               setShowCalendar(true);
@@ -576,6 +587,7 @@ function VenueScreen({
   showCalendar,
   onCalendar,
   onSelectHistorical,
+  onOpenRace,
 }: {
   area: "jra" | "nar";
   schedule: Schedule | null;
@@ -588,6 +600,7 @@ function VenueScreen({
   showCalendar: boolean;
   onCalendar: () => void;
   onSelectHistorical: (date: string, venue: Venue) => void;
+  onOpenRace: (raceId: string) => void;
 }) {
   return (
     <>
@@ -668,6 +681,8 @@ function VenueScreen({
           {day === "today" ? "本日" : "明日"}の{area.toUpperCase()}開催はありません
         </div>
       )}
+      {!showCalendar && !historicalDate && <FavoriteEntries league={area} day={day} onOpen={onOpenRace} />}
+      {!showCalendar && <PerformanceDashboard league={area} />}
     </>
   );
 }
@@ -898,6 +913,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
 }) {
   const [analysisTab, setAnalysisTab] = useState("prediction");
   const [showAllHorses, setShowAllHorses] = useState(false);
+  const favorites = useFavorites(data.race.league ?? "jra");
   const [historicalScenario, setHistoricalScenario] = useState<{id:PaceScenarioId;label:string;version:number}|null>(null);
   const analysisNav = useRef<HTMLDivElement>(null);
   const ticketDetails = useRef<HTMLDetailsElement>(null);
@@ -1067,6 +1083,8 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
                         {visibleMark(horse.mark)} {horse.name}
                       </p>
                       <p className="truncate text-xs text-slate-500">
+                        {favorites.isHorse(horse.horseId) && <span className="mr-1 rounded bg-amber-300/15 px-1 text-[10px] text-amber-200">★注目馬</span>}
+                        {favorites.isJockey(horse.jockeyId) && <span className="mr-1 rounded bg-cyan-300/15 px-1 text-[10px] text-cyan-200">★騎手</span>}
                         {[horse.style, visibleVerdict(horse.verdict)].filter(Boolean).join("・")}
                         <span className="hidden sm:inline">
                           　履歴 {horse.historySamples ?? 0}走 / 補正{" "}
@@ -1214,6 +1232,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
 
         </TabsContent>
         <TabsContent value="jockeys">
+          <FavoriteJockeyPicker league={data.race.league ?? "jra"} horses={data.horses} />
           <JockeyProfiles key={data.race.raceId} title={data.race.title} course={data.race.course} league={data.race.league} horses={data.horses} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} />
         </TabsContent>
         <TabsContent value="review">
