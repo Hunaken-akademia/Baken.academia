@@ -17,9 +17,15 @@ export function OddsTrendPanel({race,horses}:{race:TrendRace;horses:TrendRunner[
   const items=result?.raceId===race.raceId?result.items:initial;
   if(!items.length)return null;
   const historical=result?.phase==="historical",saved=result?.phase==="saved-prestart";
-  return <section aria-label="オッズ条件の参考傾向" className="mb-5 rounded-2xl border border-cyan-400/30 bg-cyan-400/[.04] p-4 text-slate-200">
-    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-cyan-200">📊 オッズ条件の参考傾向</h2><span className="rounded-full bg-cyan-400/10 px-2 py-1 text-[11px] text-cyan-200">{saved?"発走前の保存あり":historical?"過去レース":result?"暫定判定":"条件照合中"}・{items.length}件</span></div>
-    <p className="mt-2 text-xs leading-5 text-slate-400">過去3期間で回収率90%超だった参考条件です。利益や将来の成績を保証するものではありません。</p>
+  const readyCount=items.filter(item=>item.state==="ready").length,best=Math.max(...items.map(item=>TREND_RULES.find(r=>r.id===item.ruleId)?.overall.roi??0));
+  return <section aria-label="オッズ条件の参考傾向" className="mb-4 rounded-2xl border border-cyan-400/30 bg-cyan-400/[.04] text-slate-200">
+    <details className="group" data-testid="odds-trend-details">
+    <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 p-4 [&::-webkit-details-marker]:hidden">
+      <span className="min-w-0"><span className="block font-bold text-cyan-200">📊 オッズ条件の参考傾向</span><span className="mt-0.5 block text-xs text-slate-400">{items.length}件の条件・過去の回収率 最大{pct(best)}{readyCount?<strong className="ml-1 text-amber-200">・対象買い目 {readyCount}件</strong>:""}</span></span>
+      <span className="flex items-center gap-2"><span className="rounded-full bg-cyan-400/10 px-2 py-1 text-[11px] text-cyan-200">{saved?"発走前の保存あり":historical?"過去レース":result?"暫定判定":"条件照合中"}</span><span aria-hidden="true" className="text-cyan-200 transition-transform group-open:rotate-90">›</span></span>
+    </summary>
+    <div className="px-4 pb-4">
+    <p className="text-xs leading-5 text-slate-400">過去3期間で回収率90%超だった参考条件です。利益や将来の成績を保証するものではありません。</p>
     {error&&<div className="mt-2 flex items-center justify-between gap-2 text-xs text-amber-200"><span>現在オッズの照合を一時的に見合わせています。</span><button type="button" onClick={()=>setRetry(v=>v+1)} className="shrink-0 rounded border border-amber-300/40 px-2 py-1">再取得</button></div>}
     <div className="mt-3 space-y-3">{items.map(item=>{
       const rule=TREND_RULES.find(r=>r.id===item.ruleId);if(!rule)return null;
@@ -34,5 +40,7 @@ export function OddsTrendPanel({race,horses}:{race:TrendRace;horses:TrendRunner[
       </article>;
     })}</div>
     {items.length>1&&<p className="mt-3 text-[11px] text-slate-400">複数の条件に同じ買い目が含まれる場合があります。</p>}
+    </div>
+    </details>
   </section>;
 }

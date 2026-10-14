@@ -17,7 +17,7 @@ function moduleUrl(name, replacements=[]) {
 async function load(name, replacements=[]) {return import(moduleUrl(name,replacements));}
 (async()=>{
   const esbuild = require(require.resolve('esbuild',{paths:[process.env.NAR_QA_ESBUILD || web,process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES]}));
-  await esbuild.build({entryPoints:[path.join(__dirname,'nar-dashboard-fixture.tsx')],bundle:true,outfile:path.join(output,'dashboard.js'),platform:'browser',jsx:'automatic',alias:{'@':web},define:{'process.env.NODE_ENV':'"production"'}});
+  await esbuild.build({entryPoints:[path.join(__dirname,'nar-dashboard-fixture.tsx')],bundle:true,outfile:path.join(output,'dashboard.js'),platform:'browser',jsx:'automatic',alias:{'@':web},define:{'process.env.NEXT_PUBLIC_SUPABASE_URL':'"http://127.0.0.1:9"','process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY':'"qa-fixture"','process.env.NODE_ENV':'"production"'}});
   const css=fs.readdirSync(path.join(web,'.next/static/chunks')).filter(n=>n.endsWith('.css')).map(n=>fs.readFileSync(path.join(web,'.next/static/chunks',n),'utf8')).join('\n');
   const {parseNarCard,parseNarSchedule}=await load('nar-source');
   const validationUrl=moduleUrl('nar-validation',[[/from "\.\/marks"/,`from ${JSON.stringify(moduleUrl('marks'))}`]]);

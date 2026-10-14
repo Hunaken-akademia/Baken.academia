@@ -57,7 +57,7 @@ export function UpdateNotice() {
   }
 
   if (data?.acknowledged || (!data && !error)) return null;
-  if (!data) return <div className="mb-5 rounded-2xl border border-cyan-400/25 bg-cyan-400/5 p-4 text-sm"><p role="alert">{error}</p><button type="button" onClick={() => void load()} className="mt-2 rounded-lg border border-cyan-400/40 px-4 py-2 text-cyan-200">再読み込み</button></div>;
+  if (!data) return <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-900/40 px-3 py-1.5 text-xs text-slate-400"><p role="alert" className="min-w-0">{error}</p><button type="button" onClick={() => void load()} className="min-h-9 shrink-0 rounded-md px-2 font-semibold text-cyan-200 underline">再読み込み</button></div>;
   return (
     <section aria-labelledby="rein-update-title" className="mb-5 rounded-2xl border border-cyan-400/30 bg-cyan-400/5 p-4 sm:p-5">
       <p className="mb-2 text-xs font-bold text-cyan-300">アップデートのお知らせ · {UPDATE_NOTICE.date}</p>

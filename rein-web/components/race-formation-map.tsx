@@ -57,6 +57,13 @@ export function RaceFormationMap({ horses, title, course, raceId, pace, league =
           <span className="rounded-full bg-white/5 px-2 py-1">{modeLabel}：{visible.length}/{horses.length}頭を配置</span>
         </div>
       </div>
+      {!visible.length ? (
+        <div className="mx-4 mb-5 rounded-xl border border-dashed border-slate-700 bg-[#071220] p-4 text-sm leading-6 text-slate-400 sm:mx-5" data-testid="formation-board">
+          <p>この場面を推定できる通過順データがありません。</p>
+          {active !== "style" && <button type="button" onClick={() => { setMode("style"); setSelected(null); }} className="mt-2 min-h-11 rounded-lg border border-cyan-300/40 px-3 text-sm font-semibold text-cyan-100">脚質の並びで見る</button>}
+          {!eligible && !scenario && <p className="mt-2 text-xs leading-5 text-amber-200">{banei ? "ばんえいにコーナーはないため、平地の隊列図は表示しません。" : "このコースまたは日付はAI予測対象外のため、脚質を表示しています。"}</p>}
+        </div>
+      ) : (
       <div className="grid gap-5 px-4 pb-5 sm:px-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)]">
         <div className="min-w-0">
           <div className="overflow-hidden rounded-xl border border-slate-700 bg-[#071220]" aria-label={`${modeLabel}の隊列。先頭側から${visible.map((p) => p.horse.number).join("、")}番。内外や馬身差は表しません。`} data-testid="formation-board">
@@ -80,7 +87,6 @@ export function RaceFormationMap({ horses, title, course, raceId, pace, league =
                 </div>
               </div>)}
             </div>
-            {!visible.length && <p className="px-4 pb-5 text-center text-sm leading-6 text-slate-400">この場面を推定できる通過順データがありません。</p>}
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-400">各列の上から下、左の列から右の列へ前後順に配置。枠色はカードの左端、適1〜3は1着適性の上位3頭です。内外・馬身差は表しません。</p>
         </div>
@@ -98,6 +104,7 @@ export function RaceFormationMap({ horses, title, course, raceId, pace, league =
           {!eligible && !scenario && <p className="text-xs leading-5 text-amber-200">{banei ? "ばんえいにコーナーはないため、平地の隊列図は表示しません。" : "このコースまたは日付はAI予測対象外のため、脚質を表示しています。"}</p>}
         </div>
       </div>
+      )}
     </section>
   );
 }
