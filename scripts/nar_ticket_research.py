@@ -7,6 +7,7 @@ Ranking weights are not calibrated probabilities. No production rule is changed.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import itertools
 import json
 from collections import defaultdict
@@ -16,11 +17,13 @@ import numpy as np
 import pandas as pd
 
 try:
-    from nar_all_bet_analysis import LABELS, ORDERED, metrics, payout_map
+    from nar_all_bet_analysis import LABELS as ALL_LABELS, ORDERED, metrics, payout_map
     from nar_live_model import fit_live_model, inputs_by_mode, normalize_courses, prior_features
 except ModuleNotFoundError:
-    from scripts.nar_all_bet_analysis import LABELS, ORDERED, metrics, payout_map
+    from scripts.nar_all_bet_analysis import LABELS as ALL_LABELS, ORDERED, metrics, payout_map
     from scripts.nar_live_model import fit_live_model, inputs_by_mode, normalize_courses, prior_features
+
+LABELS = {bet: label for bet, label in ALL_LABELS.items() if bet != 'trifecta'}
 
 POINTS = (1, 3, 5, 10, 20, 30)
 METHODS = ('current_70_30', 'role_50', 'role_100', 'role_formation')
@@ -32,7 +35,7 @@ def normalize(values):
 
 
 def generate_candidates(horses, roles, popularity, method):
-    """Return unique, ordered candidates for all nine bets from three role shares.
+    """Return unique, ordered candidates for the eight allowed bets from three role shares.
 
 horses is [(horse_number, gate)], roles is N x 3. Scores only rank tickets.
 The current_70_30 path reproduces the live generator's nine-horse pool and
@@ -84,7 +87,6 @@ same-gate exclusion; candidate paths permit valid same-gate bracket tickets.
         hs = (horses[i][0], horses[j][0], horses[k][0])
         score = roles[i, 0] * roles[j, 1] / max(1 - roles[i, 1], 1e-12)
         score *= roles[k, 2] / max(1 - roles[i, 2] - roles[j, 2], 1e-12)
-        add('trifecta', hs, score)
         add('trio', hs, score)
         for pair in itertools.combinations(hs, 2):
             add('wide', pair, score)
@@ -109,7 +111,7 @@ def settle(tickets, payouts):
 
 
 def compare_results(rows):
-    indexed = {(r['period'], r['method'], r['bet'], r['points']): r for r in rows}
+    indexed = {(r['period'], r['method'], r['bet'], r['points'], r.get('filter', 'all')): r for r in rows}
     selected = []
     for bet in LABELS:
         for points in POINTS:
@@ -119,20 +121,40 @@ def compare_results(rows):
                 continue
             # Only 2025 chooses the method; never choose whichever wins in 2026.
             choice = max(validation, key=lambda r: (r['roi'], r['race_hit_rate'], r['method']))
-            audit = indexed.get(('2026_check', choice['method'], bet, points))
-            peer = indexed.get(('2026_check', 'current_70_30', bet, points))
-            selection_peer = indexed.get(('2025_selection', 'current_70_30', bet, points))
+            audit = indexed.get(('2026_check', choice['method'], bet, points, choice.get('filter', 'all')))
+            peer = indexed.get(('2026_check', 'current_70_30', bet, points, choice.get('filter', 'all')))
+            selection_peer = indexed.get(('2025_selection', 'current_70_30', bet, points, choice.get('filter', 'all')))
             comparable = audit and peer and audit['races'] == peer['races'] and audit['races'] >= 500
+            if comparable and audit.get('race_set_hash') != peer.get('race_set_hash'):
+                comparable = False
             passed = bool(comparable and selection_peer and choice['roi'] >= selection_peer['roi']
-                          and audit['roi'] >= peer['roi'] and audit['race_hit_rate'] >= peer['race_hit_rate'])
+                          and audit['roi'] >= 1 and audit['roi'] >= peer['roi'] and audit['race_hit_rate'] >= peer['race_hit_rate'])
             selected.append({'bet': bet, 'label': LABELS[bet], 'points': points,
-                             'method_selected_in_2025': choice['method'], 'selection': choice,
+                             'method_selected_in_2025': choice['method'], 'filter_selected_in_2025': choice.get('filter', 'all'), 'selection': choice,
                              'check_2026': audit, 'baseline_2026': peer,
                              'decision': 'candidate_for_review' if passed else 'hold'})
     return selected
 
 
-def build_report(input_dir, output_dir):
+def odds_conditions(group, candidates):
+    """Final single-win odds bands: reference research, not prestart snapshots."""
+    odds = dict(zip(group.horse_number.astype(int), group.win_odds))
+    favorites = group.loc[group.popularity.eq(1), 'win_odds']
+    favorite = float(favorites.iloc[0]) if len(favorites) == 1 else np.nan
+    leader = candidates['win'][0][0][0]
+    axis = odds.get(leader, np.nan)
+    conditions = ['all']
+    if np.isfinite(favorite) and favorite >= 1:
+        if favorite < 2: conditions.append('favorite_1_2')
+        elif favorite < 3: conditions.append('favorite_2_3')
+        elif favorite < 5: conditions.append('favorite_3_5')
+        else: conditions.append('favorite_5plus')
+    if np.isfinite(axis) and axis >= 1:
+        conditions.append('axis_1_3' if axis < 3 else 'axis_3_10' if axis < 10 else 'axis_10plus')
+    return conditions
+
+
+def build_report(input_dir, output_dir, odds_filters=False):
     files = [p for p in sorted(input_dir.rglob('nar-*.parquet'))
              if not any(tag in p.name for tag in ('-odds-', '-payouts', '-manifest'))]
     if not files:
@@ -155,6 +177,7 @@ def build_report(input_dir, output_dir):
         data[f'role_{target}'] = 1 / (1 + np.exp(-np.clip(logits, -50, 50)))
     del modes
     total = defaultdict(lambda: defaultdict(float))
+    race_hashes = defaultdict(int)
     skipped = defaultdict(int)
     examples = []
     checked = 0
@@ -176,44 +199,49 @@ def build_report(input_dir, output_dir):
         popularity = group.popularity.to_numpy()
         for method in METHODS:
             candidates = generate_candidates(horses, roles, popularity, method)
+            filters = odds_conditions(group, candidates) if odds_filters else ['all']
             for bet in payouts:
-                for points in POINTS:
-                    tickets = pick_tickets(candidates, bet, 100 * points)
-                    if not tickets:
-                        continue
-                    key = (period, method, bet, points)
-                    for k, value in settle(tickets, payouts[bet]).items():
-                        total[key][k] += value
-                    if len(examples) < 36 and method == 'role_formation' and points == 10:
-                        examples.append({'race_id': str(race_id), 'race_date': str(group.race_date.iloc[0].date()),
-                                         'bet': bet, 'selections': tickets, 'stake_yen': len(tickets) * 100,
-                                         'kind': 'historical_reconstruction'})
+                if bet not in LABELS:
+                    continue
+                for condition in filters:
+                    for points in POINTS:
+                        tickets = pick_tickets(candidates, bet, 100 * points)
+                        if not tickets:
+                            continue
+                        key = (period, method, bet, points, condition)
+                        race_hashes[key] ^= int.from_bytes(hashlib.sha256(str(race_id).encode()).digest(), 'big')
+                        for k, value in settle(tickets, payouts[bet]).items():
+                            total[key][k] += value
+                        if len(examples) < 36 and method == 'role_formation' and points == 10:
+                            examples.append({'race_id': str(race_id), 'race_date': str(group.race_date.iloc[0].date()),
+                                             'bet': bet, 'selections': tickets, 'stake_yen': len(tickets) * 100,
+                                             'kind': 'historical_reconstruction'})
         checked += 1
         if checked % 1000 == 0:
             print(f'Settled role tickets: {checked} races', flush=True)
-    rows = [{'period': p, 'method': m, 'bet': b, 'label': LABELS[b], 'points': k, **metrics(t)}
-            for (p, m, b, k), t in sorted(total.items())]
+    rows = [{'period': p, 'method': m, 'bet': b, 'label': LABELS[b], 'points': k, 'filter': condition, 'race_set_hash': hex(race_hashes[(p, m, b, k, condition)]), **metrics(t)}
+            for (p, m, b, k, condition), t in sorted(total.items())]
     report = {'status': 'completed', 'production_changed': False,
               'policy': {'training': '2019-2024', 'model_and_ticket_selection': '2025', 'subsequent_check': '2026',
                          'kind': 'historical_reconstruction_not_prestart_snapshots',
                          'scores': 'ranking weights, not calibrated ticket probabilities',
                          'stake': '100 yen equally per ticket; per-bet budgets 100/300/500/1000/2000/3000 yen',
-                         'odds_filters': 'not applied: combination table prices need semantic decoding',
-                         'new_types': 'bracket exacta and trifecta are research extensions to the current seven types',
+                         'odds_filters': 'final favorite and axis single-win odds bands' if odds_filters else 'not applied',
+                         'new_types': 'bracket exacta is a research extension; trifecta excluded from ticket generation',
                          'selection': 'choose highest ROI on 2025 only, then compare with same-budget baseline on 2026'},
               'coverage': {'chunks': len(files), 'evaluated_races': checked, 'skipped': dict(skipped)},
               'results': rows, 'candidate_review': compare_results(rows), 'examples': examples}
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     (output_dir / 'model.json').write_text(json.dumps(model, ensure_ascii=False, indent=2), encoding='utf-8')
-    lines = ['# 地方競馬・着順適性からの買い目検証', '',
+    lines = ['# 地方競馬・買い目検証（三連単除外）', '',
              '- 締切前の保存予想ではなく、過去履歴からの再現計算です。',
              '- 2019〜2024学習、2025選択、2026確認。各点100円の均等購入。',
              '- 同じ予算上限で現行7:3方式、適性50%、適性100%、着順別フォーメーションを比較。',
-             '- オッズ価格による絞り込みは未適用。本番買い目はまだ変更していません。', '',
-             '|期間|方式|券種|上限点数|対象R|的中率|回収率|平均点数|', '|---|---|---|---:|---:|---:|---:|---:|']
+             '- 単勝確定オッズ帯でレースを絞ります。組み合わせ価格・期待値フィルタは未適用。本番買い目はまだ変更していません。' if odds_filters else '- オッズ条件は未適用。本番買い目はまだ変更していません。', '',
+             '|期間|方式|オッズ条件|券種|上限点数|対象R|的中率|回収率|平均点数|', '|---|---|---|---|---:|---:|---:|---:|---:|']
     for r in rows:
-        lines.append(f"|{r['period']}|{r['method']}|{r['label']}|{r['points']}|{int(r['races'])}|{r['race_hit_rate']:.2%}|{r['roi']:.2%}|{r['average_tickets']:.1f}|")
+        lines.append(f"|{r['period']}|{r['method']}|{r['filter']}|{r['label']}|{r['points']}|{int(r['races'])}|{r['race_hit_rate']:.2%}|{r['roi']:.2%}|{r['average_tickets']:.1f}|")
     (output_dir / 'summary.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
     print(json.dumps(report['coverage'], ensure_ascii=False), flush=True)
     return report
@@ -223,5 +251,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--input-dir', type=Path, required=True)
     parser.add_argument('--output-dir', type=Path, required=True)
+    parser.add_argument('--odds-filters', action='store_true')
     args = parser.parse_args()
-    build_report(args.input_dir, args.output_dir)
+    build_report(args.input_dir, args.output_dir, args.odds_filters)
