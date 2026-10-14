@@ -1,5 +1,6 @@
 name: NAR rolling partial analysis
 # Historical recall retries refresh authentication per archive.
+# Odds-band ticket research rerun: 2026-10-14T15:40Z.
 
 on:
   workflow_dispatch:
