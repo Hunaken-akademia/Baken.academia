@@ -18,7 +18,7 @@ class NarTicketResearchTest(unittest.TestCase):
 
     def test_distinct_roles_ordered_bets_and_brackets(self):
         candidates = generate_candidates(self.horses, self.roles, [1, 2, 3, 4], 'role_100')
-        self.assertEqual(candidates['trifecta'][0][0], (1, 2, 3))
+        self.assertNotIn('trifecta', candidates)
         self.assertEqual(candidates['exacta'][0][0], (1, 2))
         self.assertIn((1, 1), dict(candidates['bracket_quinella']))
         for bet, rows in candidates.items():
@@ -28,14 +28,14 @@ class NarTicketResearchTest(unittest.TestCase):
 
     def test_budget_settlement_and_no_unknown_odds_filter(self):
         candidates = generate_candidates(self.horses, self.roles, [1, 2, 3, 4], 'role_formation')
-        tickets = pick_tickets(candidates, 'trifecta', 350)
+        tickets = pick_tickets(candidates, 'exacta', 350)
         self.assertEqual(len(tickets), 3)
-        total = settle(tickets + tickets, {(1, 2, 3): 1000})
+        total = settle(tickets + tickets, {(1, 2): 1000})
         self.assertEqual(total['spend_yen'], 300)
         self.assertEqual(total['return_yen'], 1000)
         self.assertEqual(total['hits'], 1)
         with self.assertRaises(ValueError):
-            pick_tickets(candidates, 'trifecta', 1000, min_odds=10)
+            pick_tickets(candidates, 'exacta', 1000, min_odds=10)
         self.assertEqual(pick_tickets(candidates, 'win', 100, odds={(1,): 2, (2,): 20}, min_odds=10), [(2,)])
 
     def test_same_2025_choice_even_when_2026_ranking_reverses(self):
@@ -66,11 +66,13 @@ class NarTicketResearchTest(unittest.TestCase):
             root = Path(temp)
             pd.DataFrame(rows).to_parquet(root / 'nar-fixture.parquet')
             with patch('scripts.nar_ticket_research.fit_live_model', return_value=model), patch('scripts.nar_ticket_research.prior_features', side_effect=lambda d: np.ones((len(d), 1))), patch('scripts.nar_ticket_research.inputs_by_mode', side_effect=lambda x, r: {'absolute': x}):
-                report = build_report(root, root / 'out')
+                report = build_report(root, root / 'out', odds_filters=True)
             self.assertEqual(report['coverage']['evaluated_races'], 2)
             self.assertEqual(report['coverage']['skipped']['invalid_or_refund_field'], 1)
             self.assertEqual({r['period'] for r in report['results']}, {'2025_selection', '2026_check'})
             self.assertTrue((root / 'out' / 'report.json').exists())
+            self.assertTrue(any(r['filter'] == 'favorite_2_3' for r in report['results']))
+            self.assertTrue(all(r['bet'] != 'trifecta' for r in report['results']))
 
 
 if __name__ == '__main__':
