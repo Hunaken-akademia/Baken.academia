@@ -2,6 +2,7 @@ import io
 import json
 import sys
 import time
+import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -58,6 +59,43 @@ class AuthTests(unittest.TestCase):
 
 
 class RuntimeRefreshTests(unittest.TestCase):
+    def test_concurrent_requests_score_only_one_race_at_a_time(self):
+        entered = threading.Event()
+        release = threading.Event()
+        active = 0
+        maximum = 0
+        mutex = threading.Lock()
+        def score(*args):
+            nonlocal active, maximum
+            with mutex:
+                active += 1
+                maximum = max(maximum, active)
+            entered.set()
+            release.wait(2)
+            with mutex:
+                active -= 1
+            return {'runners': []}
+        instances = []
+        for _ in range(2):
+            instance = object.__new__(rein_score.handler)
+            payload = json.dumps({'race': {}, 'runners': [{}] * 4}).encode()
+            instance.headers = {'content-length': str(len(payload)), 'x-rein-oidc-token': 'test'}
+            instance.rfile = io.BytesIO(payload)
+            instance.wfile = io.BytesIO()
+            instance.send_response = lambda *args: None
+            instance.send_header = lambda *args: None
+            instance.end_headers = lambda: None
+            instances.append(instance)
+        with patch.object(rein_score, 'authorize'), patch.object(rein_score, 'get_runtime', return_value=SimpleNamespace(score=score)):
+            threads = [threading.Thread(target=i.do_POST) for i in instances]
+            for thread in threads: thread.start()
+            self.assertTrue(entered.wait(2))
+            release.set()
+            for thread in threads: thread.join(3)
+            self.assertTrue(all(not thread.is_alive() for thread in threads))
+        self.assertEqual(maximum, 1)
+        self.assertTrue(all(json.loads(i.wfile.getvalue()) == {'runners': []} for i in instances))
+
     def test_warm_runtime_checks_registry_after_five_minutes_without_redownloading_unchanged_bundle(self):
         runtime=object()
         with patch.object(rein_score,'_runtime',runtime), patch.object(rein_score,'_runtime_version','v1'), patch.object(rein_score,'_runtime_checked_at',100), patch.object(rein_score.time,'monotonic',return_value=200), patch.object(rein_score,'_request_registry',return_value={'model':{'version':'v1'}}) as registry, patch.object(rein_score,'_request_bundle') as download:
