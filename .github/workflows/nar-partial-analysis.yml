@@ -536,10 +536,10 @@ jobs:
           echo "Completed NAR chunks downloaded: ${completed}"
           echo "completed=${completed}" >> "${GITHUB_OUTPUT}"
 
-      - name: Compare nine bet types on 2025 and 2026
+      - name: Compare eight bet types with odds conditions on 2025 and 2026
         if: steps.archives.outputs.completed != '0'
         run: |
-          python -u scripts/nar_ticket_research.py --input-dir .nar-dataset --output-dir artifacts/nar-ticket-research
+          python -u scripts/nar_ticket_research.py --input-dir .nar-dataset --output-dir artifacts/nar-ticket-research --odds-filters
           cat artifacts/nar-ticket-research/summary.md >> "${GITHUB_STEP_SUMMARY}"
       - uses: actions/upload-artifact@v4
         if: always()
