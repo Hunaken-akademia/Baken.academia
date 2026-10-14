@@ -1130,10 +1130,10 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           {rolesReady && <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">人気とREINの評価差を見る</summary><MarketReinComparison data={data} horses={listHorses} /></details>}
           {rankingReady && <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">総合評価の詳しい見方</summary><OverallAssessment data={data} insights={insights} onHorse={onHorse} /></details>}
           <details ref={ticketDetails} className="mt-5 scroll-mt-28 rounded-xl border border-slate-700 bg-[#0c192a] p-4" data-testid="ticket-details">
-            <summary className="cursor-pointer font-bold">参考買い目（全券種・本線/対抗/穴）を開く</summary>
+            <summary className="cursor-pointer font-bold">参考買い目（7券種・本線/対抗/穴）を開く</summary>
             <div className="mt-4">
           {data.evaluation?.tickets === "held" && (
-            <HeldPanel text={data.race.league === "nar" ? "地方の自動買い目・回収率は未検証のため保留しています。中央専用の買い目補正は流用しません。" : "買い目は保留中です。人気・着順別モデルの結果がそろってから生成します。"} />
+            <HeldPanel text={data.race.league === "nar" ? "着順適性と全頭の人気・単勝オッズが揃ってから、参考買い目を生成します。" : "買い目は保留中です。人気・着順別モデルの結果がそろってから生成します。"} />
           )}
           <div className="grid gap-3 sm:grid-cols-2">
             {data.tickets.map((ticket) => (
