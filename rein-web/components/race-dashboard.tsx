@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { compactSelections } from "@/lib/tickets";
 import { raceProgress } from "@/lib/race-progress";
+import { missingPredictionItems, updateScheduleText } from "@/lib/prediction-status";
 import { ownsHorizontalGesture } from "@/lib/touch-scroll";
 import { reasonViews } from "@/lib/feature-labels";
 import { longshotRoleOrder } from "@/lib/longshot-roles";
@@ -35,6 +36,8 @@ import type { PaceScenarioId } from "@/lib/pace-scenarios";
 import { PaceScenarioExplorer } from "@/components/pace-scenario-explorer";
 import { PreviousRaceComparison, RaceDayTrends } from "@/components/race-context-panels";
 import { JockeyProfiles } from "@/components/jockey-profiles";
+import { FavoriteEntries, FavoriteJockeyPicker, useFavorites } from "@/components/favorites";
+import { PerformanceDashboard } from "@/components/performance-dashboard";
 import { PredictionJournal, HorseNotebook } from "@/components/prediction-journal";
 import { MarketRankMap } from "@/components/market-rank-map";
 import { PredictionDataStatus } from "@/components/prediction-data-status";
@@ -473,6 +476,15 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
               setVenue(item);
             }}
             historicalDate={historicalDate}
+            onOpenRace={(raceId) => {
+              const owner = schedule?.venues.find((item) => item.races.some((race) => race.raceId === raceId));
+              if (!owner) return;
+              setError("");
+              setFailedRace(null);
+              setVenue(owner);
+              void analyze({ raceId });
+              window.scrollTo({ top: 0, behavior: "auto" });
+            }}
             showCalendar={showCalendar}
             onCalendar={() => {
               setShowCalendar(true);
@@ -575,6 +587,7 @@ function VenueScreen({
   showCalendar,
   onCalendar,
   onSelectHistorical,
+  onOpenRace,
 }: {
   area: "jra" | "nar";
   schedule: Schedule | null;
@@ -587,6 +600,7 @@ function VenueScreen({
   showCalendar: boolean;
   onCalendar: () => void;
   onSelectHistorical: (date: string, venue: Venue) => void;
+  onOpenRace: (raceId: string) => void;
 }) {
   return (
     <>
@@ -667,6 +681,8 @@ function VenueScreen({
           {day === "today" ? "本日" : "明日"}の{area.toUpperCase()}開催はありません
         </div>
       )}
+      {!showCalendar && !historicalDate && <FavoriteEntries league={area} day={day} onOpen={onOpenRace} />}
+      {!showCalendar && <PerformanceDashboard league={area} />}
     </>
   );
 }
@@ -896,8 +912,16 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
   onHorse: (horse: Horse) => void;
 }) {
   const [analysisTab, setAnalysisTab] = useState("prediction");
+  const [showAllHorses, setShowAllHorses] = useState(false);
+  const favorites = useFavorites(data.race.league ?? "jra");
   const [historicalScenario, setHistoricalScenario] = useState<{id:PaceScenarioId;label:string;version:number}|null>(null);
   const analysisNav = useRef<HTMLDivElement>(null);
+  const ticketDetails = useRef<HTMLDetailsElement>(null);
+  const openTickets = () => {
+    if (!ticketDetails.current) return;
+    ticketDetails.current.open = true;
+    requestAnimationFrame(() => ticketDetails.current?.scrollIntoView({ block: "start", behavior: "smooth" }));
+  };
   const changeAnalysisTab = (tab: string) => {
     setAnalysisTab(tab);
     requestAnimationFrame(() => analysisNav.current?.scrollIntoView({ block: "start" }));
@@ -912,36 +936,51 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
   const listHorses = rankingReady
     ? data.horses
     : [...data.horses].sort((a, b) => a.number - b.number);
+  const activeIndex = activeHorse ? listHorses.findIndex((horse) => horse.number === activeHorse.number) : -1;
+  const shownHorses = showAllHorses || activeIndex >= PREVIEW_COUNT ? listHorses : listHorses.slice(0, PREVIEW_COUNT);
   const firstOrder = rolesReady ? roleOrder(data.horses, "first") : [];
   const firstRank = (horse: Horse) =>
     firstOrder.findIndex((item) => item.number === horse.number) + 1;
   return (
     <div className={`rounded-3xl border-2 p-3 transition-colors sm:p-4 ${completePrediction ? "border-emerald-400/70 bg-emerald-400/[.025]" : "border-amber-400/70 bg-amber-400/[.025]"}`}>
-      <div className={`mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${completePrediction ? "border-emerald-400/30 bg-emerald-400/[.08] text-emerald-200" : "border-amber-400/30 bg-amber-400/[.08] text-amber-200"}`}>
-        <div>
-          <p className="text-sm font-bold">{completePrediction ? "完全予想" : "更新待ちの予想"}</p>
-          <p className="mt-0.5 text-xs opacity-75">{completePrediction ? "馬体重を含む当日データを取得済み" : "未発表・未取得の当日データがあります"}</p>
+      <section aria-label="レース情報" className="mb-4 rounded-2xl border border-slate-700 bg-gradient-to-br from-[#10233a] to-[#0b1727] p-4 text-white sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs text-cyan-300 sm:text-sm">
+              {data.race.start}発走 ・ {data.race.updated}
+            </p>
+            {data.prediction && data.prediction.phase !== "prestart" && (
+              <p className="mt-1 text-xs leading-5 text-amber-200">{data.prediction.label}</p>
+            )}
+            <h1 className="mt-1 break-words text-xl font-bold sm:text-3xl">
+              {data.race.title}
+            </h1>
+            <p className="mt-0.5 text-sm text-slate-400">
+              {data.race.course}　{data.race.condition}
+            </p>
+          </div>
+          <Badge className={`shrink-0 ${completePrediction ? "bg-emerald-300 text-emerald-950" : "bg-amber-300 text-amber-950"}`}>
+            {completePrediction ? "完全" : "暫定"}
+          </Badge>
         </div>
-        <Badge className={completePrediction ? "bg-emerald-300 text-emerald-950" : "bg-amber-300 text-amber-950"}>
-          {completePrediction ? "完全" : "暫定"}
-        </Badge>
-      </div>
-      {data.model && (
-        <details className="mb-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-2 text-xs text-slate-400">
-          <summary className="cursor-pointer py-1 font-semibold text-cyan-200">データの集計期間・予想の情報</summary>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 pb-2">
-          <span className="font-semibold text-cyan-300">{data.race.league === "nar" ? data.model.release?.validatedRanking ? "地方専用・全量履歴 接続済み" : "地方の取得済み履歴・暫定版" : "8年履歴 接続済み"}</span>
-          <span>
-            {data.model.races.toLocaleString()}レース・
-            {data.model.runners.toLocaleString()}走
-          </span>
-          {data.model.overallPolicy && <span>{data.model.overallPolicy}</span>}
-          <span>{data.model.strategy}</span>
-          <span>履歴：{data.model.dateFrom}〜{data.model.dateTo}</span>
-          {data.model.markPolicy && <span>印：{data.model.markPolicy}</span>}
-          {data.prediction ? <span>{data.prediction.label}</span> : <span>{data.model.snapshotPolicy}</span>}
-        </div></details>
-      )}
+        <PredictionStatus data={data} complete={completePrediction} />
+        {data.model && (
+          <details className="mt-2 text-xs text-slate-400">
+            <summary className="cursor-pointer py-1 font-semibold text-cyan-200">データの集計期間・予想の情報</summary>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 pb-1">
+            <span className="font-semibold text-cyan-300">{data.race.league === "nar" ? data.model.release?.validatedRanking ? "地方専用・全量履歴 接続済み" : "地方の取得済み履歴・暫定版" : "8年履歴 接続済み"}</span>
+            <span>
+              {data.model.races.toLocaleString()}レース・
+              {data.model.runners.toLocaleString()}走
+            </span>
+            {data.model.overallPolicy && <span>{data.model.overallPolicy}</span>}
+            <span>{data.model.strategy}</span>
+            <span>履歴：{data.model.dateFrom}〜{data.model.dateTo}</span>
+            {data.model.markPolicy && <span>印：{data.model.markPolicy}</span>}
+            {data.prediction ? <span>{data.prediction.label}</span> : <span>{data.model.snapshotPolicy}</span>}
+          </div></details>
+        )}
+      </section>
       {held.length > 0 && (
         <section className="mb-4 rounded-xl border border-amber-400/30 bg-amber-400/[.07] p-3 text-sm text-amber-100">
           <div className="flex flex-wrap items-start gap-2">
@@ -967,24 +1006,6 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           </div>
         </section>
       )}
-      <section className="mb-5 grid grid-cols-1 gap-4">
-        <Card className="min-w-0 border-slate-700 bg-gradient-to-br from-[#10233a] to-[#0b1727] text-white">
-          <CardContent className="p-5 sm:p-6">
-            <p className="text-sm text-cyan-300">
-              {data.race.start}発走 ・ {data.race.updated}
-            </p>
-            {data.prediction && data.prediction.phase !== "prestart" && (
-              <p className="mt-1 text-xs leading-5 text-amber-200">{data.prediction.label}</p>
-            )}
-            <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
-              {data.race.title}
-            </h1>
-            <p className="mt-1 text-slate-400">
-              {data.race.course}　{data.race.condition}
-            </p>
-          </CardContent>
-        </Card>
-      </section>
       <OddsTrendPanel race={data.race} horses={data.horses} />
       <div ref={analysisNav} />
       <Tabs value={analysisTab} onValueChange={changeAnalysisTab} onSwipeBack={onBack}>
@@ -995,7 +1016,9 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
         </TabsList>
         <TabsContent value="prediction">
           {hasGradedRaceHistory(data.race) && <GradedRaceHistory race={data.race} onSimulate={(id,label)=>{setHistoricalScenario(old=>({id,label,version:(old?.version??0)+1}));changeAnalysisTab("formation");}} />}
-          <PickCards data={data} onHorse={onHorse} />
+          <PickCards data={data} onHorse={onHorse}>
+            <TicketSummary data={data} onOpen={openTickets} />
+          </PickCards>
         <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-3">
           <RaceConfidenceCard confidence={data.confidence} nar={data.race.league === "nar"} reference={data.narReference} />
           <Card className="border-slate-700 bg-[#0c192a] text-white">
@@ -1040,7 +1063,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
             {rankingReady ? "順位と評価点はレース内の比較用です。評価点は勝率ではありません。" : "総合順位は保留中のため、馬番順で表示しています。"}
           </p>
           <div className="overflow-hidden rounded-2xl border border-slate-700 bg-[#0c192a]">
-            {listHorses.map((horse, index) => {
+            {shownHorses.map((horse, index) => {
               const expanded = activeHorse?.number === horse.number;
               return (
                 <Fragment key={horse.number}>
@@ -1060,6 +1083,8 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
                         {visibleMark(horse.mark)} {horse.name}
                       </p>
                       <p className="truncate text-xs text-slate-500">
+                        {favorites.isHorse(horse.horseId) && <span className="mr-1 rounded bg-amber-300/15 px-1 text-[10px] text-amber-200">★注目馬</span>}
+                        {favorites.isJockey(horse.jockeyId) && <span className="mr-1 rounded bg-cyan-300/15 px-1 text-[10px] text-cyan-200">★騎手</span>}
                         {[horse.style, visibleVerdict(horse.verdict)].filter(Boolean).join("・")}
                         <span className="hidden sm:inline">
                           　履歴 {horse.historySamples ?? 0}走 / 補正{" "}
@@ -1096,11 +1121,16 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
                 </Fragment>
               );
             })}
+            <ShowAllToggle total={listHorses.length} expanded={shownHorses.length === listHorses.length} onToggle={() => {
+              const expand = shownHorses.length !== listHorses.length;
+              if (!expand && activeHorse && activeIndex >= PREVIEW_COUNT) onHorse(activeHorse);
+              setShowAllHorses(expand);
+            }} />
           </div>
           {rolesReady && <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">人気とREINの評価差を見る</summary><MarketReinComparison data={data} horses={listHorses} /></details>}
           {rankingReady && <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">総合評価の詳しい見方</summary><OverallAssessment data={data} insights={insights} onHorse={onHorse} /></details>}
-          <details className="mt-5 rounded-xl border border-slate-700 bg-[#0c192a] p-4">
-            <summary className="cursor-pointer font-bold">参考買い目を開く</summary>
+          <details ref={ticketDetails} className="mt-5 scroll-mt-28 rounded-xl border border-slate-700 bg-[#0c192a] p-4" data-testid="ticket-details">
+            <summary className="cursor-pointer font-bold">参考買い目（全券種・本線/対抗/穴）を開く</summary>
             <div className="mt-4">
           {data.evaluation?.tickets === "held" && (
             <HeldPanel text={data.race.league === "nar" ? "地方の自動買い目・回収率は未検証のため保留しています。中央専用の買い目補正は流用しません。" : "買い目は保留中です。人気・着順別モデルの結果がそろってから生成します。"} />
@@ -1202,6 +1232,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
 
         </TabsContent>
         <TabsContent value="jockeys">
+          <FavoriteJockeyPicker league={data.race.league ?? "jra"} horses={data.horses} />
           <JockeyProfiles key={data.race.raceId} title={data.race.title} course={data.race.course} league={data.race.league} horses={data.horses} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} />
         </TabsContent>
         <TabsContent value="review">
@@ -2418,55 +2449,78 @@ function RoleRankings({
       color: "text-rose-300",
     },
   ];
+  const [roleKey, setRoleKey] = useState<RoleKey>("first");
+  const [showAll, setShowAll] = useState(false);
+  const role = roles.find((item) => item.role === roleKey) ?? roles[0];
+  const ordered = roleOrder(horses, role.role);
+  const visible = showAll ? ordered : ordered.slice(0, PREVIEW_COUNT);
   return (
-    <div>
+    <div data-testid="role-rankings">
       <p className="mb-3 text-sm text-slate-400">
         各着順専用モデルが、同じレース内での適性を比較したランキングです。
       </p>
-      <div className="grid gap-3 lg:grid-cols-3">
-        {roles.map((role) => (
-          <Card
-            key={role.title}
-            className="border-slate-700 bg-[#0c192a] text-white"
+      <div className="mb-3 flex gap-2" role="group" aria-label="着順適性の切り替え" data-no-swipe>
+        {roles.map((item) => (
+          <button
+            key={item.role}
+            type="button"
+            aria-pressed={roleKey === item.role}
+            onClick={() => setRoleKey(item.role)}
+            className={`min-h-11 flex-1 rounded-lg border px-2 text-sm font-semibold ${roleKey === item.role ? `border-current bg-white/5 ${item.color}` : "border-slate-700 text-slate-400"}`}
           >
-            <CardHeader className="pb-2">
-              <CardTitle className={`text-base ${role.color}`}>
-                {role.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {roleOrder(horses, role.role)
-                .map((horse, index) => (
-                  <button
-                    key={horse.number}
-                    onClick={() => onHorse(horse)}
-                    className="grid w-full grid-cols-[24px_32px_minmax(0,1fr)_auto] items-center gap-2 border-t border-slate-800 px-4 py-3 text-left hover:bg-white/[.03]"
-                  >
-                    <span className="text-center text-xs text-slate-500">
-                      {index + 1}
-                    </span>
-                    <span className="grid size-8 place-items-center rounded-md bg-white font-bold text-slate-900">
-                      {horse.number}
-                    </span>
-                    <span className="truncate text-sm font-semibold">
-                      {horse.name}
-                    </span>
-                    <span className={`text-right font-black ${role.color}`}>
-                      {horse[role.key] ?? 0}
-                      <span className="text-xs font-normal text-slate-500">
-                        pt
-                      </span>
-                      <span className="block text-[10px] font-normal text-slate-500">
-                        {((horse[role.probability] ?? 0) * 100).toFixed(1)}%
-                      </span>
-                    </span>
-                  </button>
-                ))}
-            </CardContent>
-          </Card>
+            {item.title}
+          </button>
         ))}
       </div>
+      <Card className="gap-0 overflow-hidden border-slate-700 py-0 bg-[#0c192a] text-white">
+        <CardContent className="p-0">
+          {visible.map((horse, index) => (
+            <button
+              key={horse.number}
+              data-horse-row
+              onClick={() => onHorse(horse)}
+              className="grid w-full grid-cols-[24px_32px_minmax(0,1fr)_auto] items-center gap-2 border-b border-slate-800 px-4 py-3 text-left last:border-b-0 hover:bg-white/[.03]"
+            >
+              <span className="text-center text-xs text-slate-500">
+                {index + 1}
+              </span>
+              <span className="grid size-8 place-items-center rounded-md bg-white font-bold text-slate-900">
+                {horse.number}
+              </span>
+              <span className="truncate text-sm font-semibold">
+                {horse.name}
+              </span>
+              <span className={`text-right font-black ${role.color}`}>
+                {horse[role.key] ?? 0}
+                <span className="text-xs font-normal text-slate-500">
+                  pt
+                </span>
+                <span className="block text-[10px] font-normal text-slate-500">
+                  {((horse[role.probability] ?? 0) * 100).toFixed(1)}%
+                </span>
+              </span>
+            </button>
+          ))}
+          <ShowAllToggle total={ordered.length} expanded={showAll} onToggle={() => setShowAll((value) => !value)} />
+        </CardContent>
+      </Card>
     </div>
+  );
+}
+
+const PREVIEW_COUNT = 5;
+
+function ShowAllToggle({ total, expanded, onToggle }: { total: number; expanded: boolean; onToggle: () => void }) {
+  if (total <= PREVIEW_COUNT) return null;
+  return (
+    <button
+      type="button"
+      aria-expanded={expanded}
+      onClick={onToggle}
+      className="min-h-11 w-full border-t border-slate-800 px-4 py-2 text-sm font-semibold text-cyan-200 hover:bg-white/[.03]"
+    >
+      {expanded ? `上位${PREVIEW_COUNT}頭だけ表示` : `全${total}頭を見る（残り${total - PREVIEW_COUNT}頭）`}
+    </button>
   );
 }
 
@@ -2479,6 +2533,25 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function PredictionStatus({ data, complete }: { data: Analysis; complete: boolean }) {
+  if (complete) {
+    return <p className="mt-3 rounded-lg bg-emerald-400/[.08] px-3 py-2 text-xs text-emerald-200">完全予想：馬体重を含む当日データを取得済み</p>;
+  }
+  const missing = missingPredictionItems(data);
+  const upcoming = !data.review?.isFinished && (!data.prediction || data.prediction.phase === "preview" || data.prediction.phase === "prestart");
+  return (
+    <div className="mt-3 rounded-lg bg-amber-400/[.08] px-3 py-2 text-xs leading-5 text-amber-100" data-testid="prediction-status">
+      <p className="font-semibold">更新待ち：{missing.length ? missing.join("・") : "当日データ"}</p>
+      {upcoming && (
+        <p className="text-amber-100/75">
+          {updateScheduleText(data.race.startsAt, Date.now(), data.race.league)}
+          開いている画面も5分ごとに自動で切り替わります。
+        </p>
+      )}
+    </div>
+  );
+}
+
 function HeldPanel({ text }: { text: string }) {
   return (
     <div className="mb-3 rounded-2xl border border-dashed border-amber-400/40 bg-amber-400/[.05] p-5 text-sm leading-6 text-amber-100">
@@ -2487,13 +2560,14 @@ function HeldPanel({ text }: { text: string }) {
   );
 }
 
-function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) => void }) {
+function PickCards({ data, onHorse, children }: { data: Analysis; onHorse: (horse: Horse) => void; children?: React.ReactNode }) {
   const picks = data.picks;
   const byNumber = (pick: MarkPick | null | undefined) =>
     pick ? data.horses.find((horse) => horse.number === pick.number) : undefined;
   if (!picks || picks.status !== "ready") {
     return <>
       <p className="mt-5 rounded-xl border border-dashed border-slate-600 p-3 text-sm text-slate-400">評価を保留しています</p>
+      {children}
       <LongshotRoles data={data} onHorse={onHorse} />
     </>;
   }
@@ -2553,11 +2627,46 @@ function PickCards({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) 
       <p className="mt-2 text-[11px] leading-5 text-slate-500">
         本命・対抗・穴候補はREINの参考評価です。
       </p>
+      {children}
       <LongshotRoles data={data} onHorse={onHorse} />
     </>
   );
 }
 
+
+function TicketSummary({ data, onOpen }: { data: Analysis; onOpen: () => void }) {
+  const held = data.evaluation?.tickets === "held";
+  const lines = data.tickets
+    .map((ticket) => ({ type: ticket.type, tier: ticket.tiers.find((tier) => tier.group === "本線" && tier.selections.length) }))
+    .filter((line): line is { type: string; tier: Ticket["tiers"][number] } => !!line.tier);
+  return (
+    <section aria-label="参考買い目の要約" data-testid="ticket-summary" className="mt-3 rounded-xl border border-sky-300/30 bg-sky-300/[.05] p-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-bold text-sky-100">参考買い目（本線）</h2>
+        {!held && lines.length > 0 && <span className="text-[11px] text-slate-400">{lines.length}券種</span>}
+      </div>
+      {held || !lines.length ? (
+        <p className="mt-2 text-xs leading-5 text-slate-400">{held ? "買い目は保留中です。人気・着順別モデルの結果がそろってから表示します。" : "表示できる買い目はまだありません。"}</p>
+      ) : (
+        <ul className="mt-2 divide-y divide-slate-800">
+          {lines.map(({ type, tier }) => {
+            const selections = compactSelections(tier.selections);
+            return (
+              <li key={type} className="grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-baseline gap-2 py-1.5 text-xs">
+                <span className="font-semibold text-slate-200">{type}</span>
+                <span className="truncate font-mono text-slate-100">{selections.slice(0, 3).join(" / ")}{selections.length > 3 ? " ほか" : ""}</span>
+                <span className="text-slate-400">{tier.points}点</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {!held && lines.length > 0 && <button type="button" onClick={onOpen} className="mt-2 min-h-11 w-full rounded-lg border border-sky-300/40 text-sm font-semibold text-sky-100 hover:bg-sky-300/10">
+        対抗・穴を含む全買い目を見る
+      </button>}
+    </section>
+  );
+}
 
 function LongshotRoles({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) => void }) {
   const [role, setRole] = useState<RoleKey>("first");

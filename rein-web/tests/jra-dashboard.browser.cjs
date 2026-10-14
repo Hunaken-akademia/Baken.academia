@@ -4,7 +4,7 @@ function moduleUrl(name){const source=fs.readFileSync(path.join(web,'lib',name+'
 (async()=>{
  const esbuild=require(require.resolve('esbuild',{paths:[process.env.JRA_QA_ESBUILD||web,process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES]}));
  fs.mkdirSync(output,{recursive:true});
- await esbuild.build({entryPoints:[path.join(__dirname,'jra-dashboard-fixture.tsx')],bundle:true,outfile:path.join(output,'dashboard.js'),platform:'browser',jsx:'automatic',alias:{'@':web},define:{'process.env.NODE_ENV':'"production"'}});
+ await esbuild.build({entryPoints:[path.join(__dirname,'jra-dashboard-fixture.tsx')],bundle:true,outfile:path.join(output,'dashboard.js'),platform:'browser',jsx:'automatic',alias:{'@':web},define:{'process.env.NEXT_PUBLIC_SUPABASE_URL':'"http://127.0.0.1:9"','process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY':'"qa-fixture"','process.env.NODE_ENV':'"production"'}});
  const css=fs.readdirSync(path.join(web,'.next/static/chunks')).filter(n=>n.endsWith('.css')).map(n=>fs.readFileSync(path.join(web,'.next/static/chunks',n),'utf8')).join('\n');
  const {jraReferenceForRace}=await import(moduleUrl('jra-reference'));
  const referenceData=JSON.parse(fs.readFileSync(path.join(web,'lib/jra-condition-reference.json'),'utf8'));
@@ -14,26 +14,54 @@ function moduleUrl(name){const source=fs.readFileSync(path.join(web,'lib',name+'
  const fixtureName=gradedRace.name,fixtureVenue=latestEdition.venue;
  const jraReference=jraReferenceForRace(referenceData,{raceName:fixtureName,venue:fixtureVenue,surface:latestEdition.surface,distanceM:latestEdition.distanceM,going:latestEdition.going,year:2026});
  assert.ok(jraReference,'JRA reference data must match fixture');assert.ok(jraReference.graded,'graded trend must match fixture');
- const horses=Array.from({length:12},(_,i)=>({number:i+1,gate:Math.ceil((i+1)/2),name:`検証馬${i+1}`,score:95-i*2,odds:2+i,popularity:i+1,mark:i===0?'◎':i===1?'○':i===5?'☆':'・',style:i<2?'先行':'差し',verdict:i===0?'本命':i===1?'対抗':i===5?'穴候補':`総合${i+1}位`,positives:['検証表示'],cautions:[],firstProbability:.2-i*.005,secondProbability:.15-i*.003,thirdProbability:.12-i*.002,jockey:`検証騎手${i+1}`,historyFactors:[{label:'騎手傾向',samples:100,winRate:12.5,top3Rate:35}],firstSuitability:100-i*4,secondSuitability:95-i*3,thirdSuitability:90-i*2,earlyPosition:i+1,mapPositions:[String(i+1)]}));
- const analysis={jraReference,warnings:[],race:{league:'jra',title:`${fixtureVenue}11R ${fixtureName}`,course:`${latestEdition.surface}${latestEdition.distanceM}m`,condition:latestEdition.going,start:'15:40',updated:'人気・オッズ 15:00取得',raceId:'2606040911',startsAt:Date.parse('2026-10-04T15:40:00+09:00'),dataTimes:{}},prediction:{phase:'prestart',source:'live',generatedAt:'2026-10-04T06:00:00Z',label:'発走前の予想'},evaluation:{roleModel:'ready',overall:'ready',tickets:'ready',held:[]},confidence:null,picks:{status:'ready',main:{number:1,role:'本命',firstRank:1},rival:{number:2,role:'対抗',firstRank:2},longshot:{number:6,role:'穴候補',firstRank:6},longshotCandidates:[{number:6,role:'穴候補',firstRank:6}],longshotStatus:'selected',longshotReason:'検証'},model:{version:'qa',dateFrom:'2019-01-05',dateTo:'2026-09-18',races:26675,runners:368068,horses:43486,strategy:'JRA検証表示',overallPolicy:'検証',markPolicy:'検証'},pace:{label:'先行候補は平均的',detail:'表示検証',leaders:[1,2]},horses,tickets:[]};
+ const horses=Array.from({length:12},(_,i)=>({number:i+1,gate:Math.ceil((i+1)/2),name:`検証馬${i+1}`,score:95-i*2,odds:2+i,popularity:i+1,mark:i===0?'◎':i===1?'○':i===5?'☆':'・',style:i<2?'先行':'差し',verdict:i===0?'本命':i===1?'対抗':i===5?'穴候補':`総合${i+1}位`,positives:['検証表示'],cautions:[],firstProbability:.2-i*.005,secondProbability:.15-i*.003,thirdProbability:.12-i*.002,jockey:`検証騎手${i+1}`,jockeyId:String(1000+i),horseId:String(300+i),historyFactors:[{label:'騎手傾向',samples:100,winRate:12.5,top3Rate:35}],firstSuitability:100-i*4,secondSuitability:95-i*3,thirdSuitability:90-i*2,earlyPosition:i+1,mapPositions:[String(i+1)]}));
+ const analysis={jraReference,warnings:[],race:{league:'jra',title:`${fixtureVenue}11R ${fixtureName}`,course:`${latestEdition.surface}${latestEdition.distanceM}m`,condition:latestEdition.going,start:'15:40',updated:'人気・オッズ 15:00取得',raceId:'2606040911',startsAt:Date.parse('2026-10-04T15:40:00+09:00'),dataTimes:{}},prediction:{phase:'prestart',source:'live',generatedAt:'2026-10-04T06:00:00Z',label:'発走前の予想'},evaluation:{roleModel:'ready',overall:'ready',tickets:'ready',held:[]},confidence:null,picks:{status:'ready',main:{number:1,role:'本命',firstRank:1},rival:{number:2,role:'対抗',firstRank:2},longshot:{number:6,role:'穴候補',firstRank:6},longshotCandidates:[{number:6,role:'穴候補',firstRank:6}],longshotStatus:'selected',longshotReason:'検証'},model:{version:'qa',dateFrom:'2019-01-05',dateTo:'2026-09-18',races:26675,runners:368068,horses:43486,strategy:'JRA検証表示',overallPolicy:'検証',markPolicy:'検証'},pace:{label:'先行候補は平均的',detail:'表示検証',leaders:[1,2]},horses,tickets:[{type:'単勝',tiers:[{group:'本線',points:1,selections:['1']},{group:'穴',points:1,selections:['6']}]},{type:'馬連',tiers:[{group:'本線',points:3,selections:['1-2','1-3','2-3']}]},{type:'三連複',tiers:[{group:'本線',points:4,selections:['1-2-3','1-2-4','1-2-6','1-3-6']}]}]};
  const schedule={dateLabel:'10月4日（日）',updatedAt:new Date().toISOString(),venues:[{name:fixtureVenue,eventId:'qa',nextRace:11,nextStart:'15:40',races:[{number:11,start:'15:40',raceId:'2606040911',title:fixtureName,course:`${latestEdition.surface}${latestEdition.distanceM}m`,status:'次レース'}]}]};
  const jockeyFixture={meta:{league:'jra',dateFrom:'2019-01-01',dateTo:'2026-09-13',starts:480,races:100,jockeys:12,definition:'検証'},profiles:Object.fromEntries(horses.map(h=>[String(h.number),{name:h.jockey,groups:{all:{'':[40,h.number+2,14,18]},venueSurface:{[`${fixtureVenue}|${latestEdition.surface}`]:[40,5,10,14]},venueDistance:{[`${fixtureVenue}|${latestEdition.surface}|${latestEdition.distanceM}`]:[40,5,10,14]},turn:{'右回り':[40,5,10,14]},gate:{'内枠（1〜2）':[40,5,10,14]},surface:{[latestEdition.surface]:[40,5,10,14]},distance:{[String(latestEdition.distanceM)]:[40,5,10,14]},venue:{[fixtureVenue]:[40,5,10,14]}}}]))};
- const server=http.createServer((req,res)=>{const send=(v,t='application/json')=>{res.setHeader('content-type',t+'; charset=utf-8');res.end(t==='application/json'?JSON.stringify(v):v)};if(req.url.endsWith('/jockey-reference'))return send(jockeyFixture);if(req.url.startsWith('/api/races'))return send(schedule);if(req.url.startsWith('/api/analyze'))return send(analysis);if(req.url.startsWith('/api/race-history'))return send({scope:'server',entries:[],races:0,fromDate:null,throughDate:null,summary:[]});if(req.url.startsWith('/api/account-data'))return send({userId:'qa',notes:{}});if(req.url==='/dashboard.js')return send(fs.readFileSync(path.join(output,'dashboard.js')),'application/javascript');if(req.url==='/styles.css')return send(css,'text/css');return send('<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><style>body{margin:0;background:#07111f;color:white}</style></head><body><div id="root"></div><script src="/dashboard.js"></script></body></html>','text/html')});
+ const favoriteState={horses:[{horseId:'302',name:'検証馬3'}],jockeys:[]};
+ const stats=(races,points,hitRaces,returned)=>({races,points,hitRaces,stake:points*100,returned});
+ const performance={days:30,range:{from:'2026-09-15',to:'2026-10-14'},generatedAt:new Date().toISOString(),from:'2026-10-03',to:'2026-10-12',saved:3,counted:2,excluded:{pending:1,scratched:0,noPayout:0},marks:[{key:'main',label:'本命',races:2,wins:1,top2:1,top3:2,winReturn:450,placeReturn:300},{key:'rival',label:'対抗',races:2,wins:0,top2:1,top3:1,winReturn:0,placeReturn:180},{key:'longshot',label:'穴候補',races:1,wins:0,top2:0,top3:0,winReturn:0,placeReturn:0}],tickets:[{type:'単勝',tiers:{本線:stats(2,2,1,450),対抗:stats(2,2,0,0),穴:stats(0,0,0,0)},total:stats(2,4,1,450)}]};
+ const server=http.createServer((req,res)=>{const send=(v,t='application/json')=>{res.setHeader('content-type',t+'; charset=utf-8');res.end(t==='application/json'?JSON.stringify(v):v)};if(req.url.startsWith('/api/analyze/performance'))return send(performance);
+ if(req.url.startsWith('/api/analyze/favorites')){if(req.method==='POST'){let raw='';req.on('data',c=>raw+=c);req.on('end',()=>{const b=JSON.parse(raw);favoriteState.jockeys=b.action==='add'?[...favoriteState.jockeys,{key:b.key,name:b.name}]:favoriteState.jockeys.filter(j=>j.key!==b.key);send(favoriteState);});return;}
+  return send(req.url.includes('day=')?{...favoriteState,date:'2026-10-04',matches:[{raceId:'2606040911',title:`${fixtureVenue}11R ${fixtureName}`,start:'15:40',items:[{number:3,horse:'検証馬3',jockey:'検証騎手3',reasons:['horse']}]}]}:favoriteState);}
+ if(req.url.endsWith('/jockey-reference'))return send(jockeyFixture);if(req.url.startsWith('/api/races'))return send(schedule);if(req.url.startsWith('/api/analyze'))return send(analysis);if(req.url.startsWith('/api/race-history'))return send({scope:'server',entries:[],races:0,fromDate:null,throughDate:null,summary:[]});if(req.url.startsWith('/api/account-data'))return send({userId:'qa',notes:{}});if(req.url==='/dashboard.js')return send(fs.readFileSync(path.join(output,'dashboard.js')),'application/javascript');if(req.url==='/styles.css')return send(css,'text/css');return send('<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><style>body{margin:0;background:#07111f;color:white}</style></head><body><div id="root"></div><script src="/dashboard.js"></script></body></html>','text/html')});
  await new Promise(r=>server.listen(8150,'127.0.0.1',r));
  const {chromium}=require(require.resolve('playwright',{paths:[process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES]})),browser=await chromium.launch({headless:true,...(process.env.JRA_QA_CHROMIUM?{executablePath:process.env.JRA_QA_CHROMIUM}:{}),args:['--no-sandbox','--disable-dev-shm-usage']});
- try{const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];page.on('pageerror',e=>errors.push(String(e)));await page.goto('http://127.0.0.1:8150');await page.getByText(fixtureVenue).first().click();await page.getByText(fixtureName).first().click();await page.getByRole('tab', {name:'予想',exact:true}).waitFor();
+ try{const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];page.on('pageerror',e=>errors.push(String(e)));await page.goto('http://127.0.0.1:8150');const favoriteEntries=page.getByTestId('favorite-entries');await favoriteEntries.getByText('注目馬',{exact:true}).waitFor();
+ const dashboard=page.getByTestId('performance-dashboard');await dashboard.locator('summary').click();
+ await dashboard.getByRole('cell',{name:'225.0%'}).waitFor();
+ await dashboard.getByRole('rowheader',{name:/^単勝/}).waitFor();
+ await dashboard.getByRole('button',{name:'本線',exact:true}).click();
+ await dashboard.getByRole('cell',{name:'225.0%'}).first().waitFor();
+ await page.getByText(fixtureVenue).first().click();await page.getByText(fixtureName).first().click();await page.getByRole('tab', {name:'予想',exact:true}).waitFor();
  await page.getByTestId('graded-history').waitFor();
+const ticketSummary=page.getByTestId('ticket-summary');await ticketSummary.getByText('三連複',{exact:true}).waitFor();
+ assert.equal(await page.getByTestId('ticket-details').evaluate(e=>e.open),false);
+ await ticketSummary.getByRole('button',{name:/全買い目を見る/}).click();
+ assert.equal(await page.getByTestId('ticket-details').evaluate(e=>e.open),true);
+ const rankings=page.getByTestId('role-rankings');
+ assert.equal(await rankings.locator('button[data-horse-row]').count(),5);
+ await rankings.getByRole('button',{name:/全12頭を見る/}).click();
+ assert.equal(await rankings.locator('button[data-horse-row]').count(),12);
+ await rankings.getByRole('button',{name:'3着適性',exact:true}).click();
+ assert.equal(await rankings.getByRole('button',{name:'3着適性',exact:true}).getAttribute('aria-pressed'),'true');
+ await page.getByTestId('prediction-status').getByText(/更新待ち：馬体重/).waitFor();
  assert.equal(await page.getByTestId('race-replay').count(),0);
  await page.getByTestId('graded-history').getByRole('button',{name:/この年をヒントに展開を比較/}).click();
  assert.equal(await page.getByRole('tab',{name:'展開',exact:true}).getAttribute('aria-selected'),'true');
  await page.getByText('参考にした過去開催',{exact:true}).waitFor();
  await page.getByRole('tab',{name:'予想',exact:true}).click();
+ await page.getByText('★注目馬').first().waitFor();
+ await page.getByRole('tab',{name:'騎手',exact:true}).click();
+ const picker=page.getByTestId('favorite-jockeys');const rider=picker.getByRole('button',{name:/検証騎手2/});
+ await rider.click();await page.waitForFunction(()=>document.querySelector('[data-testid="favorite-jockeys"] button[aria-pressed="true"]'));
+ await page.getByRole('tab',{name:'予想',exact:true}).click();await page.getByText('★騎手').first().waitFor();
  for(const tab of ['展開','馬の詳細','騎手','結果','予想']) {
    await page.getByRole('tab',{name:tab,exact:true}).click();
    assert.equal(await page.getByRole('tab',{name:tab,exact:true}).getAttribute('aria-selected'),'true');
    if(tab==='展開') {
      const explorer=page.getByTestId('pace-explorer');await explorer.waitFor();
-     assert.equal(await explorer.locator('tbody tr').count(),12);
+     assert.equal(await explorer.getByRole('region',{name:'展開順位の比較表・横スクロール'}).locator('tbody tr').count(),12);
      for(const scenario of ['lone','steady','duel','sustain','closers']) {
        await explorer.locator(`[data-scenario="${scenario}"]`).click();
        assert.equal(await explorer.locator(`[data-scenario="${scenario}"]`).getAttribute('aria-pressed'),'true');

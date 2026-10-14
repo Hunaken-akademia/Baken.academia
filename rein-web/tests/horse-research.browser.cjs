@@ -21,7 +21,7 @@ function contextData(id, empty = false) {
 }
 (async () => {
   fs.mkdirSync(output, { recursive: true });
-  await esbuild.build({ entryPoints: [path.join(__dirname, 'horse-research-fixture.tsx')], bundle: true, outfile: path.join(output, 'dashboard.js'), platform: 'browser', jsx: 'automatic', alias: { '@': web }, define: { 'process.env.NODE_ENV': '"production"' } });
+  await esbuild.build({ entryPoints: [path.join(__dirname, 'horse-research-fixture.tsx')], bundle: true, outfile: path.join(output, 'dashboard.js'), platform: 'browser', jsx: 'automatic', alias: { '@': web }, define:{'process.env.NEXT_PUBLIC_SUPABASE_URL':'"http://127.0.0.1:9"','process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY':'"qa-fixture"', 'process.env.NODE_ENV': '"production"' } });
   const css = fs.readdirSync(path.join(web, '.next/static/chunks')).filter(n => n.endsWith('.css')).map(n => fs.readFileSync(path.join(web, '.next/static/chunks', n), 'utf8')).join('\n');
   const requests = [];
   const server = http.createServer((req, res) => {

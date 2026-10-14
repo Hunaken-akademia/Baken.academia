@@ -198,6 +198,45 @@ Deno.serve(async req => {
    const schedules = checked(await admin.from("rein_schedule_snapshots").select("race_date,payload,generated_at").eq("league",b.league).gte("race_date",b.from).lte("race_date",b.to).order("race_date"));
    return json({schedules});
   }
+  if (action === "performance") {
+   // Read-only: saved pre-start predictions joined with the final live result for one league and date range.
+   if ((who !== "production" && who !== "preview") || !["jra","nar"].includes(b.league) || !dateValid(b.from) || !dateValid(b.to) || b.from > b.to || Date.parse(b.to)-Date.parse(b.from) > 92*86400_000) return json({error:"Invalid performance range"},400);
+   const idPattern = "_".repeat(b.league === "nar" ? 12 : 10);
+   const prestart: any[] = [];
+   for (let offset = 0; ; offset += 1000) {
+    const page = checked(await admin.from("rein_race_snapshots").select("race_id,race_date,generated_at,picks:payload->picks,tickets:payload->tickets,ticketStatus:payload->evaluation->>tickets,title:payload->race->>title").eq("slot","prestart").like("race_id",idPattern).gte("race_date",b.from).lte("race_date",b.to).order("race_id").range(offset,offset+999));
+    prestart.push(...page);
+    if (page.length < 1000 || prestart.length >= 5000) break;
+   }
+   const outcomes = new Map<string, any>();
+   for (let i = 0; i < prestart.length; i += 200) {
+    const ids = prestart.slice(i,i+200).map((r:any)=>r.race_id);
+    const rows = checked(await admin.from("rein_race_snapshots").select("race_id,is_final,finished:payload->review->isFinished,finishers:payload->review->finishers,payouts:payload->review->payouts,scratched:payload->scratched").eq("slot","live").in("race_id",ids));
+    for (const row of rows) outcomes.set(row.race_id,row);
+   }
+   const number = (pick:any) => Number.isInteger(pick?.number) ? pick.number : null;
+   return json({races:prestart.map((r:any)=>{
+    const o = outcomes.get(r.race_id);
+    const final = !!o?.is_final && o?.finished === true;
+    return {
+     raceId:r.race_id,date:r.race_date,title:r.title??"",generatedAt:r.generated_at,
+     picks:r.picks?.status === "ready" ? {main:number(r.picks.main),rival:number(r.picks.rival),longshot:number(r.picks.longshot)} : null,
+     tickets:r.ticketStatus === "ready" && Array.isArray(r.tickets) ? r.tickets.map((t:any)=>({type:t.type,tiers:(t.tiers??[]).map((x:any)=>({group:x.group,selections:Array.isArray(x.selections)?x.selections:[]}))})) : null,
+     final,
+     finishers:final && Array.isArray(o.finishers) ? o.finishers.map((f:any)=>({number:f.number,finish:f.finish})) : [],
+     payouts:final && Array.isArray(o.payouts) ? o.payouts.map((p:any)=>({type:p.type,selection:p.selection,payout:p.payout})) : [],
+     scratched:Array.isArray(o?.scratched) ? o.scratched.length : 0,
+    };
+   })});
+  }
+  if (action === "entries") {
+   // Read-only: runners (horse and jockey identifiers only) for every saved race on one date.
+   if ((who !== "production" && who !== "preview") || !["jra","nar"].includes(b.league) || !dateValid(b.date)) return json({error:"Invalid entries request"},400);
+   const rows = checked(await admin.from("rein_race_snapshots").select("race_id,slot,title:payload->race->>title,start:payload->race->>start,horses:payload->horses").eq("race_date",b.date).in("slot",["live","preview"]).like("race_id","_".repeat(b.league === "nar" ? 12 : 10)).order("race_id").limit(800));
+   const byRace = new Map<string, any>();
+   for (const row of rows) if (!byRace.has(row.race_id) || row.slot === "live") byRace.set(row.race_id,row);
+   return json({races:[...byRace.values()].map((r:any)=>({raceId:r.race_id,title:r.title??"",start:r.start??"",horses:(Array.isArray(r.horses)?r.horses:[]).map((h:any)=>({number:h.number,name:typeof h.name==="string"?h.name:"",horseId:typeof h.horseId==="string"?h.horseId:null,jockey:typeof h.jockey==="string"?h.jockey:"",jockeyId:typeof h.jockeyId==="string"?h.jockeyId:null}))}))});
+  }
   if (action === "history") {
    if (!raceIdValid(b.raceId)) return json({error:"Invalid race"},400);
    const league=b.league??"jra";
