@@ -3,6 +3,7 @@ import { getCache } from "@vercel/functions";
 import { SUPABASE_URL } from "./supabase/config";
 import type { SharedJournal } from "./prediction-journal";
 import type { SnapshotMeta } from "./analysis-cache";
+import { serverJson, snapshotResponse } from "./server-json";
 
 const brokerUrl = `${SUPABASE_URL}/functions/v1/rein-server-data`;
 const historyCache = getCache({ namespace: "rein-history-display-v1" });
@@ -10,9 +11,8 @@ export type StoredSnapshot = { payload: Record<string, any>; generated_at: strin
 export async function serverData<T>(action: string, params: Record<string, unknown> = {}): Promise<T> {
   const token = await getVercelOidcToken();
   if (!token) throw new Error("Server identity unavailable");
-  const response = await fetch(brokerUrl, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ action, ...params }), cache: "no-store", signal: AbortSignal.timeout(12_000) });
-  if (!response.ok) throw new Error(`Snapshot store ${response.status}`);
-  return await response.json() as T;
+  const response = await snapshotResponse(action, () => fetch(brokerUrl, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ action, ...params }), cache: "no-store", signal: AbortSignal.timeout(12_000) }));
+  return await serverJson<T>(response, "Snapshot store");
 }
 export const storedSnapshot = (raceId: string, slot: "live" | "preview" | "prestart") => serverData<{ snapshot: StoredSnapshot | null }>("read", { raceId, slot });
 export const saveSnapshot = (payload: unknown, preview: boolean) => serverData<{ saved: boolean }>("save", { payload, preview });
