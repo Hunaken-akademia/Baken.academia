@@ -7,6 +7,7 @@ import {
   type ReinEntitlement,
 } from "@/lib/rein-access";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./config";
+import { protectMemberApiRequest } from "@/lib/api-budget";
 
 function isTrustedInternalRequest(request: NextRequest) {
   const secret = process.env.CRON_SECRET || "";
@@ -96,6 +97,9 @@ export async function updateSessionAndAuthorize(request: NextRequest) {
   if (claimsError || !userId) {
     return authError(request, 401, "Googleログインが必要です");
   }
+
+  const blocked = await protectMemberApiRequest(request, userId);
+  if (blocked) return blocked;
 
   const { data, error: membershipError } = await supabase
     .from("rein_memberships")
