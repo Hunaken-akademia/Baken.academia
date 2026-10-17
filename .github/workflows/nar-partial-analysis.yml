@@ -5,6 +5,10 @@ name: NAR rolling partial analysis
 on:
   workflow_dispatch:
     inputs:
+      build_dictionary:
+        description: 'Rebuild and publish the descriptive REIN dictionary from saved results'
+        type: boolean
+        default: false
       audit_second_third:
         description: 'Research only: audit second-place support for third-place ranking'
         type: boolean
@@ -42,7 +46,7 @@ concurrency:
 
 jobs:
   analyze:
-    if: "!contains(github.event.head_commit.message, '[rein-dictionary]') && !contains(github.event.head_commit.message, '[nar-ticket-research]') && !contains(github.event.head_commit.message, '[jockey-correction]') && !contains(github.event.head_commit.message, '[jockey-reference]') && !contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
+    if: "!inputs.build_dictionary && !contains(github.event.head_commit.message, '[rein-dictionary]') && !contains(github.event.head_commit.message, '[nar-ticket-research]') && !contains(github.event.head_commit.message, '[jockey-correction]') && !contains(github.event.head_commit.message, '[jockey-reference]') && !contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -551,7 +555,11 @@ jobs:
           retention-days: 30
 
   dictionary-source:
-    if: contains(github.event.head_commit.message, '[rein-dictionary]')
+    if: github.ref == 'refs/heads/main' && (inputs.build_dictionary == true || contains(github.event.head_commit.message, '[rein-dictionary]'))
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -561,7 +569,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install pandas==2.3.3 pyarrow==19.0.1
+      - run: pip install pandas==2.3.3 pyarrow==19.0.1 numpy==2.2.6 lxml==6.0.2
+      - name: Validate dictionary aggregation rules
+        run: PYTHONPATH=.:src python -m unittest discover -s tests -p test_rein_dictionary.py
       - name: Read saved NAR history for the dictionary
         run: python scripts/download_recall_archives.py
       - name: Export reproducible dictionary input
@@ -582,3 +592,38 @@ jobs:
           path: artifacts/dictionary-source
           retention-days: 30
           if-no-files-found: error
+      - name: Read the frozen central result history
+        uses: actions/download-artifact@v4
+        with:
+          name: rein-role-v4-f09ba60f2141dda639c667423b1a07eec73eb0dc
+          path: .dictionary-jra
+          github-token: ${{ github.token }}
+          run-id: 36202792464
+      - name: Build and reconcile both dictionaries
+        run: |
+          python - <<'PYCODE'
+          from pathlib import Path
+          from datetime import datetime, timedelta, timezone
+          import tarfile
+          import pandas as pd
+          from scripts.build_rein_dictionary import build
+          from scripts.validate_rein_dictionary import validate
+          archive = next(Path('.dictionary-jra').glob('*.tar.gz'))
+          with tarfile.open(archive) as source:
+              source.extractall('.dictionary-jra/extracted', filter='data')
+          central = next(Path('.dictionary-jra/extracted').rglob('history.parquet'))
+          cutoff = str((datetime.now(timezone(timedelta(hours=9))) - timedelta(days=1)).date())
+          out = Path('rein-web/data/dictionary')
+          for league, path in [('jra', central), ('nar', Path('artifacts/dictionary-source/nar-history.parquet'))]:
+              build(pd.read_parquet(path), league, out, cutoff)
+              print(validate(out, league))
+          PYCODE
+      - name: Publish validated descriptive assets
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add rein-web/data/dictionary
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Publish validated REIN dictionary reference data'
+          git pull --rebase origin main
+          git push origin HEAD:main
