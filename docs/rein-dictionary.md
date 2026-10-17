@@ -8,6 +8,8 @@ All counts are exact integers: starts / first / top two / top three. Condition g
 
 Graded results retain the actual date, venue, distance, going, grade, official name and source URL. Condition-changing editions can be filtered. JRA's existing official name lineage is reused. NAR grades require a numbered edition, a known series name and a grade label; promotional titles containing GI or Jpn are rejected. Former TCK女王盃, ジャパンダートダービー and 北海道2歳優駿 remain distinct historical entries. Current grading is not retroactively applied to edition rows. Missing popularity/frames are excluded from their denominators.
 
+Course views show the number of runner starts and explicitly scoped first-favorite statistics. They do not display pooled all-runner win/place rates, recent-30-runner summaries, course-wide success highlights, or course win-rate sorting. Subgroup rows name the horses being counted (for example, horses starting from frame 1), and the subject column stays visible during horizontal scrolling. Fixed course attributes are omitted from the subgroup selector. Missing popularity is shown as unavailable.
+
 ## Rebuild
 
 - `scripts/build_rein_dictionary.py --league jra|nar --input INPUT.parquet --as-of YYYY-MM-DD` creates a bounded search index and 16 detail shards per league under `rein-web/data/dictionary`.

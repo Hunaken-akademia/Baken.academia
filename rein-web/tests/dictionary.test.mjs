@@ -45,6 +45,29 @@ test('dictionary routes retain authentication and league membership boundaries',
  assert.equal((await updateSessionAndAuthorize(request('/dictionary'))).status,307);
  assert.ok(readFileSync(path.join(web,'proxy.ts'),'utf8').includes('"/dictionary/:path*"'));
 });
+test('course profiles identify whose rates are shown and omit pooled course summaries',async()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server'),{NextRequest}=require('next/server');
+ const {dictionaryRequest}=load(path.join(web,'lib/dictionary-server'));
+ const response=await dictionaryRequest(new NextRequest('https://rein.invalid/?kind=course&id='+encodeURIComponent('佐賀|ダート|1400')),'nar');
+ assert.equal(response.status,200);const {profile}=await response.json();
+ const {ProfileDetail}=loader()(path.join(web,'components/rein-dictionary'));
+ const dom=new JSDOM(renderToStaticMarkup(React.createElement(ProfileDetail,{profile}))),doc=dom.window.document;
+ try{
+  const summary=doc.querySelector('[aria-label="コースの収録規模と1番人気の成績"]');assert.ok(summary);
+  assert.match(summary.textContent,/53,513.*頭分/);
+  assert.match(summary.textContent,/このコースの1番人気の馬.*5,286走/);
+  assert.match(summary.textContent,/47\.0%/);assert.doesNotMatch(summary.textContent,/9\.9%/);
+  assert.doesNotMatch(doc.body.textContent,/収録期間全体 \/|直近30出走|収録内で好成績の条件/);
+  assert.match(doc.querySelector('tbody').textContent,/1枠の馬/);
+  assert.equal(doc.querySelector('thead th').textContent,'対象の馬');assert.ok(doc.querySelector('tbody th').classList.contains('sticky'));
+  const groups=[...doc.querySelector('[aria-label="辞典詳細の集計条件"]').options].map(o=>o.value);
+  assert.ok(groups.includes('popularity'));assert.ok(!groups.includes('venueDistance'));assert.ok(!groups.includes('position'));
+  assert.equal(lib.dictionaryCourseSubject('popularity','1番人気'),'1番人気の馬');assert.equal(lib.dictionaryCourseSubject('year','2026'),'2026年の出走馬');
+  assert.deepEqual(lib.dictionaryHighlights({...profile,groups:{going:{重:[100,60,70,80]}}}),[]);
+  const missing={...profile,groups:{...profile.groups,popularity:{不明:profile.counts}}};
+  assert.match(renderToStaticMarkup(React.createElement(ProfileDetail,{profile:missing})),/1番人気の成績は未取得/);
+ }finally{dom.window.close();}
+});
 test('dictionary UI loads profiles, switches conditions and shows fetch failures',async()=>{
  const dom=new JSDOM('<div id="app"></div>',{url:'http://localhost',pretendToBeVisual:true});
  for(const n of ['window','document','navigator','HTMLElement','Element','Node','MutationObserver','CustomEvent','Event'])Object.defineProperty(globalThis,n,{value:dom.window[n],configurable:true});
@@ -59,9 +82,19 @@ test('dictionary UI loads profiles, switches conditions and shows fetch failures
   const buttons=[...document.querySelectorAll('[aria-label="辞典の競馬区分"] button')];assert.equal(buttons.find(b=>b.textContent==='中央').disabled,false);assert.equal(buttons.filter(b=>b.disabled).length,2);
   const entry=document.querySelector('[aria-label="辞典の検索結果"] button');assert.ok(entry);
   await React.act(async()=>entry.click());await settle();
+  assert.match(document.body.textContent,/収録期間全体/);assert.match(document.body.textContent,/収録内の直近30出走/);
   const select=document.querySelector('[aria-label="辞典詳細の集計条件"]');assert.ok(select);
   await React.act(async()=>{select.value='going';select.dispatchEvent(new Event('change',{bubbles:true}));});assert.match(document.querySelector('caption').textContent,/馬場状態/);
   await React.act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='閉じる').click());assert.equal(document.querySelector('[aria-label="辞典詳細の集計条件"]'),null);
+  const searchSort=document.querySelector('[aria-label="辞典の並べ替え"]');
+  await React.act(async()=>{searchSort.value='win';searchSort.dispatchEvent(new Event('change',{bubbles:true}));});await settle();
+  await React.act(async()=>[...document.querySelectorAll('[aria-label="辞典の種類"] button')].find(b=>b.textContent==='コース').click());await settle();
+  const courseEntry=document.querySelector('[aria-label="辞典の検索結果"] button');assert.match(courseEntry.textContent,/延べ出走頭数/);assert.doesNotMatch(courseEntry.textContent,/勝率|3着内率|%/);
+  assert.deepEqual([...searchSort.options].map(o=>o.value),['recent','starts']);assert.equal(searchSort.value,'recent');
+  await React.act(async()=>courseEntry.click());await settle();
+  const courseCondition=document.querySelector('[aria-label="辞典詳細の集計条件"]');
+  await React.act(async()=>{courseCondition.value='popularity';courseCondition.dispatchEvent(new Event('change',{bubbles:true}));});
+  assert.match(document.querySelector('tbody').textContent,/1番人気の馬/);
   fail=true;await React.act(async()=>[...document.querySelectorAll('[aria-label="辞典の種類"] button')].find(b=>b.textContent==='厩舎').click());await settle();assert.match(document.querySelector('[role="alert"]').textContent,/取得テスト失敗/);
  }finally{await React.act(async()=>root.unmount());dom.window.close();globalThis.fetch=oldFetch;}
 });

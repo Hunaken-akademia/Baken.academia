@@ -9,6 +9,14 @@ export type DictionaryIndex = {meta:DictionaryMeta;entries:Record<DictionaryKind
 export type DictionarySearch = {meta:DictionaryMeta;entries:DictionaryEntry[];total:number;offset:number;limit:number};
 export const DICTIONARY_KINDS: [DictionaryKind,string][] = [['horse','馬'],['jockey','騎手'],['trainer','厩舎'],['graded','重賞・グレード'],['course','コース']];
 export const DICTIONARY_GROUPS: Record<string,string> = {venue:'競馬場',surface:'芝・ダート・障害',distance:'距離',going:'馬場状態',turn:'右・左回り',gate:'枠番',venueDistance:'競馬場 × コース × 距離',season:'季節',year:'年別',popularity:'確定人気',position:'過去の位置取り',interval:'レース間隔',jockeyPair:'馬・厩舎 × 騎手',trainerPair:'馬・騎手 × 厩舎'};
+export const DICTIONARY_COURSE_GROUPS = ['gate','popularity','position','going','season','year'];
+export function dictionaryCourseSubject(group:string,key:string){
+  if(group==='gate')return key==='不明'?'枠不明の馬':`${dictionaryLabel(group,key)}の馬`;
+  if(group==='popularity')return key==='不明'?'人気不明の馬':`${key}の馬`;
+  if(group==='position')return key==='記録なし'?'位置取り不明の馬':`最初のコーナーで${key}の馬`;
+  if(group==='going')return key==='不明'?'馬場状態不明の出走馬':`${key}馬場の出走馬`;
+  return `${key}${group==='year'?'年':''}の出走馬`;
+}
 export function dictionaryRate(counts:DictionaryCounts|undefined,index:1|2|3=3){return counts?.[0]?counts[index]/counts[0]*100:null;}
 export function dictionaryInterval(c:DictionaryCounts,index:1|2|3=3){if(!c[0])return null;const n=c[0],p=c[index]/n,z=1.96,k=1+z*z/n,m=(p+z*z/(2*n))/k,h=z*Math.sqrt(p*(1-p)/n+z*z/(4*n*n))/k;return [Math.max(0,m-h)*100,Math.min(1,m+h)*100];}
 export function dictionaryNormalize(s:string){return s.normalize('NFKC').toLowerCase().replace(/\s+/g,'').replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60));}
@@ -24,8 +32,8 @@ export function searchDictionary(index:DictionaryIndex,options:{kind:DictionaryK
   return {meta:index.meta,entries:entries.slice(offset,offset+limit),total:entries.length,offset,limit};
 }
 export function dictionaryHighlights(p:DictionaryProfile){
-  const base=dictionaryRate(p.counts);if(base===null||p.kind==='graded')return [];
-  const minimum=p.kind==='horse'?5:p.kind==='course'?100:30;
+  const base=dictionaryRate(p.counts);if(base===null||p.kind==='graded'||p.kind==='course')return [];
+  const minimum=p.kind==='horse'?5:30;
   return ['venue','surface','distance','going','turn'].flatMap(group=>Object.entries(p.groups[group]??{}).flatMap(([key,c])=>{
     const value=dictionaryRate(c);if(c[0]<minimum||c[0]===p.counts[0]||key==='不明'||value===null||value<base+8)return [];
     return [{group,key,counts:c,lift:value-base}];
