@@ -90,6 +90,8 @@ test('a response crossing the window boundary retries without disabling protecti
 });
 test('bucket selection treats internal inference separately and writes more strictly', () => {
   assert.equal(requestBucket(req('/api/predict/')), 'predict');
+  assert.equal(requestBucket(req('/api/analyze', 'GET')), 'predict');
+  assert.equal(requestBucket(req('/api/nar/analyze', 'POST')), 'predict');
   assert.equal(requestBucket(req('/api/rein_score')), 'internal');
   assert.equal(requestBucket(req('/api/cron/rein-live', 'GET')), 'internal');
   assert.equal(requestBucket(req('/api/stats', 'GET')), 'read');

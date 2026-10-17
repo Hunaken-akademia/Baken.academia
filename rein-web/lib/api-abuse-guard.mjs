@@ -19,7 +19,7 @@ export function equalSecret(supplied, expected) {
 export function requestBucket(request) {
   const path = new URL(request.url).pathname.replace(/\/+$/, '');
   if (/^\/api\/(?:cron(?:[-/]|$)|internal\/|rein_score$)/.test(path)) return 'internal';
-  if (/^\/api\/predict(?:-|$)/.test(path)) return 'predict';
+  if (/^\/api\/predict(?:-|$)/.test(path) || /^\/api\/(?:nar\/)?analyze(?:\/|$)/.test(path)) return 'predict';
   if (path === '/api/premium-login') return 'login';
   return ['GET', 'HEAD', 'OPTIONS'].includes(request.method) ? 'read' : 'write';
 }
