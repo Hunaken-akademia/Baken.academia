@@ -4,6 +4,7 @@ import { getCache, waitUntil } from "@vercel/functions";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { loadHistory, scoreHistory } from "@/lib/history";
 import { buildTickets } from "@/lib/tickets";
+import { applyJraRoleAdjustment, type RoleAdjustment } from "@/lib/role-adjustments";
 import { responseCache } from "@/lib/response-cache";
 import { storedSnapshot, saveSnapshot, claimCapture, releaseCapture, serverData, dateJst } from "@/lib/server-snapshots";
 import {
@@ -45,7 +46,7 @@ const sharedCache = getCache({ namespace: "rein-analysis-v1" });
 const publicCacheHeaders = {
   "Cache-Control": "private, no-store",
 };
-const ROLE_CACHE_VERSION = "2026-10-05-history-refresh-v1";
+const ROLE_CACHE_VERSION = "2026-10-17-conditional-third-v1";
 // Last complete prediction generated before the start time, kept for post-start review.
 const PRESTART_KEY = "prestart-confidence-v2";
 
@@ -578,6 +579,7 @@ async function analyze(request: NextRequest) {
         firstProbability: 0,
         secondProbability: 0,
         thirdProbability: 0,
+        thirdProbabilityBeforeSupport: undefined as number | undefined,
         firstSuitability: 0,
         secondSuitability: 0,
         thirdSuitability: 0,
@@ -665,7 +667,7 @@ async function analyze(request: NextRequest) {
           ...new Set([...horse.cautions, `展開不利 ${horse.paceAdjustment}`]),
         ].slice(0, 5);
     });
-    let roleModel = { version: "", feature_count: 0 };
+    let roleModel: { version: string; feature_count: number; adjustment?: RoleAdjustment } = { version: "", feature_count: 0 };
     let roleModelReady = false;
     let marketDifferenceReady = false;
     let marketDifferenceOrder: number[] | null = null;
@@ -712,6 +714,7 @@ async function analyze(request: NextRequest) {
         .digest("hex")}`;
       type RoleScore = {
         version?: string;
+        roleAdjustment?: RoleAdjustment;
         feature_count?: number;
         market_difference_ready?: boolean;
         runners?: Array<{
@@ -719,6 +722,7 @@ async function analyze(request: NextRequest) {
           first_probability: number;
           second_probability: number;
           third_probability: number;
+          third_probability_before_support?: number;
           market_first_probability?: number | null;
           market_second_probability?: number | null;
           market_third_probability?: number | null;
@@ -765,9 +769,12 @@ async function analyze(request: NextRequest) {
           );
         }
       }
+      scored = applyJraRoleAdjustment(scored, { racecourse, surface, going }, scratchedRows.length > 0);
+      if (!scored.runners?.length) throw new Error("着順モデルの応答が不正です");
       roleModel = {
         version: scored.version || "REIN role v4",
         feature_count: scored.feature_count || 106,
+        adjustment: scored.roleAdjustment,
       };
       const byNumber = new Map(
         scored.runners.map((runner) => [runner.horse_number, runner]),
@@ -791,6 +798,7 @@ async function analyze(request: NextRequest) {
         horse.firstProbability = role.first_probability;
         horse.secondProbability = role.second_probability;
         horse.thirdProbability = role.third_probability;
+        horse.thirdProbabilityBeforeSupport = role.third_probability_before_support;
         horse.firstSuitability = Math.round(
           (100 * role.first_probability) / maxima.first,
         );
@@ -1024,6 +1032,7 @@ async function analyze(request: NextRequest) {
         ...history.meta,
         version: roleModel.version,
         featureCount: roleModel.feature_count,
+        roleAdjustment: roleModel.adjustment,
         overallPolicy: preview
           ? "総合順位：前日暫定（市場情報は未反映）"
           : "総合順位：上位4頭＝市場差式、5位以下＝従来順",

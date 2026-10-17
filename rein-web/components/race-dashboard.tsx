@@ -99,6 +99,7 @@ type Analysis = {
   picks?: Picks;
   scratched?: Array<{ number: number; name: string }>;
   model?: {
+    roleAdjustment?: { version: string; label: string; experimental: boolean };
     release?: { id:string; validatedRanking:boolean; selectionYear:number; auditThrough:string };
     provisional?: boolean;
     probabilityKind?: string;
@@ -1127,6 +1128,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
               setShowAllHorses(expand);
             }} />
           </div>
+          {rolesReady && data.model?.roleAdjustment && <p className="mt-3 rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-3 text-xs leading-5 text-cyan-100">条件付き3着補助を試験採用中：阪神・良馬場では、2着への適性も参考に3着評価を補助しています。過去検証では改善傾向がありましたが、今後も成績を確認します。</p>}
           {rolesReady && <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">人気とREINの評価差を見る</summary><MarketReinComparison data={data} horses={listHorses} /></details>}
           {rankingReady && <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">総合評価の詳しい見方</summary><OverallAssessment data={data} insights={insights} onHorse={onHorse} /></details>}
           <details ref={ticketDetails} className="mt-5 scroll-mt-28 rounded-xl border border-slate-700 bg-[#0c192a] p-4" data-testid="ticket-details">

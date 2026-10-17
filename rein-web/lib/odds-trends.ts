@@ -4,11 +4,11 @@ export type TrendBet = "win" | "bracket_quinella" | "quinella" | "trio";
 export type TrendQuote = { numbers: number[]; odds: number };
 export type TrendRunner = { number: number; gate?: number; odds: number | null; name?: string };
 export type TrendRace = { raceId: string; title: string; course: string; condition: string; startsAt?: number | null; league?: "jra" | "nar"; context?: { ageType?: string }; dataTimes?: { odds?: string | null; card?: string | null } };
-export type TrendRule = { id: string; league: "jra" | "nar"; bet: TrendBet; policy: string; conditions: Record<string,string>; overall: { races: number; roi: number; race_hit_rate: number; points_per_race: number }; periods: Array<{ label: string; races: number; roi: number; roi_without_largest_ticket: number; date_from: string; date_to: string }> };
+export type TrendRule = { id: string; league: "jra" | "nar"; bet: TrendBet; policy: string; conditions: Record<string,string>; evidence?: { experimental: boolean; exclusionUnit: "race"; strictPass: boolean }; annual?: Array<{ year: string; races: number; roi: number }>; overall: { races: number; roi: number; race_hit_rate: number; points_per_race: number }; periods: Array<{ label: string; races: number; roi: number; roi_without_largest_ticket: number; date_from: string; date_to: string }> };
 export type TrendItem = { ruleId: string; state: "ready" | "waiting" | "no-tickets" | "no-prestart"; selections: TrendQuote[]; fetchedAt: string | null; note?: string; saved?: boolean; settlement?: { status: string; returnYen: number | null } };
 export type OddsTrendData = { raceId: string; version: string; phase: "provisional" | "saved-prestart" | "historical"; generatedAt: string; startsAt?: number | null; items: TrendItem[]; error?: string };
 export const TREND_VERSION = catalog.version;
-export const TREND_RULES:TrendRule[] = catalog.rules.map(rule=>({...rule,league:rule.league as "jra"|"nar",bet:rule.bet as TrendBet,conditions:Object.fromEntries(Object.entries(rule.conditions).filter(([,value])=>typeof value==="string"))}));
+export const TREND_RULES:TrendRule[] = catalog.rules.map(rule=>({...rule,league:rule.league as "jra"|"nar",bet:rule.bet as TrendBet,evidence:rule.evidence?.exclusionUnit==="race"?{...rule.evidence,exclusionUnit:"race" as const}:undefined,conditions:Object.fromEntries(Object.entries(rule.conditions).filter(([,value])=>typeof value==="string"))}));
 export const TREND_BET_LABELS: Record<TrendBet,string> = { win:"単勝", bracket_quinella:"枠連", quinella:"馬連", trio:"3連複" };
 
 export function validTrendRaceId(id: string, league: "jra" | "nar") {
@@ -28,6 +28,10 @@ export function ruleMatches(rule: TrendRule, race: TrendRace, horses: TrendRunne
   for(const [key,value] of Object.entries(rule.conditions)) {
     if(key==="venue"&&venue!==value)return false;
     if(key==="going"&&race.condition!==value)return false;
+    if(key==="surface") {
+      const surface=course.includes("障害")?"障害":course.includes("ダート")?"ダート":course.includes("芝")?"芝":undefined;
+      if(!surface){unknown=true;continue;}if(surface!==value)return false;
+    }
     if(key==="distance_band") {const d=Number(course.match(/(\d{3,4})\s*m/i)?.[1]);if(!d){unknown=true;continue;}if(d<1401||d>1800)return false;}
     if(key==="class") {if(/J[・.]?G/.test(title)||!/(?:^|\W)G(?:II|2)(?:\W|$)/.test(title))return false;}
     if(key==="age_type") {const age=race.context?.ageType??ageTypeFromText(title);if(!age){unknown=true;continue;}if(age!==value)return false;}
@@ -66,6 +70,6 @@ export function selectTrendTickets(rule:TrendRule,horses:TrendRunner[],quotes:Tr
   }).slice(0,3);
 }
 export function ruleDescription(rule:TrendRule) {
-  const names:Record<string,string>={going:"馬場",venue:"競馬場",distance_band:"距離",favorite_band:"1番人気の単勝",favorite_gap:"単勝上位の開き",class:"クラス",age_type:"年齢条件",ticket_front_gap:"券種上位の開き"};
+  const names:Record<string,string>={going:"馬場",venue:"競馬場",surface:"コース",distance_band:"距離",favorite_band:"1番人気の単勝",favorite_gap:"単勝上位の開き",class:"クラス",age_type:"年齢条件",ticket_front_gap:"券種上位の開き"};
   return Object.entries(rule.conditions).map(([k,v])=>`${names[k]??k}：${v==="G2"?"GII":v}${k==="distance_band"?"m":k==="favorite_band"?"倍":""}`).join("・");
 }

@@ -1,4 +1,4 @@
-export const BETS:Record<string,string>={"odds90-7354":"win","odds90-6337":"bracket_quinella","odds90-9769":"trio","odds90-2537":"quinella","odds90-46606":"bracket_quinella","odds90-10935":"trio","odds90-4114":"bracket_quinella","odds90-6341":"bracket_quinella","odds90-43158":"trio","odds90-683":"win"};
+export const BETS:Record<string,string>={"odds90-7354":"win","odds90-6337":"bracket_quinella","odds90-9769":"trio","odds90-2537":"quinella","odds90-46606":"bracket_quinella","odds90-10935":"trio","odds90-4114":"bracket_quinella","odds90-6341":"bracket_quinella","odds90-43158":"trio","odds90-683":"win","odds90-2026101701":"trio"};
 export function observationRecord(item:any,snapshot:any,now=Date.now()) {
   const starts=Date.parse(snapshot.starts_at),at=Date.parse(item?.fetchedAt),id=snapshot.race_id,bet=BETS[item?.ruleId];
   if(!bet||snapshot.slot!=="live"||item?.state!=="ready"||!Number.isFinite(starts)||now>=starts||!Number.isFinite(at)||at>now||now-at>600_000||at>=starts||snapshot.payload?.scratched?.length)throw new Error("Not a valid prestart observation");

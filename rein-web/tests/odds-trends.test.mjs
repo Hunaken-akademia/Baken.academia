@@ -12,7 +12,7 @@ const rule=id=>core.TREND_RULES.find(r=>r.id==='odds90-'+id);
 const horses=[1,2,3,4].map(number=>({number,gate:number<=2?1:number-1,odds:4}));
 const race={raceId:'2605040308',title:'東京8R サラ系3歳1勝クラス',course:'芝・左1600m',condition:'良',league:'jra'};
 test('fixed catalog matches exact grade, age and odds thresholds without expanding unknown conditions',()=>{
- assert.equal(core.TREND_RULES.length,10);
+ assert.equal(core.TREND_RULES.length,11);
  assert.equal(core.ruleMatches(rule('4114'),{...race,title:'東京11R テスト GIII'},horses),false);
  assert.equal(core.ruleMatches(rule('4114'),{...race,title:'東京11R テスト GⅡ'},horses),true);
  assert.equal(core.ruleMatches(rule('4114'),{...race,title:'東京11R テスト J・GII'},horses),false);
@@ -29,6 +29,24 @@ test('PL benchmark preserves unordered probability mass and same-frame probabili
  assert.ok(Math.abs(core.selectionProbability(three,'bracket_quinella',[1,2])-2/3)<1e-12);
  const quotes=[{numbers:[4],odds:50},{numbers:[3],odds:20},{numbers:[1],odds:20},{numbers:[2],odds:25}];
  assert.deepEqual(core.selectTrendTickets(rule('7354'),horses,quotes).map(q=>q.numbers),[[1],[3],[2]]);
+});
+test('long-term Nakayama dirt rule gates surface, preserves odds boundaries, and is accepted by durable observation records',()=>{
+ const r=rule('2026101701');assert.equal(r.evidence.experimental,true);assert.equal(r.evidence.strictPass,false);
+ assert.equal(r.periods.length,4);assert.equal(r.annual.length,8);
+ const card={...race,title:'中山8R サラ系3歳以上1勝クラス',course:'ダート・右1800m'};
+ assert.equal(core.ruleMatches(r,card,horses),true);
+ assert.equal(core.ruleMatches(r,{...card,course:'芝・右1800m'},horses),false);
+ assert.equal(core.ruleMatches(r,{...card,course:'障害・芝2880m'},horses),false);
+ assert.equal(core.ruleMatches(r,{...card,course:'1800m'},horses),null);
+ assert.equal(core.ruleMatches(r,{...card,title:'阪神8R テスト'},horses),false);
+ assert.equal(core.ruleMatches(r,{...card,league:'nar'},horses),false);
+ const q=[{numbers:[1,2,3],odds:4.9},{numbers:[1,2,4],odds:5},{numbers:[1,3,4],odds:9.9},{numbers:[2,3,4],odds:10}];
+ const selections=core.selectTrendTickets(r,horses,q);assert.deepEqual(selections.map(x=>x.odds),[5,9.9]);
+ const now=Date.parse('2026-10-17T03:00:00Z');
+ const snapshot={race_id:card.raceId,slot:'live',starts_at:new Date(now+300000).toISOString(),payload:{horses}};
+ const row=record.observationRecord({ruleId:r.id,state:'ready',fetchedAt:new Date(now-1000).toISOString(),selections},snapshot,now);
+ assert.equal(row.payload.bet,'trio');assert.equal(row.stake_yen,200);
+ assert.throws(()=>record.observationRecord({ruleId:r.id,state:'ready',fetchedAt:new Date(now-1000).toISOString(),selections},{...snapshot,race_id:'202610170308'},now));
 });
 test('market parsers preserve real combination headers and reject incomplete or wrong-race books',()=>{
  const meta='<meta property="og:url" content="https://sports.yahoo.co.jp/keiba/race/odds/tfw/2605040308">';

@@ -42,6 +42,7 @@ export type Horse = {
   firstProbability?: number;
   secondProbability?: number;
   thirdProbability?: number;
+  thirdProbabilityBeforeSupport?: number;
   firstSuitability?: number;
   secondSuitability?: number;
   thirdSuitability?: number;

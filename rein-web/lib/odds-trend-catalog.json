@@ -1,5 +1,5 @@
 {
-  "version": "odds90-20261013-v1",
+  "version": "odds90-20261017-v2",
   "validated": false,
   "rules": [
     {
@@ -411,6 +411,103 @@
           "roi_without_largest_ticket": 0.9451013513513513,
           "date_from": "2025-05-03",
           "date_to": "2026-08-30"
+        }
+      ]
+    },
+    {
+      "id": "odds90-2026101701",
+      "league": "jra",
+      "bet": "trio",
+      "policy": "オッズ5〜10未満・最大3点",
+      "conditions": {
+        "venue": "中山",
+        "surface": "ダート"
+      },
+      "evidence": {
+        "experimental": true,
+        "exclusionUnit": "race",
+        "strictPass": false
+      },
+      "overall": {
+        "races": 782,
+        "roi": 1.1284313725490196,
+        "race_hit_rate": 0.23145780051150894,
+        "points_per_race": 1.565217391304348
+      },
+      "periods": [
+        {
+          "label": "探索 2019〜2022",
+          "races": 405,
+          "roi": 1.1630718954248367,
+          "roi_without_largest_ticket": 1.148772504091653,
+          "date_from": "2019-01-05",
+          "date_to": "2022-12-28"
+        },
+        {
+          "label": "確認 2023〜2024",
+          "races": 201,
+          "roi": 1.0758620689655172,
+          "roi_without_largest_ticket": 1.0514195583596215,
+          "date_from": "2023-01-05",
+          "date_to": "2024-12-28"
+        },
+        {
+          "label": "点検 2025",
+          "races": 102,
+          "roi": 1.089090909090909,
+          "roi_without_largest_ticket": 1.0447852760736196,
+          "date_from": "2025-01-05",
+          "date_to": "2025-12-28"
+        },
+        {
+          "label": "点検 2026",
+          "races": 74,
+          "roi": 1.14453125,
+          "roi_without_largest_ticket": 1.084126984126984,
+          "date_from": "2026-01-04",
+          "date_to": "2026-09-13"
+        }
+      ],
+      "annual": [
+        {
+          "year": "2019",
+          "races": 113,
+          "roi": 1.1748427672955974
+        },
+        {
+          "year": "2020",
+          "races": 103,
+          "roi": 0.9273809523809524
+        },
+        {
+          "year": "2021",
+          "races": 95,
+          "roi": 1.282857142857143
+        },
+        {
+          "year": "2022",
+          "races": 94,
+          "roi": 1.3075862068965518
+        },
+        {
+          "year": "2023",
+          "races": 112,
+          "roi": 1.1420765027322404
+        },
+        {
+          "year": "2024",
+          "races": 89,
+          "roi": 0.986764705882353
+        },
+        {
+          "year": "2025",
+          "races": 102,
+          "roi": 1.089090909090909
+        },
+        {
+          "year": "2026",
+          "races": 74,
+          "roi": 1.14453125
         }
       ]
     }

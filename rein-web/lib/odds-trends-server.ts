@@ -81,7 +81,7 @@ export async function captureOddsTrends(payload:Snapshot) {
   await getOddsTrends(id,league,payload);
 }
 export async function getOddsTrends(raceId:string,league:"jra"|"nar",payload?:Snapshot) {
-  const key=`${league}:${raceId}:${payload?.prediction?.generatedAt??"view"}`;
+  const key=`${TREND_VERSION}:${league}:${raceId}:${payload?.prediction?.generatedAt??"view"}`;
   const saved=await cache.get(key).catch(()=>null) as OddsTrendData|null;if(saved&&!(saved.phase==="provisional"&&saved.startsAt&&Date.now()>=saved.startsAt))return saved;
   let job=pending.get(key);if(!job){if(pending.size>=6)throw new Error("Busy");job=build(raceId,league,payload).then(async result=>{await cache.set(key,result,{ttl:60}).catch(()=>{});return result;}).finally(()=>pending.delete(key));pending.set(key,job);}
   return job;
