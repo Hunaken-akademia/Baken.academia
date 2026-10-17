@@ -408,6 +408,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <a href={`/dictionary?area=${area}`} className="inline-flex min-h-11 items-center rounded-xl border border-cyan-300/30 px-3 text-sm font-bold text-cyan-200 hover:bg-cyan-300/10">辞典</a>
             <Button
               aria-label={
                 data ? "最新の馬体重・馬場・オッズで再分析" : "開催情報を更新"

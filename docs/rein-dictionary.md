@@ -1,0 +1,17 @@
+# REIN dictionary
+
+`/dictionary` provides horse, jockey, trainer, course and graded-series reference profiles. Central, local and all views follow the existing membership plan. Per-league APIs are `/api/analyze/dictionary` and `/api/nar/dictionary`; both use the existing proxy entitlement checks. The page additionally verifies a signed-in active membership. Assets are outside `public`, responses are private/no-store, and only requested search pages or profiles are serialized to the browser.
+
+The initial reference release contains official saved results for JRA 2019-01-05–2026-09-13 and NAR 2019-01-01–2026-09-27. These are reference periods, not a live entry list or a claim of complete current coverage. The UI shows exact periods, annual race counts and generation time. Banei is excluded; JRA jumps remain a separate surface. Cancelled/excluded runners do not count, nonfinishers and disqualifications do. Races without a confirmed winner are omitted. Names never replace IDs for entity matching; JRA and NAR identifiers are never merged. Stable identities also retain retired horses and people.
+
+All counts are exact integers: starts / first / top two / top three. Condition groups include venue, surface, exact distance, going, turn, gate, venue × surface × distance, season, year, final popularity and recorded first-corner position where available. Horses add recorded race interval, horse × rider and horse × trainer; riders/trainers add their partnership. Recent totals use the last 5 horse starts or 30 person/course starts present in the dataset. Cross-league starts and data gaps can affect the recorded interval. Descriptive highlights require a minimum sample and are explicitly exploratory; no prediction coefficient or ticket rule is changed.
+
+Graded results retain the actual date, venue, distance, going, grade, official name and source URL. Condition-changing editions can be filtered. JRA's existing official name lineage is reused. NAR grades require a numbered edition, a known series name and a grade label; promotional titles containing GI or Jpn are rejected. Former TCK女王盃, ジャパンダートダービー and 北海道2歳優駿 remain distinct historical entries. Current grading is not retroactively applied to edition rows. Missing popularity/frames are excluded from their denominators.
+
+## Rebuild
+
+- `scripts/build_rein_dictionary.py --league jra|nar --input INPUT.parquet --as-of YYYY-MM-DD` creates a bounded search index and 16 detail shards per league under `rein-web/data/dictionary`.
+- `scripts/validate_rein_dictionary.py` reconciles every index, entity, subgroup and shard before publishing. `tests/test_rein_dictionary.py` covers cancellation, dead heat, identity, duplicate, date, surface and misleading-grade cases.
+- In the existing **NAR rolling partial analysis** workflow, run manually with `build_dictionary: true` to rebuild from licensed archived inputs, validate and commit only the dictionary assets. The task-specific push marker is `[rein-dictionary]`. Empty/invalid results stop publication. No new automatic schedule was added.
+- The initial JRA input is the frozen history artifact from run `36202792464`; NAR inputs use the existing authorized archive reader. Refresh the input source/cutoff when adding more recent reference history; rebuilding unchanged historical archives does not extend coverage.
+- `npm run build` runs the application suite including private API, membership and interactive dictionary checks. This feature never modifies scoring models, old prediction snapshots, membership records or WAKE data.

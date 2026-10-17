@@ -1,0 +1,244 @@
+{
+  "passed": true,
+  "independentRawChecks": [
+    {
+      "league": "jra",
+      "kind": "horse",
+      "id": "2017104266",
+      "name": "カップッチョ",
+      "counts": [
+        88,
+        1,
+        1,
+        6
+      ]
+    },
+    {
+      "league": "jra",
+      "kind": "horse",
+      "id": "2023105474",
+      "name": "トワイライトビュー",
+      "counts": [
+        6,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "league": "jra",
+      "kind": "horse",
+      "id": "2023100444",
+      "name": "ワンダーアンレール",
+      "counts": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "league": "jra",
+      "kind": "jockey",
+      "id": "1126",
+      "name": "松山 弘平",
+      "counts": [
+        6635,
+        918,
+        1668,
+        2305
+      ]
+    },
+    {
+      "league": "jra",
+      "kind": "jockey",
+      "id": "1206",
+      "name": "小林 美駒",
+      "counts": [
+        1338,
+        103,
+        188,
+        276
+      ]
+    },
+    {
+      "league": "jra",
+      "kind": "jockey",
+      "id": "1097",
+      "name": "小島 太一",
+      "counts": [
+        9,
+        0,
+        2,
+        4
+      ]
+    },
+    {
+      "league": "jra",
+      "kind": "trainer",
+      "id": "1075",
+      "name": "矢作 芳人",
+      "counts": [
+        3913,
+        405,
+        753,
+        1071
+      ]
+    },
+    {
+      "league": "jra",
+      "kind": "trainer",
+      "id": "1077",
+      "name": "加藤 和宏",
+      "counts": [
+        1713,
+        25,
+        69,
+        135
+      ]
+    },
+    {
+      "league": "jra",
+      "kind": "trainer",
+      "id": "1222",
+      "name": "古賀 大生",
+      "counts": [
+        27,
+        2,
+        3,
+        7
+      ]
+    },
+    {
+      "league": "nar",
+      "kind": "horse",
+      "id": "30095408426",
+      "name": "アルマヘクトール",
+      "counts": [
+        192,
+        11,
+        28,
+        52
+      ]
+    },
+    {
+      "league": "nar",
+      "kind": "horse",
+      "id": "30093408866",
+      "name": "タドマツリ",
+      "counts": [
+        15,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "league": "nar",
+      "kind": "horse",
+      "id": "30064404707",
+      "name": "エボニードール",
+      "counts": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "league": "nar",
+      "kind": "jockey",
+      "id": "31231",
+      "name": "笹川翼",
+      "counts": [
+        11678,
+        2096,
+        3931,
+        5441
+      ]
+    },
+    {
+      "league": "nar",
+      "kind": "jockey",
+      "id": "31360",
+      "name": "長谷蓮",
+      "counts": [
+        1224,
+        144,
+        299,
+        459
+      ]
+    },
+    {
+      "league": "nar",
+      "kind": "jockey",
+      "id": "60574",
+      "name": "ゴンサ",
+      "counts": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "league": "nar",
+      "kind": "trainer",
+      "id": "10911",
+      "name": "藤田正",
+      "counts": [
+        7095,
+        380,
+        924,
+        1586
+      ]
+    },
+    {
+      "league": "nar",
+      "kind": "trainer",
+      "id": "11479",
+      "name": "繁田健",
+      "counts": [
+        1061,
+        230,
+        416,
+        538
+      ]
+    },
+    {
+      "league": "nar",
+      "kind": "trainer",
+      "id": "40314",
+      "name": "古賀慎",
+      "counts": [
+        1,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "sourceArtifactIds": {
+    "jra": 10893235194,
+    "nar": 12101343100
+  },
+  "note": "Raw source counts independently recalculated for 18 profiles across both leagues, including high/median/low sample counts.",
+  "applicationTests": {
+    "passed": 170,
+    "failed": 0
+  },
+  "aggregationTests": {
+    "passed": 5,
+    "failed": 0
+  },
+  "allExportedGroups": {
+    "jra": 1897600,
+    "nar": 2236720,
+    "passed": true
+  },
+  "build": {
+    "localProductionBuild": "passed",
+    "typeCheck": "passed"
+  },
+  "verificationLimit": "Authenticated production browser interaction has not been performed; API-to-UI interactions and membership authorization were exercised locally."
+}

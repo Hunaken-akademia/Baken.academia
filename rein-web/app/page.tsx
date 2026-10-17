@@ -61,6 +61,8 @@ export default async function ReinHome() {
           </Link>
         </div>
 
+        <Link href="/dictionary" className="mt-5 block rounded-2xl border border-cyan-300/30 bg-cyan-300/5 p-5 font-bold text-cyan-200">REIN辞典を開く →<span className="mt-2 block text-sm font-normal text-slate-400">馬・騎手・厩舎・重賞・コースの条件別成績を調べる</span></Link>
+
         <form action="/auth/signout" method="post" className="mt-8 text-center">
           <button className="text-sm text-slate-500 underline underline-offset-4 hover:text-slate-300">ログアウト</button>
         </form>
