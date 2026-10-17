@@ -1,0 +1,59 @@
+{
+  "version": "rein-dictionary-v1",
+  "league": "jra",
+  "dateFrom": "2019-01-05",
+  "dateTo": "2026-09-13",
+  "races": 26675,
+  "starts": 366691,
+  "generatedAt": "2026-10-17T13:12:35.982366+00:00",
+  "definition": "取消・除外・ばんえい・勝ち馬未確認のレースを除外。中止・失格は出走数に含む。同着は各馬の確定着順を集計。未収録の出走は含まない。",
+  "source": "JRA公式の保存結果",
+  "sourceUrl": "https://www.jra.go.jp/datafile/seiseki/replay/",
+  "coverage": {
+    "2019": {
+      "races": 3452,
+      "starts": 47345
+    },
+    "2020": {
+      "races": 3456,
+      "starts": 48127
+    },
+    "2021": {
+      "races": 3456,
+      "starts": 47660
+    },
+    "2022": {
+      "races": 3456,
+      "starts": 47054
+    },
+    "2023": {
+      "races": 3456,
+      "starts": 47493
+    },
+    "2024": {
+      "races": 3454,
+      "starts": 46994
+    },
+    "2025": {
+      "races": 3455,
+      "starts": 47715
+    },
+    "2026": {
+      "races": 2490,
+      "starts": 34303
+    }
+  },
+  "entities": {
+    "horse": 43471,
+    "jockey": 185,
+    "trainer": 244,
+    "course": 135,
+    "graded": 140
+  },
+  "audit": {
+    "inputRows": 368068,
+    "excludedRows": 1377,
+    "definition": "取消・除外・ばんえい・勝ち馬未確認のレースを除外。中止・失格は出走数に含む。同着は各馬の確定着順を集計。未収録の出走は含まない。"
+  },
+  "encodedBytes": 17527293
+}
