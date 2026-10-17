@@ -42,7 +42,7 @@ concurrency:
 
 jobs:
   analyze:
-    if: "!contains(github.event.head_commit.message, '[nar-ticket-research]') && !contains(github.event.head_commit.message, '[jockey-correction]') && !contains(github.event.head_commit.message, '[jockey-reference]') && !contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
+    if: "!contains(github.event.head_commit.message, '[rein-dictionary]') && !contains(github.event.head_commit.message, '[nar-ticket-research]') && !contains(github.event.head_commit.message, '[jockey-correction]') && !contains(github.event.head_commit.message, '[jockey-reference]') && !contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -549,3 +549,36 @@ jobs:
           path: artifacts/nar-ticket-research
           if-no-files-found: warn
           retention-days: 30
+
+  dictionary-source:
+    if: contains(github.event.head_commit.message, '[rein-dictionary]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install pandas==2.3.3 pyarrow==19.0.1
+      - name: Read saved NAR history for the dictionary
+        run: python scripts/download_recall_archives.py
+      - name: Export reproducible dictionary input
+        run: |
+          python - <<'PYCODE'
+          from pathlib import Path
+          import pandas as pd
+          paths = sorted(p for p in Path('.nar-dataset').rglob('nar-*.parquet') if not any(s in p.name for s in ['-odds-', '-payouts', '-manifest']))
+          data = pd.concat([pd.read_parquet(p) for p in paths], ignore_index=True)
+          data = data.drop_duplicates(['race_id', 'horse_number'], keep='last')
+          out = Path('artifacts/dictionary-source'); out.mkdir(parents=True, exist_ok=True)
+          data.to_parquet(out / 'nar-history.parquet', index=False)
+          print('Dictionary source:', len(paths), 'archives;', len(data), 'rows;', data.race_id.nunique(), 'races')
+          PYCODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rein-dictionary-source-${{ github.run_id }}
+          path: artifacts/dictionary-source
+          retention-days: 30
+          if-no-files-found: error
