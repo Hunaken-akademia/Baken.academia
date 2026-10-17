@@ -568,7 +568,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
       - run: pip install pandas==2.3.3 pyarrow==19.0.1 numpy==2.2.6 lxml==6.0.2
       - name: Validate dictionary aggregation rules
         run: PYTHONPATH=.:src python -m unittest discover -s tests -p test_rein_dictionary.py
