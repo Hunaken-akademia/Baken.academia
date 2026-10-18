@@ -65,8 +65,9 @@ class NarTicketResearchTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             pd.DataFrame(rows).to_parquet(root / 'nar-fixture.parquet')
-            with patch('scripts.nar_ticket_research.fit_live_model', return_value=model), patch('scripts.nar_ticket_research.prior_features', side_effect=lambda d: np.ones((len(d), 1))), patch('scripts.nar_ticket_research.inputs_by_mode', side_effect=lambda x, r: {'absolute': x}):
+            with patch('scripts.nar_ticket_research.fit_live_model', return_value=model) as fit_model, patch('scripts.nar_ticket_research.prior_features', side_effect=lambda d: np.ones((len(d), 1))), patch('scripts.nar_ticket_research.inputs_by_mode', side_effect=lambda x, r: {'absolute': x}):
                 report = build_report(root, root / 'out', odds_filters=True)
+                self.assertEqual(fit_model.call_args.kwargs, {'refit_for_serving': False})
             self.assertEqual(report['coverage']['evaluated_races'], 2)
             self.assertEqual(report['coverage']['skipped']['invalid_or_refund_field'], 1)
             self.assertEqual({r['period'] for r in report['results']}, {'2025_selection', '2026_check'})

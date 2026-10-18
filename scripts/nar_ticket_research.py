@@ -167,7 +167,7 @@ def build_report(input_dir, output_dir, odds_filters=False):
     invalid_races = set(data.loc[original_status.str.contains('取消|除外|中止|失格') | data.finish_position.isna(), 'race_id'])
     data = data.loc[data.finish_position.notna()].sort_values(['race_date', 'race_id', 'horse_number'])
     data = data.drop_duplicates(['race_id', 'horse_id']).reset_index(drop=True)
-    model = fit_live_model(data)
+    model = fit_live_model(data, refit_for_serving=False)
     if model.get('status') != 'provisional':
         raise ValueError('Role model has insufficient chronological coverage')
     modes = inputs_by_mode(prior_features(data), data.race_id)

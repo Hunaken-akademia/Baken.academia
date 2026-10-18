@@ -23,3 +23,12 @@ supabase/.temp/
 # Local frozen model bundle used for accuracy research
 .second-third-audit/
 .nar-dataset/
+
+# Local retrospective research inputs and caches
+research-input/
+research-cache/
+
+# Full aggregate research output is distributed as the report archive.
+reports/rein-comprehensive-20261018/*.json
+!reports/rein-comprehensive-20261018/manifest.json
+!reports/rein-comprehensive-20261018/review-summary.json

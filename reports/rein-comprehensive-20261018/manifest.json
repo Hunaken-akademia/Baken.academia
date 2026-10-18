@@ -1,0 +1,55 @@
+{
+  "created": "2026-10-18",
+  "baseline_commit": "1308ca3577a88c000da87213a2ff46c5732a3216",
+  "python": "3.12.14",
+  "packages": {
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "scipy": "1.17.0",
+    "sklearn": "1.8.0",
+    "lightgbm": "4.6.0",
+    "pyarrow": "23.0.1"
+  },
+  "artifacts": {
+    "jra_model_and_history": 10893235194,
+    "nar_history": 12101739035,
+    "metadata": 11737120265,
+    "final_odds_shards": [
+      11738520332,
+      11738151805,
+      11737911146,
+      11737442430,
+      11737070167,
+      11736909151
+    ]
+  },
+  "input_files": [
+    {
+      "path": "research-input/12101739035/nar-history.parquet",
+      "bytes": 112828674,
+      "sha256": "690d3923f0d26f5bf801654ddef61d64499fcb4d5b3a843931ef4675320b0abe"
+    },
+    {
+      "path": "research-input/11737120265/race-metadata.parquet",
+      "bytes": 2347668,
+      "sha256": "8d4f1a2bde2f5b733de345e473b3ac5493034c74d14a7cd3edc7db8f8032a836"
+    },
+    {
+      "path": "research-input/prepared/nar-baseline.parquet",
+      "bytes": 140959386,
+      "sha256": "93e904a0885e3a0a86c2afd7a8200a48abb0231390a5cafd979f008a149558a0"
+    },
+    {
+      "path": "research-input/prepared/jra-baseline.parquet",
+      "bytes": 10153288,
+      "sha256": "28b35c854a6afcfab84398a55dd52a222ea2ec8924a0fef91705a8dc4c6fc0af"
+    },
+    {
+      "path": ".second-third-audit/jra/rein-role-v4-f09ba60f2141dda639c667423b1a07eec73eb0dc/data/history.parquet",
+      "bytes": 6880690,
+      "sha256": "bb0b24eee8089c4ce1028a343bd0f4eed14f508e2fae8988daab4895f6ef1bd4"
+    }
+  ],
+  "test_result": "13 passed",
+  "scope": "aggregate research only; no raw runner data or model files in deliverable"
+}

@@ -68,7 +68,7 @@ def audit(frame: pd.DataFrame, scores: np.ndarray, target: int) -> dict:
             for p in (1, 4, 10) for g in [actual if p == 1 else actual.loc[actual.popularity.ge(p)]]}
 
 
-def fit_live_model(frame: pd.DataFrame) -> dict:
+def fit_live_model(frame: pd.DataFrame, *, refit_for_serving: bool = True) -> dict:
     data = frame.loc[frame.finish_position.notna()].sort_values(["race_date", "race_id", "horse_number"]).reset_index(drop=True)
     x_modes = inputs_by_mode(prior_features(data), data.race_id)
     train = data.race_date.lt("2025-01-01").to_numpy()
@@ -91,8 +91,11 @@ def fit_live_model(frame: pd.DataFrame) -> dict:
         # Resolve ties deterministically, preferring the lower dimensional model.
         mode = max(candidates, key=lambda pair: (pair[0], {"absolute": 2, "relative": 1, "hybrid": 0}[pair[1]]))[1]
         features = x_modes[mode]
-        scaler = StandardScaler().fit(features)
-        fitted = LogisticRegression(C=0.1, max_iter=250).fit(scaler.transform(features), y)
+        # Serving may refit on all available history; backtests must keep the
+        # original training cutoff, including the scaler.
+        fit_mask = np.ones(len(data), dtype=bool) if refit_for_serving else train
+        scaler = StandardScaler().fit(features[fit_mask])
+        fitted = LogisticRegression(C=0.1, max_iter=250).fit(scaler.transform(features[fit_mask]), y[fit_mask])
         coef = fitted.coef_[0] / scaler.scale_
         intercept = fitted.intercept_[0] - np.dot(coef, scaler.mean_)
         roles[str(target)] = {"mode": mode, "coef": np.round(coef, 9).tolist(), "intercept": round(float(intercept), 9)}
@@ -100,7 +103,9 @@ def fit_live_model(frame: pd.DataFrame) -> dict:
         "status": "provisional", "version": "nar-history-ranker-v1", "features": FEATURES,
         "roles": roles, "comparison": comparison,
         "marketBaseline2026": {str(t): audit(data.loc[test], -data.loc[test, "popularity"].fillna(999).to_numpy(), t) for t in (1, 2, 3)},
+        "refitForServing": refit_for_serving,
+        "coefficientTrainingPeriod": "all available history" if refit_for_serving else "2019-2024 only",
         "selectionPeriod": "2025", "auditPeriod": "2026 (取得済み範囲)",
         "probabilityKind": "ranking-share", "inputs": "発走日前の地方履歴のみ。当日オッズ・人気は不使用。",
-        "note": "相対・絶対・ハイブリッドを2025年の適性Top5で選択。2026年は未使用監査。数値は未校正の評価シェアで、的中確率ではありません。",
+        "note": "相対・絶対・ハイブリッドを2025年の適性Top5で選択。2026年は過去に確認済みの遡及監査。数値は未校正の評価シェアで、的中確率ではありません。",
     }
