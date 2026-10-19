@@ -42,6 +42,7 @@ import { PredictionJournal, HorseNotebook } from "@/components/prediction-journa
 import { MarketRankMap } from "@/components/market-rank-map";
 import { PredictionDataStatus } from "@/components/prediction-data-status";
 import { OddsTrendPanel } from "@/components/odds-trend-panel";
+import { OddsTrendBoard } from "@/components/odds-trend-board";
 import { UpdateNotice } from "@/components/update-notice";
 import { RaceCalendar } from "@/components/race-calendar";
 import { ReinCloudProvider } from "@/components/rein-cloud-provider";
@@ -684,6 +685,7 @@ function VenueScreen({
         </div>
       )}
       {!showCalendar && !historicalDate && <FavoriteEntries league={area} day={day} onOpen={onOpenRace} />}
+      {!showCalendar && !historicalDate && day === "today" && <OddsTrendBoard league={area} onOpen={onOpenRace} />}
       {!showCalendar && <PerformanceDashboard league={area} />}
     </>
   );
