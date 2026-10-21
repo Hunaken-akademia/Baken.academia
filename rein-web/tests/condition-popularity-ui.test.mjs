@@ -16,6 +16,10 @@ test('matrix reasons, sparse data and automatic pattern predictions render witho
  const button=name=>[...doc.querySelectorAll('button')].find(el=>el.getAttribute('aria-label')===name||el.textContent===name);
  button('1 検証馬1・距離 ◎の根拠').click();await tick();assert.match(doc.querySelector('[aria-label="全頭の適性早見表"] [role="status"]').textContent,/10走・3着内率 60.0%・通算比 \+20.0pt/);
  assert.doesNotMatch(doc.querySelector('[aria-label="全頭の適性早見表"] table').textContent,/血統/);
+ button('1 検証馬1・騎手との相性 ◎の根拠').click();await tick();assert.match(doc.querySelector('[aria-label="全頭の適性早見表"] [role="status"]').textContent,/騎手1騎手で3-2-1-1・7走/);
+ button('2 検証馬2・騎手との相性 —の根拠').click();await tick();assert.match(doc.querySelector('[aria-label="全頭の適性早見表"] [role="status"]').textContent,/騎手2騎手とは初コンビ/);
+ const sireRow=[...doc.querySelectorAll('[aria-label="全頭の適性早見表"] tr')].find(tr=>tr.querySelector('th')?.textContent.startsWith('種牡馬'));
+ assert.equal(sireRow.querySelectorAll('td')[0].textContent,'フリオーソ（モンテロッソ）');assert.equal(sireRow.querySelectorAll('td')[1].textContent,'—');
  button('1 検証馬1の詳細を見る').click();assert.equal(doc.querySelector('#detail').textContent,'検証馬1');
  assert.match(doc.querySelector('[aria-label="人気パターン予測"]').textContent,/② 適性表だけの参考予測/);
  await tick();

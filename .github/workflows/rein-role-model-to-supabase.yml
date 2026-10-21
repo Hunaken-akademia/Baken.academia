@@ -92,9 +92,12 @@ jobs:
   refresh-history:
     if: contains(github.event.head_commit.message, '[history-refresh]') || (github.event_name == 'workflow_run' && (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'))
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Sire lookups from past race cards catch up within a daily budget (one page
+    # per 3-4 s); afterwards only new horses are fetched.
+    timeout-minutes: 330
     env:
       SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-rein-model"
+      JRA_PEDIGREE_BUDGET_MINUTES: "290"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

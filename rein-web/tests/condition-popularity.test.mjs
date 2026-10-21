@@ -18,6 +18,12 @@ test('condition symbols show sparse observed data with reference labels and shri
   assert.equal(conditionSymbol(horse(100,1,4),'距離適性').confidence,'reference');
   assert.equal(conditionSymbol(horse(80),'馬場適性').symbol,'—');
   assert.equal(conditionSymbol({historyFactors:[{label:'騎手傾向',samples:500,top3Rate:80}]},'騎手相性').symbol,'—');
+  const pair=conditionSymbol({jockey:'服部茂 ',historyFactors:[{label:'通算成績',samples:14,top3Rate:85.7},{label:'騎手相性',samples:7,wins:3,top3:6,top3Rate:85.7,record:'3-2-1-1'}]},'騎手相性');
+  assert.equal(pair.symbol,'◎');assert.match(pair.detail,/^服部茂騎手で3-2-1-1・7走・3着内率 85.7%・実績率による参考評価$/);
+  const sire=conditionSymbol({historyFactors:[{label:'通算成績',samples:20,top3Rate:90},{label:'血統適性',samples:40,top3Rate:40,baseline:30,subject:'フリオーソ産駒・1600〜1799m'}]},'血統適性');
+  assert.equal(sire.symbol,'○');assert.equal(sire.detail,'フリオーソ産駒・1600〜1799m 40走・3着内率 40.0%・産駒全体（30.0%）比 +10.0pt');
+  const first=conditionSymbol({jockey:'小野楓',historyFactors:[{label:'騎手相性',samples:0,top3Rate:0,record:'0-0-0-0'}]},'騎手相性');
+  assert.equal(first.symbol,'—');assert.equal(first.detail,'小野楓騎手とは初コンビ（騎乗実績なし）');
 });
 test('popularity boundaries cover A to D and never invent missing popularity',()=>{
   for(const [value,group] of [[1,'A'],[3,'A'],[4,'B'],[6,'B'],[7,'C'],[9,'C'],[10,'D'],[18,'D']]) assert.equal(popularityGroup(value),group);

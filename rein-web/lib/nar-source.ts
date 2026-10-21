@@ -1,6 +1,6 @@
 // NAR pages have nested tables. Split on runner blocks, not arbitrary <tr>s.
 export const NAR_COURSES: Record<string, string> = {"03":"帯広","10":"盛岡","11":"水沢","18":"浦和","19":"船橋","20":"大井","21":"川崎","22":"金沢","23":"笠松","24":"名古屋","27":"園田","28":"姫路","31":"高知","32":"佐賀","36":"門別"};
-export const narText = (s: string) => s.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<[^>]+>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim();
+export const narText = (s: string) => s.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<[^>]+>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/&#0*39;/g,"'").replace(/&amp;/g,"&").replace(/\s+/g," ").trim();
 const contents = (html: string, tag: string, cls: string) => [...html.matchAll(new RegExp(`<${tag}\\b[^>]*class=["'][^"']*\\b${cls}\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/${tag}>`,"gi"))].map(m=>m[1]);
 const cell = (html: string, cls: string) => narText(contents(html,"td",cls)[0] ?? "");
 const idFrom = (html: string, key: string) => html.match(new RegExp(`${key}=(\\d+)`))?.[1] ?? "";
@@ -53,6 +53,9 @@ export type NarHorse = {
   jockey:string; trainer:string; odds:number|null; popularity:number; weight?:number; weightChange?:number;
   age?:number; sex?:string; weightCarried?:number; style:string; earlyPosition:number|null;
   recentPositions:string[]; mapPositions:string[]; pastCorners:number[];
+  // Official card record of today's jockey on this horse (1st-2nd-3rd-other).
+  jockeyRecord?:{starts:number;wins:number;seconds:number;thirds:number};
+  sire?:string; dam?:string; damSire?:string;
 };
 function raceHeading(html: string, raceId: string) {
   const key = narRaceKey(raceId); if (!key) throw new Error("Invalid NAR race");
@@ -95,8 +98,17 @@ export function parseNarCard(html: string, raceId: string) {
     // Only the past-race timing cells contain time + passing order + final 3f.
     const positions = [...block.matchAll(/\d+:\d{2}\.\d\s*[　\s]+(\d{1,2}(?:-\d{1,2}){1,3})\s*[　\s]+\d+\.\d/g)].map(m=>m[1]).slice(0,5);
     const early = positions.length ? positions.reduce((s,p,i)=>s+Number(p.split("-")[0])*(5-i),0)/positions.reduce((s,_,i)=>s+5-i,0) : null;
-    const weightCarried = narText(block).match(/(?:生|毛)\s+(\d{2,3}\.\d)\s+/)?.[1];
-    horses.push({horseId:idFrom(block,"k_lineageLoginCode"),number,gate,name,jockeyId:idFrom(block,"k_riderLicenseNo"),trainerId:idFrom(block,"k_trainerLicenseNo"),jockey:narText(contents(block,"a","jockeyName")[0] ?? "").split("（")[0],trainer:narText(block.match(/<a[^>]*href=["'][^"']*TrainerMark[^"']*["'][^>]*>([\s\S]*?)<\/a>/)?.[1] ?? ""),odds,popularity,...(weight?{weight:Number(weight[1]),...(weight[2]!==undefined?{weightChange:Number(weight[2])}:{})}:{}),...(age?{sex:age[1],age:Number(age[2])}:{}),...(weightCarried?{weightCarried:Number(weightCarried)}:{}),style:early===null?"不明":early<=2?"逃げ":early<=4?"先行":early<=6?"好位":early<=9?"差し":"追込",earlyPosition:early,recentPositions:positions,mapPositions:positions,pastCorners:positions.map(p=>p.split("-").length)});
+    // The cell after the birthday holds the apprentice mark, weight carried and
+    // today's jockey's record on this horse, e.g. "☆ 55.0　0-0-0-3".
+    const ride = [...block.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m=>narText(m[1]).match(/^\D{0,2}(\d{2,3}\.\d)\s+(\d+)-(\d+)-(\d+)-(\d+)$/)).find(Boolean);
+    // Apprentice marks (☆▲△★◇) sit between the birthday and the weight.
+    const weightCarried = ride?.[1] ?? narText(block).match(/(?:生|毛)\s+(?:[☆▲△★◇]\s*)?(\d{2,3}\.\d)\s+/)?.[1];
+    const jockeyRecord = ride ? (([w,s2,t,o])=>({starts:w+s2+t+o,wins:w,seconds:s2,thirds:t}))(ride.slice(2,6).map(Number)) : undefined;
+    // Pedigree is the last three plain three-column cells: sire, dam, (dam sire).
+    // Other plain cells of that width (such as best times) come before them.
+    const lineage = [...block.matchAll(/<td\b[^>]*colspan=["']?3["']?[^>]*>([^<]*)<\/td>/gi)].map(m=>narText(m[1])).slice(-3);
+    const [sire, dam, damSire] = lineage.length === 3 && lineage[0] && lineage[1] && /^（.+）$/.test(lineage[2]) ? [lineage[0], lineage[1], lineage[2].slice(1,-1)] : [];
+    horses.push({horseId:idFrom(block,"k_lineageLoginCode"),number,gate,name,jockeyId:idFrom(block,"k_riderLicenseNo"),trainerId:idFrom(block,"k_trainerLicenseNo"),jockey:narText(contents(block,"a","jockeyName")[0] ?? "").split("（")[0],trainer:narText(block.match(/<a[^>]*href=["'][^"']*TrainerMark[^"']*["'][^>]*>([\s\S]*?)<\/a>/)?.[1] ?? ""),odds,popularity,...(weight?{weight:Number(weight[1]),...(weight[2]!==undefined?{weightChange:Number(weight[2])}:{})}:{}),...(age?{sex:age[1],age:Number(age[2])}:{}),...(weightCarried?{weightCarried:Number(weightCarried)}:{}),...(jockeyRecord?{jockeyRecord}:{}),...(sire?{sire,dam,damSire}:{}),style:early===null?"不明":early<=2?"逃げ":early<=4?"先行":early<=6?"好位":early<=9?"差し":"追込",earlyPosition:early,recentPositions:positions,mapPositions:positions,pastCorners:positions.map(p=>p.split("-").length)});
   }
   if (!horses.length || new Set(horses.map(h=>h.number)).size!==horses.length || horses.some(h=>h.gate<1||h.gate>8)) throw new Error("地方出走表を安全に読み取れませんでした");
   return {race:{raceId,title:`${key.venue} ${key.number}R ${raceName}`,course,condition:going,start,startsAt:Date.parse(`${key.date}T${start}:00+09:00`),updated:"",league:"nar" as const},horses,scratched,context:{racecourse:key.venue,surface,distanceM:distance,going,code:key.code,date:key.date}};

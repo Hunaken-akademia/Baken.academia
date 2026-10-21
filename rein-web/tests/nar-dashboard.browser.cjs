@@ -22,7 +22,7 @@ async function load(name, replacements=[]) {return import(moduleUrl(name,replace
   const {parseNarCard,parseNarSchedule}=await load('nar-source');
   const validationUrl=moduleUrl('nar-validation',[[/from "\.\/marks"/,`from ${JSON.stringify(moduleUrl('marks'))}`]]);
   const {narReferenceSignals}=await import(validationUrl);
-  const {narRank}=await load('nar-model',[[/import \{ serverData \} from "\.\/server-snapshots";/,'const serverData=()=>{throw new Error("Offline QA")};'],[/from "\.\/nar-validation"/,`from ${JSON.stringify(validationUrl)}`]]);
+  const {narRank}=await load('nar-model',[[/import \{ serverData \} from "\.\/server-snapshots";/,'const serverData=()=>{throw new Error("Offline QA")};'],[/from "\.\/nar-validation"/,`from ${JSON.stringify(validationUrl)}`],[/from "\.\/lineage"/,`from ${JSON.stringify(moduleUrl('lineage'))}`]]);
   const {selectPicks}=await load('marks');
   const profile=JSON.parse(gunzipSync(fs.readFileSync(path.join(output,'model/nar-history-profile.json.gz'))));
   const report=JSON.parse(fs.readFileSync(path.join(output,'model/report.json')));

@@ -7,6 +7,10 @@ export type HistoryFactor = {
   winRate?: number;
   top3Rate?: number;
   averageFinish?: number;
+  record?: string;
+  // Rows that compare with something other than the horse's own career (e.g. all progeny).
+  baseline?: number;
+  subject?: string;
 };
 export type Horse = {
   probabilityKind?: "ranking-share";
@@ -27,6 +31,9 @@ export type Horse = {
   weight?: number;
   weightChange?: number;
   pedigree?: string;
+  sire?: string;
+  dam?: string;
+  damSire?: string;
   jockey?: string;
   jockeyId?: string;
   trainer?: string;
