@@ -16,6 +16,7 @@ on:
   push:
     branches: [main]
     paths:
+      - .github/nar-track-research-request.json
       - .github/nar-partial-analysis-request.json
       - .github/workflows/nar-partial-analysis.yml
       - scripts/nar_ticket_research.py
@@ -46,7 +47,7 @@ concurrency:
 
 jobs:
   analyze:
-    if: "!inputs.build_dictionary && !contains(github.event.head_commit.message, '[rein-dictionary]') && !contains(github.event.head_commit.message, '[nar-ticket-research]') && !contains(github.event.head_commit.message, '[jockey-correction]') && !contains(github.event.head_commit.message, '[jockey-reference]') && !contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
+    if: "!contains(github.event.head_commit.message, '[nar-track-research]') && !inputs.build_dictionary && !contains(github.event.head_commit.message, '[rein-dictionary]') && !contains(github.event.head_commit.message, '[nar-ticket-research]') && !contains(github.event.head_commit.message, '[jockey-correction]') && !contains(github.event.head_commit.message, '[jockey-reference]') && !contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -627,3 +628,37 @@ jobs:
           git commit -m 'Publish validated REIN dictionary reference data'
           git pull --rebase origin main
           git push origin HEAD:main
+
+  track-research:
+    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[nar-track-research]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
+      OPENBLAS_NUM_THREADS: '2'
+      OMP_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest tests/test_nar_track_research.py -q
+      - name: Collect official dated Kochi sand measurements
+        run: python scripts/nar_track_research.py --output artifacts/nar-track --since 2019-01-01
+      - name: Read saved race results for 2024 through 2026
+        run: python scripts/download_track_research_archives.py
+      - name: Analyze matched dates and prior running styles without activating changes
+        run: python scripts/nar_track_research.py --input-dir .nar-dataset --measurements artifacts/nar-track/kochi-measurements.json --output artifacts/nar-track
+      - name: Research summary
+        run: cat artifacts/nar-track/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: nar-track-research-${{ github.run_id }}
+          path: artifacts/nar-track
+          retention-days: 90
+          if-no-files-found: error
