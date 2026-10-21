@@ -8,10 +8,12 @@ const research=uri(compile('horse-research').replace('"./marks"',JSON.stringify(
 const {conditionSymbol}=await import(uri(compile('condition-symbols').replace('"./horse-research"',JSON.stringify(research))));
 const {popularityGroup,popularityPattern,buildDayTrends}=await import(uri(compile('race-day-trends')));
 const horse=(rate,samples=10,career=20)=>({parameterFactors:[{label:'通算成績',samples:career,top3Rate:40},{label:'距離適性',samples,top3Rate:rate}]});
-test('condition symbols use each horse career with explicit thresholds and sufficient samples',()=>{
+test('condition symbols show sparse observed data with reference labels and shrinkage',()=>{
   for(const [rate,symbol] of [[55,'◎'],[45,'○'],[35,'△'],[34.9,'×'],[0,'×']])assert.equal(conditionSymbol(horse(rate),'距離適性').symbol,symbol);
-  assert.equal(conditionSymbol(horse(80,9),'距離適性').symbol,'—');
-  assert.equal(conditionSymbol(horse(80,10,19),'距離適性').symbol,'—');
+  assert.notEqual(conditionSymbol(horse(80,9),'距離適性').symbol,'—');
+  assert.equal(conditionSymbol(horse(80,9),'距離適性').confidence,'reference');
+  assert.notEqual(conditionSymbol(horse(80,10,19),'距離適性').symbol,'—');
+  assert.equal(conditionSymbol(horse(100,1,4),'距離適性').symbol,'○');
   assert.equal(conditionSymbol(horse(80),'馬場適性').symbol,'—');
   assert.equal(conditionSymbol({historyFactors:[{label:'騎手傾向',samples:500,top3Rate:80}]},'騎手相性').symbol,'—');
 });

@@ -20,7 +20,7 @@ function requestContext(url: string) {
   cached.set(url, { until: Date.now() + 300000, promise });
   return promise;
 }
-function useRaceContext(race: Race): { data?: RaceContextData; error?: string; loading: boolean; retry: () => void } {
+export function useRaceContext(race: Race): { data?: RaceContextData; error?: string; loading: boolean; retry: () => void } {
   const url = `${race.league === "nar" ? "/api/nar" : "/api"}/analyze/context?raceId=${encodeURIComponent(race.raceId)}`;
   const [attempt, setAttempt] = useState(0), [state, setState] = useState<{ url: string; data?: RaceContextData; error?: string; loading: boolean }>({ url, loading: true });
   useEffect(() => {

@@ -50,7 +50,7 @@ function contextData(id, empty = false) {
       await page.goto(`http://127.0.0.1:8152/?area=${area}`);
       await page.getByRole('button', { name: /東京/ }).first().click();
       await page.getByRole('button', { name: /比較検証レース/ }).click();
-      assert.equal(requests.filter(url => url.startsWith(area === 'nar' ? '/api/nar/analyze/context?' : '/api/analyze/context?')).length, 0, 'context is fetched lazily');
+      assert.ok(requests.filter(url => url.startsWith(area === 'nar' ? '/api/nar/analyze/context?' : '/api/analyze/context?')).length <= 1, 'automatic pattern forecast shares one context request');
       await page.getByRole('tab', { name: '比較', exact: true }).click();
       const panel = page.getByRole('region', { name: '気になる馬を比較', exact: true });
       await panel.getByRole('heading', { name: '気になる馬を最大4頭で比較' }).waitFor();
