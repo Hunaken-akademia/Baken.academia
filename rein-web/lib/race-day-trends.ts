@@ -1,8 +1,25 @@
+export const POPULARITY_GROUPS = [
+  { id: "A", label: "1〜3番人気" }, { id: "B", label: "4〜6番人気" },
+  { id: "C", label: "7〜9番人気" }, { id: "D", label: "10番人気以下" },
+] as const;
+export function popularityGroup(value: unknown): "A" | "B" | "C" | "D" | null {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 18) return null;
+  return value <= 3 ? "A" : value <= 6 ? "B" : value <= 9 ? "C" : "D";
+}
+export function popularityPattern(finishers: Array<{ number: number; finish: number; popularity?: number; odds?: number }>, horses: Array<{ number: number; popularity?: number }> = []) {
+  if (new Set(finishers.map(f => f.number)).size !== finishers.length) return null;
+  const top = [1,2,3].map(place => finishers.filter(f => f.finish === place));
+  if (top.some(items => items.length !== 1)) return null;
+  const result = top.map(([f]) => ({ ...f, popularity: f.popularity ?? horses.find(h => h.number === f.number)?.popularity }));
+  if (result.some(f => !popularityGroup(f.popularity))) return null;
+  return { pattern: result.map(f => popularityGroup(f.popularity)).join("-"), finishers: result, source: top.every(([f]) => popularityGroup(f.popularity)) ? "結果掲載人気" : "保存時点の人気" };
+}
+
 export type TrendRace = {
   raceId: string; date: string; title: string; course: string; condition: string;
   startsAt: number | null; capturedAt: string; isFinished: boolean;
-  horses: Array<{ number: number; gate?: number; style?: string }>;
-  finishers: Array<{ number: number; finish: number }>;
+  horses: Array<{ number: number; gate?: number; style?: string; popularity?: number }>;
+  finishers: Array<{ number: number; finish: number; popularity?: number; odds?: number }>;
 };
 export type TrendGroup = { label: string; runners: number; wins: number; top3: number; winRate: number | null; top3Rate: number | null };
 export const raceSurface = (course: string) => course.match(/ばんえい|障害|芝|ダート/)?.[0] ?? null;
@@ -49,7 +66,7 @@ export function buildDayTrends(target: Pick<TrendRace, "raceId" | "date" | "cour
     styles: summarize(["逃げ・先行・好位", "差し・追込"], styleGroup),
     unknownGate: races.reduce((s, r) => s + r.horses.filter(h => !gateGroup(h)).length, 0),
     unknownStyle: races.reduce((s, r) => s + r.horses.filter(h => !styleGroup(h)).length, 0),
-    races: races.map(r => ({ raceId: r.raceId, title: r.title, course: r.course, condition: r.condition, capturedAt: r.capturedAt, runners: r.horses.length })),
+    races: races.map(r => ({ raceId: r.raceId, title: r.title, course: r.course, condition: r.condition, capturedAt: r.capturedAt, runners: r.horses.length, popularity: popularityPattern(r.finishers, r.horses) })),
   };
 }
 export type DayTrends = ReturnType<typeof buildDayTrends>;

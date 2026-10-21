@@ -953,6 +953,7 @@ async function analyze(request: NextRequest) {
           row.cells[3].split(" ")[0],
       ),
       odds: parseResultOdds(row.cells[7])!,
+      popularity: parsePopularity(row.cells[7] || "") ?? undefined,
     }));
     const payouts = parsePayouts(result);
     const startAt = /^\d{1,2}:\d{2}$/.test(start)

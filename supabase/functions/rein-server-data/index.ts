@@ -171,7 +171,7 @@ Deno.serve(async req => {
    const rows = checked(await admin.from("rein_race_snapshots").select("race_id,race_date,starts_at,captured_at,is_final,race:payload->race,horses:payload->horses,review:payload->review").eq("race_date",target.race_date).eq("slot","live").like("race_id",b.raceId.slice(0,-2)+"%").lt("race_id",b.raceId).order("race_id").limit(11));
    return json({
     target:{raceId:target.race_id,date:target.race_date,course:target.payload.race.course,startsAt:target.starts_at?Date.parse(target.starts_at):null,horses:target.payload.horses.map((h:any)=>({number:h.number,horseId:h.horseId,name:h.name}))},
-    races:rows.map((r:any)=>({raceId:r.race_id,date:r.race_date,title:r.race?.title??"",course:r.race?.course??"",condition:r.race?.condition??"未取得",startsAt:r.starts_at?Date.parse(r.starts_at):null,capturedAt:r.captured_at,isFinished:r.is_final&&r.review?.isFinished===true,horses:(r.horses??[]).map((h:any)=>({number:h.number,gate:h.gate,style:h.style})),finishers:(r.review?.finishers??[]).map((f:any)=>({number:f.number,finish:f.finish}))})),
+    races:rows.map((r:any)=>({raceId:r.race_id,date:r.race_date,title:r.race?.title??"",course:r.race?.course??"",condition:r.race?.condition??"未取得",startsAt:r.starts_at?Date.parse(r.starts_at):null,capturedAt:r.captured_at,isFinished:r.is_final&&r.review?.isFinished===true,horses:(r.horses??[]).map((h:any)=>({number:h.number,gate:h.gate,style:h.style,popularity:h.popularity})),finishers:(r.review?.finishers??[]).map((f:any)=>({number:f.number,finish:f.finish,popularity:f.popularity,odds:f.odds}))})),
    });
   }
   if (action === "read") {

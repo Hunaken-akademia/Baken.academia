@@ -27,6 +27,8 @@ import { reasonViews } from "@/lib/feature-labels";
 import { longshotRoleOrder } from "@/lib/longshot-roles";
 import { roleOrder, type RoleKey, type Picks, type MarkPick } from "@/lib/marks";
 import type { Horse } from "@/lib/horse-types";
+import { ConditionMatrix } from "@/components/condition-matrix";
+import { PopularityGroups, PopularityResult } from "@/components/popularity-groups";
 import { HorseComparison } from "@/components/horse-comparison";
 import { HorseConditionDetails } from "@/components/horse-condition-details";
 import dynamic from "next/dynamic";
@@ -126,6 +128,7 @@ type Analysis = {
       number: number;
       name: string;
       odds: number;
+      popularity?: number;
     }>;
     payouts: RacePayout[];
   };
@@ -1020,6 +1023,8 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
         </TabsList>
         <TabsContent value="prediction">
           {hasGradedRaceHistory(data.race) && <GradedRaceHistory race={data.race} onSimulate={(id,label)=>{setHistoricalScenario(old=>({id,label,version:(old?.version??0)+1}));changeAnalysisTab("formation");}} />}
+          <ConditionMatrix key={data.race.raceId} horses={data.horses} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
+          <PopularityGroups key={data.race.raceId} horses={data.horses} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
           <PickCards data={data} onHorse={onHorse}>
             <TicketSummary data={data} onOpen={openTickets} />
           </PickCards>
@@ -1241,6 +1246,8 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           <JockeyProfiles key={data.race.raceId} title={data.race.title} course={data.race.course} league={data.race.league} horses={data.horses} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} />
         </TabsContent>
         <TabsContent value="review">
+          <PopularityResult horses={data.horses} finishers={data.review?.finishers ?? []} finished={data.review?.isFinished ?? false} />
+          <RaceDayTrends race={data.race} />
       {data.review?.isFinished && (
         <section className="mb-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/[.07] p-4 sm:p-5">
           <div className="flex items-center justify-between">
