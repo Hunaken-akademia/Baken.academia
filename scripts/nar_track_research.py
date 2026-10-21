@@ -131,7 +131,7 @@ def collect_other_sources(out):
 
 
 def prior_styles(frame):
-    """Use the previous five known first-corner ranks, strictly before the date.
+    """Use observed ranks among the previous five starts, strictly before the date.
 
     Relative front <= 1/3; middle <= 2/3; rear > 2/3. At least two observed
     starts are required. The current race's position is never an input.
@@ -149,10 +149,12 @@ def prior_styles(frame):
     for _, group in work.loc[work.horse_id.notna() & work.horse_id.ne("")].groupby("horse_id"):
         history = []
         for _, day in group.sort_values(["race_date", "race_id"]).groupby("race_date", sort=False):
-            if len(history) >= 2:
-                mean = sum(history[-5:]) / len(history[-5:])
+            current_date = pd.Timestamp(day.race_date.iloc[0])
+            valid = [position for date, position in history[-5:] if pd.notna(position) and (current_date-pd.Timestamp(date)).days <= 180]
+            if len(valid) >= 2:
+                mean = sum(valid) / len(valid)
                 work.loc[day.index, "prior_style"] = "front" if mean <= 1 / 3 else "middle" if mean <= 2 / 3 else "rear"
-            history.extend(day._position.dropna().tolist())
+            history.extend(day[["race_date", "_position"]].itertuples(index=False, name=None))
     return work.drop(columns="_position")
 
 

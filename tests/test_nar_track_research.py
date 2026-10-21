@@ -93,3 +93,12 @@ def test_unparsed_enrichment_does_not_invent_passing_positions():
     frame = pd.DataFrame([dict(horse_number=1, horse_id="a", race_date="2026-01-01", race_no=1, corner_positions=None)])
     record = dict(horse_number=1, horse_id="a", race_date="2026-01-01", race_no=1, corner_positions="(1,2)-3")
     assert merge_corners(frame, [record])[1] == 0
+
+
+def test_missing_recent_starts_do_not_keep_old_styles_alive():
+    rows=[]
+    for i in range(9):
+        for n in range(1,10):
+            rows.append(dict(race_id=str(i),race_date=f'2025-01-{i+1:02}',horse_id=str(n),horse_number=n,corner_positions='1-2-3-4' if i<2 else None))
+    result=prior_styles(pd.DataFrame(rows))
+    assert set(result.loc[result.race_date.eq('2025-01-09'),'prior_style'])=={'unknown'}
