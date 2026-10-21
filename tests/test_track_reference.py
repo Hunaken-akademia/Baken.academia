@@ -19,6 +19,13 @@ def test_article_preserves_pdf_image_and_japanese_without_charset():
     assert {r["url"] for r in links} == {"https://official.example/table.pdf", "https://official.example/resources/images/news/table.png"}
 
 
+def test_shift_jis_fragment_retains_venue_and_measurement_time():
+    raw = '<div title="東京"><div>10月18日（日曜）7時00分</div><div>9.2</div></div>'.encode("cp932")
+    _, text, _ = extract_html(raw, "https://official.example/data", {"official.example"})
+    assert "10月18日(日曜)7時00分" in text
+    assert "�" not in text
+
+
 def test_navigation_does_not_collect_unrelated_attachments_or_text():
     raw = '''<html><main><nav>砂厚 <a href="/other.pdf">広告</a></nav>
     <a href="/news/condition-260905">走路状況</a><a href="/race.pdf">出走表</a>
