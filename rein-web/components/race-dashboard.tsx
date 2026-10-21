@@ -28,7 +28,9 @@ import { longshotRoleOrder } from "@/lib/longshot-roles";
 import { roleOrder, type RoleKey, type Picks, type MarkPick } from "@/lib/marks";
 import type { Horse } from "@/lib/horse-types";
 import { ConditionMatrix } from "@/components/condition-matrix";
-import { PopularityGroups, PopularityResult } from "@/components/popularity-groups";
+import { patternPredictionSafe } from "@/lib/popularity-forecast";
+import { PopularityForecast } from "@/components/popularity-forecast";
+import { PopularityResult } from "@/components/popularity-groups";
 import { HorseComparison } from "@/components/horse-comparison";
 import { HorseConditionDetails } from "@/components/horse-condition-details";
 import dynamic from "next/dynamic";
@@ -1024,7 +1026,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
         <TabsContent value="prediction">
           {hasGradedRaceHistory(data.race) && <GradedRaceHistory race={data.race} onSimulate={(id,label)=>{setHistoricalScenario(old=>({id,label,version:(old?.version??0)+1}));changeAnalysisTab("formation");}} />}
           <ConditionMatrix key={data.race.raceId} horses={data.horses} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
-          <PopularityGroups key={data.race.raceId} horses={data.horses} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
+          <PopularityForecast key={data.race.raceId} horses={data.horses} race={data.race} rolesReady={rolesReady} finished={data.review?.isFinished ?? false} predictionSafe={patternPredictionSafe(data.prediction, data.race.startsAt, data.review?.isFinished ?? false)} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
           <PickCards data={data} onHorse={onHorse}>
             <TicketSummary data={data} onOpen={openTickets} />
           </PickCards>
