@@ -11,9 +11,11 @@ const horse=(rate,samples=10,career=20)=>({parameterFactors:[{label:'通算成�
 test('condition symbols show sparse observed data with reference labels and shrinkage',()=>{
   for(const [rate,symbol] of [[55,'◎'],[45,'○'],[35,'△'],[34.9,'×'],[0,'×']])assert.equal(conditionSymbol(horse(rate),'距離適性').symbol,symbol);
   assert.notEqual(conditionSymbol(horse(80,9),'距離適性').symbol,'—');
-  assert.equal(conditionSymbol(horse(80,9),'距離適性').confidence,'reference');
+  assert.equal(conditionSymbol(horse(80,9),'距離適性').confidence,'standard');
+  assert.equal(conditionSymbol(horse(80,5),'距離適性').confidence,'standard');
+  assert.equal(conditionSymbol(horse(80,4),'距離適性').confidence,'reference');
   assert.notEqual(conditionSymbol(horse(80,10,19),'距離適性').symbol,'—');
-  assert.equal(conditionSymbol(horse(100,1,4),'距離適性').symbol,'○');
+  assert.equal(conditionSymbol(horse(100,1,4),'距離適性').confidence,'reference');
   assert.equal(conditionSymbol(horse(80),'馬場適性').symbol,'—');
   assert.equal(conditionSymbol({historyFactors:[{label:'騎手傾向',samples:500,top3Rate:80}]},'騎手相性').symbol,'—');
 });

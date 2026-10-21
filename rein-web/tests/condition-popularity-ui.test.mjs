@@ -9,7 +9,7 @@ const bundle=await build({entryPoints:[path.join(here,'condition-popularity-fixt
 test('matrix reasons, sparse data and automatic pattern predictions render without manual group picking',async()=>{
  const dom=new JSDOM('<div id="root"></div>',{runScripts:'outside-only',url:'https://rein.test'});
  try{
- dom.window.fetch=async()=>({ok:true,json:async()=>({previousRuns:{},trends:{races:[]}})});
+ dom.window.fetch=async()=>({ok:true,json:async()=>({previousRuns:{},trends:{races:[{popularity:{pattern:'A-B-A',source:'結果掲載人気'}}]}})});
  dom.window.eval(bundle.outputFiles[0].text);
  const tick=()=>new Promise(resolve=>setTimeout(resolve,25));await tick();
  const doc=dom.window.document;
@@ -17,8 +17,13 @@ test('matrix reasons, sparse data and automatic pattern predictions render witho
  button('1 検証馬1・距離 ◎の根拠').click();await tick();assert.match(doc.querySelector('[aria-label="全頭の適性早見表"] [role="status"]').textContent,/10走・3着内率 60.0%・通算比 \+20.0pt/);
  assert.doesNotMatch(doc.querySelector('[aria-label="全頭の適性早見表"] table').textContent,/血統/);
  button('1 検証馬1の詳細を見る').click();assert.equal(doc.querySelector('#detail').textContent,'検証馬1');
- assert.match(doc.querySelector('[aria-label="人気パターン予測"]').textContent,/① 適性表だけの参考予測/);
- assert.match(doc.querySelector('[aria-label="人気パターン予測"]').textContent,/② REIN＋当日傾向の注目パターン/);
+ assert.match(doc.querySelector('[aria-label="人気パターン予測"]').textContent,/② 適性表だけの参考予測/);
+ await tick();
+ const daily=doc.querySelector('[aria-label="当日傾向だけの人気パターン"]');
+ assert.match(daily.textContent,/A→B→A/);
+ assert.match(daily.textContent,/1\/1レース/);
+ assert.ok(daily.compareDocumentPosition([...doc.querySelectorAll('h3')].find(h=>h.textContent.includes('② 適性表'))) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING);
+ assert.match(doc.querySelector('[aria-label="人気パターン予測"]').textContent,/③ REIN＋当日傾向の注目パターン/);
  assert.match(doc.querySelector('[aria-label="人気パターン予測"]').textContent,/[ABCD] → [ABCD] → [ABCD]/);
  assert.doesNotMatch(doc.body.textContent,/候補をクリア|グループから候補を選ぶ/);
  assert.match(doc.querySelector('[aria-label="このレースの人気別決着"]').textContent,/A-B-A/);

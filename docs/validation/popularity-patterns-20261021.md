@@ -4,7 +4,7 @@ The initial release misunderstood the request as manual selection within popular
 
 ## Sparse condition display
 
-Observed condition rates are no longer discarded by a hard 20-career/10-condition-start cutoff. Records of 1–9 starts remain visible with a sparse-sample label. Career-relative differences are multiplied by min(1, starts/10). When a career-relative comparison is unavailable, the rate is shrunk toward 33.3% using five pseudo-observations. Conditions missing for every horse are omitted, and missing cells remain unknown. No pedigree, going or horse/jockey combination statistics are fabricated.
+Observed condition rates are no longer discarded by a hard 20-career/10-condition-start cutoff. Records of 1–4 starts remain visible with a sparse-sample label; five or more starts use normal labels. Career-relative differences are multiplied by min(1, starts/5). When a career-relative comparison is unavailable, the rate is shrunk toward 33.3% using five pseudo-observations. Conditions missing for every horse are omitted, and missing cells remain unknown. No pedigree, going or horse/jockey combination statistics are fabricated.
 
 ## Forecast construction
 
@@ -26,3 +26,7 @@ Daily adjustment uses only earlier, same-venue, same-surface, final-popularity r
 The sample is small, one day and NAR only. It does not establish an accuracy improvement, JRA performance, profitability, or the value of the daily adjustment (not audited in this sample). Both displays remain explicitly experimental. Examples: Monbetsu 11R on 2026-10-20 returned A-A-B and both methods ranked A-A-B first; Monbetsu 12R returned A-B-B, which neither method placed in its top three.
 
 Validation: targeted logic and DOM interaction tests; full web test suite and production build. Live signed-in browser behavior requires a member session.
+
+## Display follow-up
+
+The daily-only pattern frequency panel is placed first, independent of REIN or condition scores and even when those estimates are held. It shows prior observed result counts for one or more races, respects ties, and does not choose horses. This does not change the three-race requirement for the separate combined estimate’s daily adjustment. Cushion value data is not currently collected or used by REIN.
