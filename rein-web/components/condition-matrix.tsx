@@ -21,6 +21,6 @@ export function ConditionMatrix({ horses, onHorse }: { horses: Horse[]; onHorse:
     {horse && cell && detail && <p role="status" className="m-3 rounded-lg bg-cyan-300/10 p-3 text-xs leading-6"><strong>{horse.number} {horse.name}・{CONDITION_ROWS.find(r=>r.factor===detail.factor)?.label}：{cell.symbol}</strong><br />{cell.detail}</p>}
     {!rows.length && <p className="p-4 text-xs text-slate-400">条件別実績を取得できていません。未取得の項目は評価しません。</p>}
     <p className="px-4 py-2 text-[11px] leading-5 text-slate-400">全頭未取得の項目は非表示。現在未掲載：{CONDITION_ROWS.filter(row => !rows.some(r => r.factor === row.factor)).map(row => row.label).join("・") || "なし"}。取得のない馬の欄は—です。</p>
-    <details className="border-t border-slate-700 p-4 text-xs leading-6 text-slate-400"><summary className="min-h-8 cursor-pointer font-semibold text-slate-300">判定基準・集計対象</summary><p>条件別3着内率の通算差が+15pt以上で◎、+5pt以上で○、−5pt以上で△、それ未満で×。1〜9走は通算差を「走数÷10」で弱めて参考判定します。通算との比較ができない項目は3着内率を5走分の中立値（33.3%）で補正し、60%以上◎・40%以上○・20%以上△・それ未満×。記号は的中確率ではありません。</p><p>距離は履歴の距離区分です。血統・馬場状態・馬×騎手の未取得項目を、騎手全体など別の成績では代用しません。</p></details>
+    <details className="border-t border-slate-700 p-4 text-xs leading-6 text-slate-400"><summary className="min-h-8 cursor-pointer font-semibold text-slate-300">判定基準・集計対象</summary><p>条件別3着内率の通算差が+15pt以上で◎、+5pt以上で○、−5pt以上で△、それ未満で×。1〜4走は通算差を「走数÷5」で弱めて参考判定します。5走以上は通常表示です。通算との比較ができない項目は3着内率を5走分の中立値（33.3%）で補正し、60%以上◎・40%以上○・20%以上△・それ未満×。記号は的中確率ではありません。</p><p>距離は履歴の距離区分です。血統・馬場状態・馬×騎手の未取得項目を、騎手全体など別の成績では代用しません。</p></details>
   </section>;
 }

@@ -20,9 +20,9 @@ export function conditionSymbol(horse: Horse, label: string) {
   const career = factors.find(f => f.label === "通算成績");
   const rate = historyRate(factor, "top3"), diff = factor ? careerDifference(factor, career) : null;
   const samples = factor?.samples ?? 0;
-  const confidence = rate === null ? "missing" : samples < 10 ? "reference" : "standard";
+  const confidence = rate === null ? "missing" : samples < 5 ? "reference" : "standard";
   // Keep sparse observed records visible; shrink differences rather than discarding the record.
-  const adjustedDiff = diff === null ? null : diff * Math.min(1, samples / 10);
+  const adjustedDiff = diff === null ? null : diff * Math.min(1, samples / 5);
   const adjustedRate = rate === null ? null : (rate * samples + 100 / 3 * 5) / (samples + 5);
   const symbol = rate === null ? "—" : adjustedDiff !== null
     ? adjustedDiff >= 15 ? "◎" : adjustedDiff >= 5 ? "○" : adjustedDiff >= -5 ? "△" : "×"
