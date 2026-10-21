@@ -3,6 +3,7 @@ import { getVercelOidcToken } from "@vercel/oidc";
 import { getCache, waitUntil } from "@vercel/functions";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { loadHistory, scoreHistory } from "@/lib/history";
+import { pairFactors, parseCardLineage, pedigreeFactors } from "@/lib/lineage";
 import { buildTickets } from "@/lib/tickets";
 import { applyJraRoleAdjustment, type RoleAdjustment } from "@/lib/role-adjustments";
 import { responseCache } from "@/lib/response-cache";
@@ -486,6 +487,12 @@ async function analyze(request: NextRequest) {
         row.html.match(/directory\/trainer\/(\d+)/)?.[1],
       );
       const pedigree = cells[5];
+      const lineage = parseCardLineage(pedigree);
+      // Aptitude-table rows only; they do not change the history score.
+      const tableFactors = [
+        ...(history.horseJockey ? pairFactors(history.horseJockey[`${horseId}|${jockeyId}`]) : []),
+        ...pedigreeFactors(history, lineage.sire, surface, distanceM),
+      ];
       const detailSlice = detailText.slice(
         Math.max(0, detailText.lastIndexOf(name)),
         detailText.lastIndexOf(name) + 900,
@@ -564,6 +571,7 @@ async function analyze(request: NextRequest) {
         weight,
         weightChange: change,
         pedigree,
+        ...lineage,
         jockey,
         trainer,
         earlyPosition: styleProfile.earlyPosition,
@@ -603,7 +611,7 @@ async function analyze(request: NextRequest) {
           second: [] as Array<{ feature: string; contribution: number }>,
           third: [] as Array<{ feature: string; contribution: number }>,
         },
-        parameterFactors: historical.components.map((component) => ({
+        parameterFactors: [...historical.components.map((component) => ({
           label: component.label,
           samples: component.samples,
           impact: Math.round(component.signal * 1000) / 10,
@@ -612,7 +620,7 @@ async function analyze(request: NextRequest) {
           winRate: component.winRate,
           top3Rate: component.top3Rate,
           averageFinish: component.averageFinish,
-        })),
+        })), ...tableFactors],
       };
     });
     if (!fixedWeights && raw.length && raw.every((horse) => horse.weight > 0)) {

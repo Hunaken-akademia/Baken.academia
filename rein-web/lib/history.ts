@@ -27,9 +27,12 @@ export type HistoryBundle = {
   trainer: Rates;
   course: Rates;
   gate: Rates;
-  // NAR only: progeny totals by sire name, filled while sire lookups catch up.
+  // Progeny totals by sire name, filled while sire lookups catch up (NAR and JRA).
   sire?: Rates;
   sireDistance?: Rates;
+  // JRA only: progeny by sire, surface and distance band; exact horse x jockey records.
+  sireSurfaceDistance?: Rates;
+  horseJockey?: Record<string, number[]>;
 };
 
 export type HistoryInput = {

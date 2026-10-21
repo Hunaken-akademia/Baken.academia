@@ -4,6 +4,7 @@ import { serverData } from "./server-snapshots";
 import type { HistoryBundle } from "./history";
 import type { NarHorse } from "./nar-source";
 import type { HistoryFactor } from "./horse-types";
+import { pairFactors, pedigreeFactors } from "./lineage";
 import { narConditionKey, type NarConditionValidation } from "./nar-validation";
 
 export type NarModel = {status:string;version:string;features:string[];roles:Record<string,{mode:"absolute"|"relative"|"hybrid";intercept:number;coef:number[]}>;conditionalRoles?:Record<string,{kind:"course"|"courseDistance"|"courseGoing";models:Record<string,{intercept:number;coef:number[]}>}>;conditionValidation?:NarConditionValidation;comparison:Record<string,Record<string,{audit2026:Record<string,{races:number;hits:number;rate:number|null}>}>>;note:string;release?:{id:string;validatedRanking:boolean;selectionYear:number;auditThrough:string}};
@@ -52,22 +53,14 @@ export function narHistoryInputs(profile:HistoryBundle,horse:NarHorse,context:{r
   });
   return {values,factors,samples:rates[0]?.n??0};
 }
-// Today's jockey on this horse, as an aptitude row. A first ride keeps a zero-start
-// record so the table can say so, but it never counts as a rate.
+// Today's jockey on this horse (official card record). A first ride keeps a
+// zero-start record so the table can say so, but it never counts as a rate.
 export function narJockeyFactors(horse: Pick<NarHorse,"jockeyRecord">): HistoryFactor[] {
-  const r = horse.jockeyRecord; if (!r) return [];
-  const top3 = r.wins + r.seconds + r.thirds, rate = (n:number) => r.starts ? Math.round(n / r.starts * 1000) / 10 : 0;
-  return [{label:"騎手相性",samples:r.starts,impact:0,wins:r.wins,top3,winRate:rate(r.wins),top3Rate:rate(top3),record:`${r.wins}-${r.seconds}-${r.thirds}-${r.starts-top3}`}];
+  const r = horse.jockeyRecord;
+  return r ? pairFactors([r.starts, r.wins, r.seconds, r.thirds]) : [];
 }
-// Sire progeny at today's distance band, compared with all of the sire's progeny.
-export function narPedigreeFactors(profile:HistoryBundle,horse:Pick<NarHorse,"sire">,distanceM:number): HistoryFactor[] {
-  const sire=(horse.sire??"").normalize("NFKC").replace(/\s+/g,""),bucket=Math.floor(distanceM/200);
-  const all=sire?profile.sire?.[sire]:undefined,band=sire?profile.sireDistance?.[`${sire}|${bucket}`]:undefined;
-  if(!all||!band)return [];
-  const counts=(r:{n:number;w:number;t:number})=>({wins:Math.max(0,Math.round(r.w*(r.n+20)-1.5)),top3:Math.max(0,Math.round(r.t*(r.n+20)-4.5))});
-  const {wins,top3}=counts(band),overall=counts(all).top3;
-  return [{label:"血統適性",samples:band.n,impact:0,wins,top3,winRate:Math.round(wins/band.n*1000)/10,top3Rate:Math.round(top3/band.n*1000)/10,averageFinish:band.f,baseline:Math.round(overall/all.n*1000)/10,subject:`${horse.sire}産駒・${bucket*200}〜${bucket*200+199}m`}];
-}
+// NAR profiles have no surface split: sire progeny by distance band only.
+export const narPedigreeFactors = (profile:HistoryBundle,horse:Pick<NarHorse,"sire">,distanceM:number) => pedigreeFactors(profile,horse.sire,undefined,distanceM);
 export function narRank(runtime:NarRuntime,horses:NarHorse[],context:{racecourse:string;surface:string;distanceM:number;date:string;going?:string}) {
   // A rolling aggregate must never be used to reconstruct a date inside its own
   // training period. Historical reviews use authentic stored prestart snapshots.

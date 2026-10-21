@@ -2,22 +2,21 @@
 Initial bootstrap uses archived history once. Later refreshes read only the small
 aggregate state and newly completed daily archives. No rounded-rate reversal.
 """
-import gzip,hashlib,html,io,json,os,random,re,tarfile,time,unicodedata,urllib.request
+import gzip,hashlib,html,io,json,os,random,re,tarfile,time,unicodedata,urllib.parse,urllib.request
 from pathlib import Path
 from datetime import datetime,timedelta,timezone
 import pandas as pd
-from baken_academia.rein_history import _key
+from baken_academia.rein_history import _key,lineage_name
 from nar_live_model import normalize_courses
 
 PEDIGREE_URL='https://www.keiba.go.jp/KeibaWeb/DataRoom/RaceHorseInfo'
+LIST_URL='https://www.keiba.go.jp/KeibaWeb/DataRoom/RaceHorseList'
+# The official horse search lists 50 horses per page with their sire, but stops at
+# 2000 results; larger birth years are split by the first letter of the name.
+KANA='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポヴ'
 # Sire progeny counts are sums of each offspring's exact horse-level counts.
 SIRE_GROUPS={'sire':'horse','sireSurface':'horseSurface','sireDistance':'horseDistance','sireCourse':'horseCourse'}
 GROUPS={'horse':['horse_id'],'horseSurface':['horse_id','surface'],'horseDistance':['horse_id','distance_bucket'],'horseCourse':['horse_id','racecourse'],'jockey':['jockey_id'],'trainer':['trainer_id'],'course':['racecourse','surface','distance_bucket','going'],'gate':['racecourse','surface','distance_bucket','gate']}
-
-
-def lineage_name(value):
-    # Same key as the web runtime: the card and horse pages differ only in spacing.
-    return re.sub(r'\s+','',unicodedata.normalize('NFKC',html.unescape(value or '')))
 
 
 def parse_pedigree(page):
@@ -26,6 +25,55 @@ def parse_pedigree(page):
     dam_sire=re.search(r'>\s*母父\s*</td>\s*<td[^>]*>([^<]*)<',page)
     if not sire or not html.unescape(sire.group(1)).strip():return None
     return [html.unescape(sire.group(1)).strip(),html.unescape(dam_sire.group(1)).strip() if dam_sire else '']
+
+
+def list_url(year,prefix,page):
+    query={'k_pageNum':page,'k_horseName':prefix,'k_horseNameCondition':'start','k_dataKind':'*','k_fatherHorse':'','k_fatherHorseCondition':'start','k_motherHorse':'','k_motherHorseCondition':'start','k_birthYear':year,'k_activeCode':1,'k_horsebelong':'*','k_belongCode':'*','k_flag':1}
+    return LIST_URL+'?'+urllib.parse.urlencode(query)
+
+
+def parse_horse_list(page):
+    """(total, capped, {horse id: sire}) from one page of the official horse search."""
+    text=re.sub(r'\s+',' ',re.sub(r'<[^>]+>',' ',page))
+    capped=re.search(r'検索結果:\s*(\d+)\s*件/全\s*(\d+)\s*件',text);plain=re.search(r'検索結果:\s*(\d+)\s*件',text)
+    total=int(capped.group(2)) if capped else int(plain.group(1)) if plain else 0
+    sires={}
+    for row in re.findall(r'<tr>([\s\S]*?)</tr>',page):
+        horse=re.search(r'RaceHorseInfo\?k_lineageLoginCode=(\d+)',row);cells=re.findall(r'<td[^>]*>([\s\S]*?)</td>',row)
+        if horse and len(cells)>=7:sires[horse.group(1)]=re.sub(r'\s+',' ',html.unescape(re.sub(r'<[^>]+>',' ',cells[5]))).strip()
+    return total,bool(capped),sires
+
+
+def crawl_horse_lists(state,years,budget_seconds,fetch=None,delay=(3.0,4.0),clock=time.monotonic,sleep=time.sleep):
+    """Bulk sire lookup: one request covers 50 horses. Finished (year, prefix) units are kept in state."""
+    fetch=fetch or (lambda url:get(url).decode('utf-8','replace'))
+    pedigree=state.setdefault('pedigree',{});done=set(state.setdefault('pedigreeLists',[]));deadline=clock()+budget_seconds;requests=0
+    def page(year,prefix,number):
+        nonlocal requests
+        if requests:sleep(random.uniform(*delay))
+        requests+=1;total,capped,sires=parse_horse_list(fetch(list_url(year,prefix,number)))
+        for horse,sire in sires.items():
+            if _key(horse) not in pedigree or not pedigree[_key(horse)][0]:pedigree[_key(horse)]=[sire,'']
+        return total,capped,len(sires)
+    def unit(year,prefix):
+        key=f'{year}|{prefix}'
+        if key in done:return True
+        if clock()>=deadline:return False
+        total,capped,count=page(year,prefix,0)
+        if capped:
+            # Too many results for one listing: split by the next name letter.
+            if len(prefix)>=2:raise ValueError(f'Horse list still capped for {key}')
+            if not all(unit(year,prefix+k) for k in KANA):return False
+            done.add(key);state['pedigreeLists']=sorted(done);return True
+        number=1
+        while count==50 and number*50<total:
+            if clock()>=deadline:return False
+            _,_,count=page(year,prefix,number);number+=1
+        done.add(key);state['pedigreeLists']=sorted(done);return True
+    complete=True
+    for year in years:
+        if clock()>=deadline or not unit(year,''):complete=False;break
+    return {'requests':requests,'complete':complete,'horses':len(pedigree)}
 
 
 def collect_pedigrees(state,priority,budget_seconds,fetch=None,delay=(3.0,4.0),clock=time.monotonic,sleep=time.sleep):
@@ -144,8 +192,12 @@ def main():
             d=pd.read_parquet(io.BytesIO(t.extractfile(members[0]).read()))
         if not pd.to_datetime(d.race_date).dt.date.eq(day).all():raise ValueError('Unexpected daily archive date')
         state=append(state,d);recent+=[str(h) for h in d.horse_id.dropna().unique()];print('Added day',day,flush=True);day+=timedelta(days=1)
-    # Newest runners first, then horses with the most starts in the aggregates.
-    pedigree=collect_pedigrees(state,recent[::-1],float(os.environ.get('NAR_PEDIGREE_BUDGET_MINUTES','20'))*60)
+    # Bulk listings (newest birth years first), then single horse pages for anyone
+    # the listings missed, newest runners first.
+    budget=float(os.environ.get('NAR_PEDIGREE_BUDGET_MINUTES','20'))*60;started=time.monotonic()
+    first_year=int(state['meta']['dateFrom'][:4])-15
+    lists=crawl_horse_lists(state,range(end.year-2,first_year-1,-1),budget)
+    pedigree={'lists':lists,**collect_pedigrees(state,recent[::-1],max(0,budget-(time.monotonic()-started)) if lists['complete'] else 0)}
     print('Pedigrees',json.dumps(pedigree),flush=True)
     payload=profile(state)
     for kind,value in [('profile',payload),('state',state)]:

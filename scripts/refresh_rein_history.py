@@ -5,7 +5,7 @@ from pathlib import Path
 import argparse, asyncio, hashlib, json, os, tarfile, time, urllib.error, urllib.request
 from datetime import datetime,timedelta,timezone
 import pandas as pd
-from baken_academia import jra_backfill
+from baken_academia import jra_backfill, jra_pedigree
 from baken_academia.rein_history import build as profile_build
 
 
@@ -55,9 +55,12 @@ async def main():
     now=datetime.now(timezone(timedelta(hours=9)));end=now.date()-timedelta(days=now.hour<22)
     start=pd.Timestamp(model['history_through']).date()+timedelta(days=1)
     summary={'previous_version':model['version'],'previous_history_through':model['history_through'],'checked_through':str(end),'models_retrained':False}
-    if start>end:
+    # Sire lookups catch up across refreshes, so a day without new races still
+    # publishes their progress until every history horse is covered.
+    lineage_done=(model.get('metrics') or {}).get('historyRefresh',{}).get('pedigree',{}).get('remaining')==0
+    if start>end and lineage_done:
         summary['status']='unchanged';(out/'summary.json').write_text(json.dumps(summary,indent=2));return
-    if (end-start).days>45:raise ValueError('History gap exceeds bounded refresh window')
+    if start<=end and (end-start).days>45:raise ValueError('History gap exceeds bounded refresh window')
     with open_with_retry(active['bundle_url'],timeout=60) as r:bundle=r.read()
     if hashlib.sha256(bundle).hexdigest()!=model['artifact_sha256']:raise ValueError('Active bundle checksum mismatch')
     archive=out/'active.tar.gz';archive.write_bytes(bundle)
@@ -65,25 +68,37 @@ async def main():
     with tarfile.open(archive,'r:gz') as t:t.extractall(extracted,filter='data')
     root=next(extracted.glob('*/schema.json')).parent
     old=json.loads((root/'manifest.json').read_text());frozen={p.relative_to(root).as_posix():digest(p) for p in root.rglob('*') if p.is_file() and (p.suffix=='.txt' or p.name=='schema.json')}
-    result=await jra_backfill.backfill(argparse.Namespace(start_date=str(start),end_date=str(end),work_dir=out/'raw',output=out/'fresh.parquet',min_delay=3.0,max_delay=4.0,permission_confirmed=True,continue_on_error=False,allow_empty=True,max_events=None))
-    if result.get('errors'):raise ValueError('Incomplete JRA history refresh')
-    if not result.get('races'):
-        summary.update(status='unchanged',source=result);(out/'summary.json').write_text(json.dumps(summary,indent=2));return
-    base=pd.read_parquet(root/'data/history.parquet');fresh=pd.read_parquet(out/'fresh.parquet')
-    merged=merge_history(base,fresh,start,end)
-    required=set(base.columns)-set(fresh.columns)
-    if required:raise ValueError('Fresh rows missing columns: '+','.join(sorted(required)))
-    history=root/'data/history.parquet';merged.to_parquet(history,index=False,compression='zstd',compression_level=12)
-    profile=root/'history-profile.json.gz';profile_build(history,profile)
+    base=pd.read_parquet(root/'data/history.parquet');base['race_date']=pd.to_datetime(base.race_date);merged=base;result={'races':0}
+    if start<=end:
+        result=await jra_backfill.backfill(argparse.Namespace(start_date=str(start),end_date=str(end),work_dir=out/'raw',output=out/'fresh.parquet',min_delay=3.0,max_delay=4.0,permission_confirmed=True,continue_on_error=False,allow_empty=True,max_events=None))
+        if result.get('errors'):raise ValueError('Incomplete JRA history refresh')
+    if result.get('races'):
+        fresh=pd.read_parquet(out/'fresh.parquet')
+        merged=merge_history(base,fresh,start,end)
+        required=set(base.columns)-set(fresh.columns)
+        if required:raise ValueError('Fresh rows missing columns: '+','.join(sorted(required)))
+    lineage_path=root/'data/pedigree.json'
+    store=json.loads(lineage_path.read_text()) if lineage_path.exists() else {}
+    known=len(store.get('horses',{}))
+    lineage=jra_pedigree.collect(merged,store,float(os.environ.get('JRA_PEDIGREE_BUDGET_MINUTES','20'))*60)
+    print('Pedigrees',json.dumps(lineage),flush=True)
+    if not result.get('races') and lineage['horses']==known:
+        summary.update(status='unchanged',source=result,pedigree=lineage);(out/'summary.json').write_text(json.dumps(summary,indent=2));return
+    lineage_path.write_text(json.dumps(store,ensure_ascii=False,separators=(',',':')))
+    history=root/'data/history.parquet'
+    if result.get('races'):merged.to_parquet(history,index=False,compression='zstd',compression_level=12)
+    profile=root/'history-profile.json.gz';profile_build(history,profile,pedigree=store['horses'],pairs=True)
+    # The web runtime rejects profiles over 16 MB; never publish one it cannot load.
+    if profile.stat().st_size>15_000_000:raise ValueError('History profile too large')
     for name,sha in frozen.items():
         if digest(root/name)!=sha:raise ValueError('A model or schema changed during history refresh')
-    key=digest(history)+''.join(frozen[name] for name in sorted(frozen))
+    key=digest(history)+digest(lineage_path)+''.join(frozen[name] for name in sorted(frozen))
     version='rein-role-v4-'+hashlib.sha256(key.encode()).hexdigest()[:40]
     newroot=root.with_name(version);root.rename(newroot);root=newroot
     manifest={**old,'version':version,'history_through':str(merged.race_date.max().date()),'history_rows':len(merged),'history_races':int(merged.race_id.nunique()),'source_commit':os.environ['GITHUB_SHA'],'created_at':datetime.now(timezone.utc).isoformat()}
     manifest['files']=[{'path':p.relative_to(root).as_posix(),'sha256':digest(p),'size_bytes':p.stat().st_size} for p in sorted(root.rglob('*')) if p.is_file() and p.name!='manifest.json']
     (root/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
-    summary.update(status='refreshed',new_version=version,history_through=manifest['history_through'],added_rows=len(merged)-len(base),added_races=int(merged.race_id.nunique()-base.race_id.nunique()),profileSha=digest(root/'history-profile.json.gz'),frozen_model_files=frozen)
+    summary.update(status='refreshed',new_version=version,history_through=manifest['history_through'],added_rows=len(merged)-len(base),added_races=int(merged.race_id.nunique()-base.race_id.nunique()),profileSha=digest(root/'history-profile.json.gz'),pedigree=lineage,frozen_model_files=frozen)
     (out/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2))
     metrics={'comparison':{**model.get('metrics',{}),'historyRefresh':summary}}
     (out/'metrics.json').write_text(json.dumps(metrics,ensure_ascii=False))

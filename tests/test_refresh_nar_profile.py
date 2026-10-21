@@ -1,9 +1,9 @@
-import gzip,json,sys
+import gzip,json,sys,urllib.parse
 from pathlib import Path
 import pandas as pd
 import pytest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from refresh_nar_profile import GROUPS,append,collect_pedigrees,parse_pedigree,profile
+from refresh_nar_profile import GROUPS,KANA,append,collect_pedigrees,crawl_horse_lists,parse_horse_list,parse_pedigree,profile
 from baken_academia.rein_history import build
 
 
@@ -69,3 +69,38 @@ def test_pedigree_collection_is_budgeted_prioritized_and_resumable():
     assert state['pedigree']=={'20200':["St Mark's Basilica",'アグネスデジタル'],'20202':['','']}
     second=collect_pedigrees(state,[],100,fetch=fetch,delay=(4,4),clock=lambda:now[0],sleep=sleep)
     assert calls[2:]==['20201'] and second=={'added':0,'failures':1,'remaining':1}
+
+
+def listing(rows,total,capped=False):
+    # Trimmed from the official RaceHorseList markup.
+    head=f'検索結果: {min(total,2000)} 件/全 {total}件' if capped else f'検索結果: {total} 件'
+    body=''.join(f'''<tr> <td> {i} </td> <td> <a href="/KeibaWeb/DataRoom/RaceHorseInfo?k_lineageLoginCode={h}&amp;k_activeCode=1"> 馬{h} </a> </td>
+<td> <span class="sex ">牡</span><span class="age ">抹消</span> </td> <td> 2022 </td> <td> 退厩 </td> <td> {sire} </td> <td> 母 </td> </tr>''' for i,(h,sire) in enumerate(rows,1))
+    return f'<p>{head}</p><table><tbody><tr><th>No.</th></tr>{body}</tbody></table>'
+
+
+def test_horse_list_page_parses_ids_sires_and_cap():
+    assert parse_horse_list(listing([('0020112506078','安 風'),('22','St Mark&#039;s Basilica')],386))==(386,False,{'0020112506078':'安 風','22':"St Mark's Basilica"})
+    assert parse_horse_list(listing([],5706,True))[:2]==(5706,True)
+
+
+def test_list_crawl_pages_splits_capped_years_and_resumes():
+    pages={}
+    big=[(str(1000+i),'父A') for i in range(120)]
+    def fetch(url):
+        q=dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query,keep_blank_values=True));year,prefix,page=q['k_birthYear'],q['k_horseName'],int(q['k_pageNum'])
+        pages.setdefault((year,prefix),[]).append(page)
+        if year=='2022':return listing(big[page*50:page*50+50],120)
+        if prefix=='':return listing([],2500,True)
+        return listing([(f'9{KANA.index(prefix)}','父B')],1) if prefix in 'アイ' else listing([],0)
+    now=[0.0];state={}
+    first=crawl_horse_lists(state,[2022,2021],10**6,fetch=fetch,delay=(4,4),clock=lambda:now[0],sleep=lambda s:now.__setitem__(0,now[0]+s))
+    assert pages[('2022','')]==[0,1,2] and len(pages)==2+len(KANA)
+    assert first['complete'] and state['pedigree']['1119']==['父A',''] and state['pedigree']['91']==['父B','']
+    assert {'2022|','2021|','2021|ア'}<=set(state['pedigreeLists'])
+    before=len(pages[('2022','')]);again=crawl_horse_lists(state,[2022,2021],10**6,fetch=fetch,clock=lambda:now[0],sleep=lambda s:None)
+    assert again['requests']==0 and len(pages[('2022','')])==before
+    # A budget cut leaves the unfinished year for the next refresh.
+    fresh={};now[0]=0.0
+    cut=crawl_horse_lists(fresh,[2022],3,fetch=fetch,delay=(4,4),clock=lambda:now[0],sleep=lambda s:now.__setitem__(0,now[0]+s))
+    assert not cut['complete'] and '2022|' not in fresh['pedigreeLists']
