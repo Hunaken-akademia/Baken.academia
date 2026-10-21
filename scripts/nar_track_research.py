@@ -193,6 +193,14 @@ def analyze(input_dir, measurements, out):
               "matched_races": joined.loc[joined.date.notna()].race_id.nunique(), "matched_days": joined.loc[joined.date.notna()].race_date.nunique(),
               "known_prior_style_starts": len(eligible), "groups": summary,
               "limitations": ["砂厚はクッション値ではない", "現時点の公式記事の再取得。過去の改訂履歴と発走前公開を検証していない", "同日一致のみ。欠測日の前方補完なし", "当日の通過順から脚質を作らず、前日以前の最大5走を使用", "枠順は実際の内外走行位置ではない", "記述集計であり、因果効果・予測改善・回収率を示さない", "距離・クラス・人気・季節による交絡が残る。予想補正は未採用"]}
+    coverage_path = out / "corner-collection.json"
+    if coverage_path.exists():
+        coverage = json.loads(coverage_path.read_text())
+        report["passing_order_coverage"] = {"planned_races": coverage["planned_races"], "completed_races": coverage["completed_races"],
+                                             "pilot": coverage["pilot"], "errors": sum(r["status"] == "error" for r in coverage["records"])}
+        report["limitations"].append("通過順の補完対象は高知の過去出走。高知以外の出走からは脚質履歴を補わない")
+        if len(eligible) and (coverage["pilot"] or coverage["completed_races"] < coverage["planned_races"] or report["passing_order_coverage"]["errors"]):
+            report["status"] = "descriptive-partial"
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))
     joined.to_parquet(out / "kochi-joined.parquet", index=False)
