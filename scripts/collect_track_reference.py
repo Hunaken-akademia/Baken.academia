@@ -129,6 +129,8 @@ def collect(catalog, output, max_pages=180, max_depth=2, interval=3):
             else:
                 title, text, links = extract_html(raw, final_url, hosts, article)
                 record["format"] = "html"
+                if re.search(r"404|not found|ページが見つか|アクセスできません", title, re.I):
+                    raise RuntimeError("Soft error page returned with HTTP 200")
                 if "システムメンテナンス" in title:
                     blocked.add(host)
                     raise RuntimeError("Official system maintenance; host paused")

@@ -27,3 +27,26 @@ def test_navigation_does_not_collect_unrelated_attachments_or_text():
     assert "広告" not in text
     assert len(links) == 1
     assert "目標" in text  # retained as text, never converted to a measurement
+
+
+def test_error_pages_are_not_successful_documents_and_host_is_paused(tmp_path, monkeypatch):
+    import json
+    from pathlib import Path
+    from types import SimpleNamespace
+    from scripts.collect_track_reference import collect
+
+    calls = []
+
+    def fetch(command, **kwargs):
+        url = command[-1]
+        calls.append(url)
+        Path(command[command.index("--output") + 1]).write_bytes(b"<title>404 Not Found</title>")
+        status = 403 if "/blocked" in url else 200
+        return SimpleNamespace(returncode=0, stdout=f"{status}\n{url}")
+
+    monkeypatch.setattr("scripts.collect_track_reference.subprocess.run", fetch)
+    sources = [{"venue": "test", "url": f"https://official.example/{p}"} for p in ["missing", "blocked", "later"]]
+    rows = collect({"allowed_hosts": ["official.example"], "sources": sources}, tmp_path, interval=0)
+    assert [r["status"] for r in rows] == ["error", "error", "host-paused"]
+    assert len(calls) == 2
+    assert json.loads((tmp_path / "manifest.json").read_text())["counts"] == {"error": 2, "host-paused": 1}
