@@ -1,0 +1,31 @@
+name: Collect historical track references
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/track-reference-history-request.json]
+permissions:
+  contents: read
+concurrency:
+  group: rein-track-reference-collection
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - run: pip install lxml pdfplumber==0.11.9 pytest
+      - run: python -m pytest tests/test_track_reference.py -q
+      - name: Archive monthly historical notices and linked measurements
+        run: python scripts/collect_track_reference.py --catalog config/track-reference-history-sources.json --output artifacts/track-reference-history --max-pages 400
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: historical-track-reference-${{ github.run_id }}
+          path: artifacts/track-reference-history
+          retention-days: 90
+          if-no-files-found: error
