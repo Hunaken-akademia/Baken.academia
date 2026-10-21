@@ -47,7 +47,7 @@ concurrency:
 
 jobs:
   analyze:
-    if: "!contains(github.event.head_commit.message, '[nar-track-research]') && !inputs.build_dictionary && !contains(github.event.head_commit.message, '[rein-dictionary]') && !contains(github.event.head_commit.message, '[nar-ticket-research]') && !contains(github.event.head_commit.message, '[jockey-correction]') && !contains(github.event.head_commit.message, '[jockey-reference]') && !contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
+    if: "!contains(github.event.head_commit.message, '[nar-track-corners]') && !contains(github.event.head_commit.message, '[nar-track-research]') && !inputs.build_dictionary && !contains(github.event.head_commit.message, '[rein-dictionary]') && !contains(github.event.head_commit.message, '[nar-ticket-research]') && !contains(github.event.head_commit.message, '[jockey-correction]') && !contains(github.event.head_commit.message, '[jockey-reference]') && !contains(github.event.head_commit.message, '[eight-year-recall]') && !contains(github.event.head_commit.message, '[accuracy-experiments]') && !contains(github.event.head_commit.message, '[nar-history-refresh]') && !(github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture') && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')"
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -660,5 +660,49 @@ jobs:
         with:
           name: nar-track-research-${{ github.run_id }}
           path: artifacts/nar-track
+          retention-days: 90
+          if-no-files-found: error
+
+  track-corners:
+    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[nar-track-corners]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      actions: read
+    env:
+      OPENBLAS_NUM_THREADS: '2'
+      OMP_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest tests/test_nar_track_research.py -q
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: nar-track-research-39591724797
+          path: .nar-track-source
+          github-token: ${{ github.token }}
+          run-id: '39591724797'
+      - name: Restore official passing orders with a three-second minimum delay
+        timeout-minutes: 330
+        continue-on-error: true
+        run: python scripts/enrich_nar_track_corners.py --input .nar-track-source/kochi-joined.parquet --output artifacts/nar-track-corners
+      - name: Recompute descriptive groups from available checkpoints
+        if: always()
+        run: |
+          test -s artifacts/nar-track-corners/results/nar-kochi-enriched.parquet
+          python scripts/nar_track_research.py --input-dir artifacts/nar-track-corners/results --measurements .nar-track-source/kochi-measurements.json --output artifacts/nar-track-corners
+          cat artifacts/nar-track-corners/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: nar-track-corners-${{ github.run_id }}
+          path: artifacts/nar-track-corners
           retention-days: 90
           if-no-files-found: error

@@ -3,6 +3,7 @@ import json
 import pandas as pd
 
 from scripts.nar_track_research import analyze, parse_kochi_post, prior_styles
+from scripts.enrich_nar_track_corners import merge_corners
 
 
 def post(text, title="2026年10月18日の馬場状態"):
@@ -71,3 +72,24 @@ def test_join_does_not_forward_fill_and_unknown_styles_are_excluded(tmp_path):
     assert report["known_prior_style_starts"] == 9
     assert report["production_applied"] is False
     assert all(g["period"] == "2025" for g in report["groups"])
+
+
+def test_enrichment_requires_same_horse_date_and_race_and_keeps_outcome():
+    frame = pd.DataFrame([dict(horse_number=1, horse_id="a", race_date="2026-01-01", race_no=1, corner_positions=None, finish_position=3)])
+    record = dict(horse_number=1, horse_id="wrong", race_date="2026-01-01", race_no=1, corner_positions="1-2-3-4", finish_position=1)
+    result, count = merge_corners(frame, [record])
+    assert count == 0
+    record["horse_id"] = "a"
+    record["race_date"] = "2026-01-02"
+    assert merge_corners(frame, [record])[1] == 0
+    record["race_date"] = "2026-01-01"
+    result, count = merge_corners(frame, [record])
+    assert count == 1
+    assert result.iloc[0].corner_positions == "1-2-3-4"
+    assert result.iloc[0].finish_position == 3
+
+
+def test_unparsed_enrichment_does_not_invent_passing_positions():
+    frame = pd.DataFrame([dict(horse_number=1, horse_id="a", race_date="2026-01-01", race_no=1, corner_positions=None)])
+    record = dict(horse_number=1, horse_id="a", race_date="2026-01-01", race_no=1, corner_positions="(1,2)-3")
+    assert merge_corners(frame, [record])[1] == 0
