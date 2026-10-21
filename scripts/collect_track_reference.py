@@ -36,7 +36,11 @@ def extract_html(raw, url, hosts, attachment_page=False):
     doc = html.fromstring(raw)
     # libxml's default encoding for HTML without a declaration is Latin-1.
     if not re.search(br"charset|encoding=", raw[:4096], re.I):
-        doc = html.fromstring(raw.decode("utf-8-sig", errors="replace"))
+        try:
+            decoded = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            decoded = raw.decode("cp932")
+        doc = html.fromstring(decoded)
     title = " ".join(doc.xpath("string(//title)").split())
     content = doc.xpath("//main|//article|//*[@id='main']|//*[@id='contents']")
     root = content[0] if content else doc
