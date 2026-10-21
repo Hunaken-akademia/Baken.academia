@@ -1,0 +1,375 @@
+{
+  "scope": "Official track reference inventory; no modeled values or automatic production changes",
+  "allowed_hosts": [
+    "blog.f-keiba.com",
+    "www.banei-keiba.or.jp",
+    "www.hokkaidokeiba.net",
+    "www.iwatekeiba.or.jp",
+    "www.jra.go.jp",
+    "www.kanazawakeiba.com",
+    "www.kasamatsu-keiba.com",
+    "www.kawasaki-keiba.jp",
+    "www.nagoyakeiba.com",
+    "www.sagakeiba.net",
+    "www.sonoda-himeji.jp",
+    "www.tokyocitykeiba.com",
+    "www.urawa-keiba.jp"
+  ],
+  "sources": [
+    {
+      "venue": "JRA（掲載競馬場はページ見出しで確認）",
+      "url": "https://www.jra.go.jp/keiba/baba/",
+      "article": false
+    },
+    {
+      "venue": "JRA（掲載競馬場はページ見出しで確認）",
+      "url": "https://www.jra.go.jp/keiba/baba/index2.html",
+      "article": false
+    },
+    {
+      "venue": "JRA（掲載競馬場はページ見出しで確認）",
+      "url": "https://www.jra.go.jp/keiba/baba/index3.html",
+      "article": false
+    },
+    {
+      "venue": "JRA（掲載競馬場はデータ内で確認）",
+      "url": "https://www.jra.go.jp/keiba/baba/_data_week_weather.json",
+      "article": false
+    },
+    {
+      "venue": "JRA（掲載競馬場はデータ内で確認）",
+      "url": "https://www.jra.go.jp/keiba/baba/_data_week.html",
+      "article": false
+    },
+    {
+      "venue": "JRA（掲載競馬場はデータ内で確認）",
+      "url": "https://www.jra.go.jp/keiba/baba/_data_cushion.html",
+      "article": false
+    },
+    {
+      "venue": "JRA（掲載競馬場はデータ内で確認）",
+      "url": "https://www.jra.go.jp/keiba/baba/_data_moist.html",
+      "article": false
+    },
+    {
+      "venue": "JRA基礎資料",
+      "url": "https://www.jra.go.jp/keiba/baba/kaisetsu/",
+      "article": false
+    },
+    {
+      "venue": "JRA基礎資料",
+      "url": "https://www.jra.go.jp/keiba/baba/dirt/",
+      "article": false
+    },
+    {
+      "venue": "JRA基礎資料",
+      "url": "https://www.jra.go.jp/keiba/baba/moist/",
+      "article": false
+    },
+    {
+      "venue": "笠松",
+      "url": "https://www.kasamatsu-keiba.com/news/detail/1540",
+      "article": true
+    },
+    {
+      "venue": "笠松",
+      "url": "https://www.kasamatsu-keiba.com/news/detail/1484",
+      "article": true
+    },
+    {
+      "venue": "笠松",
+      "url": "https://www.kasamatsu-keiba.com/resources/pdfs/news/2026/1772173134_7dcb735380284d2d2c60.pdf",
+      "article": true
+    },
+    {
+      "venue": "園田",
+      "url": "https://www.sonoda-himeji.jp/news/detail/2550",
+      "article": true
+    },
+    {
+      "venue": "園田",
+      "url": "https://www.sonoda-himeji.jp/news/detail/2256",
+      "article": true
+    },
+    {
+      "venue": "園田",
+      "url": "https://www.sonoda-himeji.jp/news/detail/2213",
+      "article": true
+    },
+    {
+      "venue": "園田",
+      "url": "https://www.sonoda-himeji.jp/news/detail/2018",
+      "article": true
+    },
+    {
+      "venue": "園田",
+      "url": "https://www.sonoda-himeji.jp/news/detail/1896",
+      "article": true
+    },
+    {
+      "venue": "園田",
+      "url": "https://www.sonoda-himeji.jp/news/detail/1366",
+      "article": true
+    },
+    {
+      "venue": "園田",
+      "url": "https://www.sonoda-himeji.jp/news/detail/1174",
+      "article": true
+    },
+    {
+      "venue": "姫路",
+      "url": "https://www.sonoda-himeji.jp/news/detail/2502",
+      "article": true
+    },
+    {
+      "venue": "大井",
+      "url": "https://www.tokyocitykeiba.com/news/65689/",
+      "article": true
+    },
+    {
+      "venue": "大井",
+      "url": "https://www.tokyocitykeiba.com/news/61420/",
+      "article": true
+    },
+    {
+      "venue": "大井",
+      "url": "https://www.tokyocitykeiba.com/news/61176/",
+      "article": true
+    },
+    {
+      "venue": "大井",
+      "url": "https://www.tokyocitykeiba.com/news/65005/",
+      "article": true
+    },
+    {
+      "venue": "大井",
+      "url": "https://www.tokyocitykeiba.com/news/56570/",
+      "article": true
+    },
+    {
+      "venue": "大井",
+      "url": "https://www.tokyocitykeiba.com/news/56105/",
+      "article": true
+    },
+    {
+      "venue": "大井",
+      "url": "https://www.tokyocitykeiba.com/news/45067/",
+      "article": true
+    },
+    {
+      "venue": "大井",
+      "url": "https://www.tokyocitykeiba.com/news/44638/",
+      "article": true
+    },
+    {
+      "venue": "大井",
+      "url": "https://www.tokyocitykeiba.com/news/24615/",
+      "article": true
+    },
+    {
+      "venue": "大井",
+      "url": "https://www.tokyocitykeiba.com/news/22257/",
+      "article": true
+    },
+    {
+      "venue": "大井",
+      "url": "https://www.tokyocitykeiba.com/news/2475/",
+      "article": true
+    },
+    {
+      "venue": "浦和",
+      "url": "https://www.urawa-keiba.jp/info/news/detail.html?did=1979",
+      "article": true
+    },
+    {
+      "venue": "浦和",
+      "url": "https://www.urawa-keiba.jp/info/news/detail.html?did=1513",
+      "article": true
+    },
+    {
+      "venue": "浦和",
+      "url": "https://www.urawa-keiba.jp/info/news/detail.html?did=1102",
+      "article": true
+    },
+    {
+      "venue": "浦和",
+      "url": "https://www.urawa-keiba.jp/info/news/detail.html?did=719",
+      "article": true
+    },
+    {
+      "venue": "川崎",
+      "url": "https://www.kawasaki-keiba.jp/info/news/detail.html?did=2056",
+      "article": true
+    },
+    {
+      "venue": "船橋",
+      "url": "https://blog.f-keiba.com/info/2022/03/post-cd66.html",
+      "article": true
+    },
+    {
+      "venue": "金沢",
+      "url": "https://www.kanazawakeiba.com/news/info-38957/",
+      "article": true
+    },
+    {
+      "venue": "金沢",
+      "url": "https://www.kanazawakeiba.com/news/info-37906/",
+      "article": true
+    },
+    {
+      "venue": "金沢",
+      "url": "https://www.kanazawakeiba.com/race/info-37050/",
+      "article": true
+    },
+    {
+      "venue": "金沢",
+      "url": "https://www.kanazawakeiba.com/race/info-37202/",
+      "article": true
+    },
+    {
+      "venue": "金沢",
+      "url": "https://www.kanazawakeiba.com/race/info-36706/",
+      "article": true
+    },
+    {
+      "venue": "金沢",
+      "url": "https://www.kanazawakeiba.com/race/info-36628/",
+      "article": true
+    },
+    {
+      "venue": "金沢",
+      "url": "https://www.kanazawakeiba.com/race/info-36151/",
+      "article": true
+    },
+    {
+      "venue": "金沢",
+      "url": "https://www.kanazawakeiba.com/race/info-36024/",
+      "article": true
+    },
+    {
+      "venue": "門別",
+      "url": "https://www.hokkaidokeiba.net/topics/main.php?p_tcd=0000007623",
+      "article": true
+    },
+    {
+      "venue": "門別",
+      "url": "https://www.hokkaidokeiba.net/topics/main.php?p_tcd=0000007532",
+      "article": true
+    },
+    {
+      "venue": "名古屋",
+      "url": "https://www.nagoyakeiba.com/info/race/dirt_course/index.html",
+      "article": true
+    },
+    {
+      "venue": "名古屋",
+      "url": "https://www.nagoyakeiba.com/news/2026/09/post-1759.html",
+      "article": true
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/news/condition-260905-2-2-2",
+      "article": true
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/news/condition-260823-2",
+      "article": true
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/news/condition-260509-1-2",
+      "article": true
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/news/condition-260314",
+      "article": true
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/news/condition-260404-1",
+      "article": true
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/news/condition-250806",
+      "article": true
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/news/condition-250809",
+      "article": true
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/news/condition-251018",
+      "article": true
+    },
+    {
+      "venue": "帯広",
+      "url": "https://www.banei-keiba.or.jp/tp_detail.php?id=10371",
+      "article": true
+    },
+    {
+      "venue": "帯広",
+      "url": "https://www.banei-keiba.or.jp/tp_detail.php?id=9245",
+      "article": true
+    },
+    {
+      "venue": "佐賀（公開資料探索）",
+      "url": "https://www.sagakeiba.net/",
+      "article": false
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/?s=%E8%B5%B0%E8%B7%AF%E7%8A%B6%E6%B3%81&paged=1",
+      "article": false
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/?s=%E8%B5%B0%E8%B7%AF%E7%8A%B6%E6%B3%81&paged=2",
+      "article": false
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/?s=%E8%B5%B0%E8%B7%AF%E7%8A%B6%E6%B3%81&paged=3",
+      "article": false
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/?s=%E8%B5%B0%E8%B7%AF%E7%8A%B6%E6%B3%81&paged=4",
+      "article": false
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/?s=%E8%B5%B0%E8%B7%AF%E7%8A%B6%E6%B3%81&paged=5",
+      "article": false
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/?s=%E8%B5%B0%E8%B7%AF%E7%8A%B6%E6%B3%81&paged=6",
+      "article": false
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/?s=%E8%B5%B0%E8%B7%AF%E7%8A%B6%E6%B3%81&paged=7",
+      "article": false
+    },
+    {
+      "venue": "岩手（盛岡・水沢は記事で確認）",
+      "url": "https://www.iwatekeiba.or.jp/?s=%E8%B5%B0%E8%B7%AF%E7%8A%B6%E6%B3%81&paged=8",
+      "article": false
+    },
+    {
+      "venue": "笠松（公開資料探索）",
+      "url": "https://www.kasamatsu-keiba.com/news",
+      "article": false
+    },
+    {
+      "venue": "名古屋",
+      "url": "https://www.nagoyakeiba.com/news/2026/index_2.html",
+      "article": false
+    }
+  ]
+}
