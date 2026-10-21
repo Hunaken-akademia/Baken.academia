@@ -1023,9 +1023,12 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
             <TabsTrigger key={value} value={value} className="min-h-11 px-1 text-[11px] sm:text-sm">{label}</TabsTrigger>
           ))}
         </TabsList>
+        {data.race.league === "nar" && <div id="race-condition-matrix" className="scroll-mt-28">
+          <ConditionMatrix key={data.race.raceId} horses={data.horses} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
+        </div>}
         <TabsContent value="prediction">
           {hasGradedRaceHistory(data.race) && <GradedRaceHistory race={data.race} onSimulate={(id,label)=>{setHistoricalScenario(old=>({id,label,version:(old?.version??0)+1}));changeAnalysisTab("formation");}} />}
-          <ConditionMatrix key={data.race.raceId} horses={data.horses} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
+          {data.race.league !== "nar" && <ConditionMatrix key={data.race.raceId} horses={data.horses} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />}
           <PopularityForecast key={data.race.raceId} horses={data.horses} race={data.race} rolesReady={rolesReady} finished={data.review?.isFinished ?? false} predictionSafe={patternPredictionSafe(data.prediction, data.race.startsAt, data.review?.isFinished ?? false)} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
           <PickCards data={data} onHorse={onHorse}>
             <TicketSummary data={data} onOpen={openTickets} />
@@ -1215,7 +1218,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{[...data.horses].sort((a, b) => a.number - b.number).map(horse => <button key={horse.number} type="button" onClick={() => onHorse(horse)} className="min-h-11 rounded-lg border border-slate-700 px-3 py-2 text-left text-xs text-slate-200"><span className="mr-2 font-bold text-cyan-200">{horse.number}</span>{horse.name}</button>)}</div>
             </div>
           )}
-          <details className="my-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">条件別の参考ランキングを見る</summary><ConditionReferenceRankings data={data} /></details>
+          {data.race.league !== "nar" && <details className="my-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">条件別の参考ランキングを見る</summary><ConditionReferenceRankings data={data} /></details>}
       <section className="mb-5 rounded-2xl border border-cyan-400/20 bg-[#0c192a] p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -2389,7 +2392,7 @@ function HorseDetails({ horse, data }: { horse: Horse; data: Analysis }) {
         </div>
       </div>
       <PreviousRaceComparison horse={horse} race={data.race} />
-      <HorseConditionDetails horse={horse} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} />
+      {data.race.league === "nar" ? <a href="#race-condition-matrix" className="mt-4 inline-flex min-h-11 items-center text-sm text-cyan-200 underline">条件別実績は全頭の適性早見表で確認</a> : <HorseConditionDetails horse={horse} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} />}
       <details className="mt-4 rounded-xl border border-slate-700 p-4">
         <summary className="cursor-pointer text-sm font-semibold">評価の根拠・能力パラメーターを詳しく見る</summary>
       {rolesReady ? (
