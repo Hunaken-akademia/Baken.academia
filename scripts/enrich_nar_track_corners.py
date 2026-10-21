@@ -49,6 +49,7 @@ async def run(args):
     if args.limit:
         races = races.tail(args.limit)
     log = []
+    consecutive_errors = 0
     async with PoliteNarClient(args.output / "raw-results", 3, 3) as client:
         for number, (rid, race) in enumerate(races.iterrows(), 1):
             mask = data.race_id.eq(rid)
@@ -58,12 +59,18 @@ async def run(args):
                 updated, count = merge_corners(data.loc[mask], records)
                 data.loc[mask, "corner_positions"] = updated.corner_positions
                 log.append({"race_id": rid, "source_url": race.source_url, "updated": count, "status": "fetched"})
+                consecutive_errors = 0
             except Exception as error:
                 log.append({"race_id": rid, "source_url": race.source_url, "status": "error", "error": str(error)})
-            if number % 25 == 0 or number == len(races):
+                consecutive_errors += 1
+            stop = consecutive_errors >= 3
+            if number % 25 == 0 or number == len(races) or stop:
                 data.to_parquet(checkpoint, index=False)
                 (args.output / "corner-collection.json").write_text(json.dumps({"planned_races": len(races), "completed_races": number, "pilot": bool(args.limit), "records": log}, ensure_ascii=False, indent=2))
                 print(f"{number}/{len(races)} races; updated {sum(r.get('updated', 0) for r in log)} passing orders; errors {sum(r['status']=='error' for r in log)}", flush=True)
+            if stop:
+                print('Stopped after three consecutive source errors; checkpoint retained. No continued requests to a blocked or changed source.', flush=True)
+                break
     if not any(r.get("updated", 0) for r in log):
         raise RuntimeError("No matching official passing orders restored")
 
