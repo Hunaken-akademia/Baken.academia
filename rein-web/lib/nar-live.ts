@@ -4,7 +4,7 @@ import { captureOddsTrends } from "./odds-trends-server";
 import { fetchSource } from "./source-fetch";
 import { serverData, storedSnapshot, saveSnapshot, claimCapture, releaseCapture } from "./server-snapshots";
 import { parseNarCard, parseNarResult, parseNarSchedule, narVenueCodes, narRaceKey, narUrl, narScheduleIndexUrl, type NarHorse } from "./nar-source";
-import { loadNarRuntime, narRank } from "./nar-model";
+import { loadNarRuntime, narJockeyFactors, narRank } from "./nar-model";
 import { raceProgress } from "./race-progress";
 import { selectPicks } from "./marks";
 import { narReferenceSignals } from "./nar-validation";
@@ -59,7 +59,7 @@ export async function refreshNarRace(raceId:string, preview=false, expectedRelea
     if(expectedRelease && runtime?.model.release?.id!==expectedRelease)throw new Error("地方モデルの切り替え待ちです");
     let scored:ReturnType<typeof narRank>|null=null;
     if(runtime) {try{scored=narRank(runtime,card.horses,card.context);}catch(e){held.push(e instanceof Error?e.message:"地方評価を保留しています");}}
-    const horses=scored??card.horses.map(h=>({...h,score:0,mark:"",verdict:"履歴モデル待ち",positives:[] as string[],cautions:[] as string[]}));
+    const horses=scored??card.horses.map(h=>({...h,score:0,mark:"",verdict:"履歴モデル待ち",positives:[] as string[],cautions:[] as string[],historyFactors:narJockeyFactors(h)}));
     const signals=scored&&runtime?narReferenceSignals(scored,runtime.model.conditionValidation,card.context):null;
     const leaders=card.horses.filter(h=>h.earlyPosition!==null&&h.earlyPosition<=3).map(h=>h.number);
     const pace=key.code==="03"?{label:"ばんえい：平地ペース対象外",detail:"障害越えと馬場水分の影響が大きいため、平地の隊列・ペースは適用しません。",leaders:[]}:{label:leaders.length>=4?"先行候補多め":leaders.length<=1?"先行候補少なめ":"先行候補は平均的",detail:"近走の通過順からの参考分類。地方でのペース精度は未検証です。",leaders};

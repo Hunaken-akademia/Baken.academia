@@ -2429,7 +2429,7 @@ function HorseDetails({ horse, data }: { horse: Horse; data: Analysis }) {
         <p className="mt-3 text-xs leading-5 text-slate-500">
           調教師：{horse.trainer || "取得中"}
           <br />
-          血統：{horse.pedigree || "取得中"}
+          血統：{horse.pedigree || (horse.sire ? `${horse.sire}${horse.damSire ? `（母父 ${horse.damSire}）` : ""}` : "取得中")}
         </p>
       ) : null}
     </div>

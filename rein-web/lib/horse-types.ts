@@ -7,6 +7,7 @@ export type HistoryFactor = {
   winRate?: number;
   top3Rate?: number;
   averageFinish?: number;
+  record?: string;
 };
 export type Horse = {
   probabilityKind?: "ranking-share";
@@ -27,6 +28,9 @@ export type Horse = {
   weight?: number;
   weightChange?: number;
   pedigree?: string;
+  sire?: string;
+  dam?: string;
+  damSire?: string;
   jockey?: string;
   jockeyId?: string;
   trainer?: string;
