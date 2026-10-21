@@ -16,6 +16,7 @@ export type HistoryBundle = {
     runners: number;
     horses: number;
     leakagePolicy: string;
+    pedigreeCoverage?: number;
   };
   horse: Rates;
   horseRecent5: Rates;
@@ -26,6 +27,9 @@ export type HistoryBundle = {
   trainer: Rates;
   course: Rates;
   gate: Rates;
+  // NAR only: progeny totals by sire name, filled while sire lookups catch up.
+  sire?: Rates;
+  sireDistance?: Rates;
 };
 
 export type HistoryInput = {

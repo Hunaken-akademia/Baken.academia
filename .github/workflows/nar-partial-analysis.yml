@@ -390,10 +390,13 @@ jobs:
   refresh-profile:
     if: contains(github.event.head_commit.message, '[nar-history-refresh]') || (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'REIN daily race capture' && (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'))
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Sire lookups catch up within a daily budget at one official page per 3-4 s;
+    # once every known horse is collected only new runners are fetched.
+    timeout-minutes: 330
     env:
       SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-jra-archive"
       SUPABASE_SERVER_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/rein-server-data"
+      NAR_PEDIGREE_BUDGET_MINUTES: "290"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

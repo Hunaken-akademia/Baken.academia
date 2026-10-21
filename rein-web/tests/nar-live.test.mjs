@@ -7,7 +7,7 @@ async function load(file, replacements=[]){return import(moduleUrl(file,replacem
 const validationUrl=moduleUrl('../lib/nar-validation.ts',[[/from "\.\/marks"/,`from ${JSON.stringify(moduleUrl('../lib/marks.ts'))}`]]);
 const {narReferenceSignals,narConditionKey}=await import(validationUrl);
 const {narRaceKey,narUrl,narScheduleIndexUrl,narVenueCodes,parseNarSchedule,parseNarCard,parseNarResult}=await load('../lib/nar-source.ts');
-const {narHistoryInputs,narJockeyFactors,narRank,validateNarModel}=await load('../lib/nar-model.ts',[[/import \{ serverData \} from "\.\/server-snapshots";/,'const serverData=()=>{throw new Error("No network in ranker tests")};'],[/from "\.\/nar-validation"/,`from ${JSON.stringify(validationUrl)}`]]);
+const {narHistoryInputs,narJockeyFactors,narPedigreeFactors,narRank,validateNarModel}=await load('../lib/nar-model.ts',[[/import \{ serverData \} from "\.\/server-snapshots";/,'const serverData=()=>{throw new Error("No network in ranker tests")};'],[/from "\.\/nar-validation"/,`from ${JSON.stringify(validationUrl)}`]]);
 const {expireNarReleaseMetas}=await load('../lib/nar-release.ts');
 const entry=(number,gate,info='',market='',weight='470<br>(-2)')=>`<tr class="tBorder">${gate?`<td class="courseNum course_0${gate}">${gate}</td>`:''}<td class="horseNum">${number}</td><a class="horseName" href="/HorseMarkInfo?k_lineageLoginCode=${number}">馬${number}</a><a class="jockeyName" href="/RiderMark?k_riderLicenseNo=2">騎手（所属）</a><td class="odds_weight">${market}</td><table><tr><td>全</td><td>10-9-8-7</td></tr></table><td class="odds_weight">${weight}</td><td>1:12.3　2-3-4　38.5</td><td class="info">${info}</td></tr>`;
 const card=(entries)=>`<h4>2026年9月28日（月） 船 橋 第1競走 14:40発走</h4><section class="raceTitle"><h3>出走表テスト</h3><ul class="dataArea"><li>ダート 1200ｍ（左） 天候：晴 馬場：良</li></ul></section><section class="cardTable"><table>${entries}</table></section>`;
@@ -58,6 +58,8 @@ test('card keeps today\'s jockey record on this horse and the sire line',()=>{
  assert.deepEqual([r.horses[0].sire,r.horses[0].dam,r.horses[0].damSire],['フリオーソ','フクシマブリリオ','モンテロッソ']);
  assert.deepEqual(r.horses[1].jockeyRecord,{starts:0,wins:0,seconds:0,thirds:0});
  assert.equal(r.horses[1].sire,"St Mark's Basilica");
+ // Apprentice marks (☆) used to hide the weight carried.
+ assert.equal(r.horses[0].weightCarried,54);assert.equal(r.horses[1].weightCarried,54);
  // Past timing cells such as "1:12.3　2-3-4　38.5" are never read as a ride record.
  assert.equal(r.horses[2].jockeyRecord,undefined);assert.equal(r.horses[2].sire,undefined);
  assert.deepEqual(narJockeyFactors(r.horses[0]),[{label:'騎手相性',samples:7,impact:0,wins:3,top3:6,winRate:42.9,top3Rate:85.7,record:'3-2-1-1'}]);
@@ -65,6 +67,16 @@ test('card keeps today\'s jockey record on this horse and the sire line',()=>{
  const ranked=narRank({profile,model},[{...horse(1),jockeyRecord:{starts:7,wins:3,seconds:2,thirds:1}},horse(2)],context);
  assert.equal(ranked.find(h=>h.number===1).historyFactors.find(f=>f.label==='騎手相性').record,'3-2-1-1');
  assert.equal(ranked.find(h=>h.number===2).historyFactors.some(f=>f.label==='騎手相性'),false);
+});
+test('sire progeny rows compare today\'s distance band with all progeny and wait for collected sires',()=>{
+ // Profile rates are smoothed as (count+1.5)/(n+20) and (top3+4.5)/(n+20).
+ const sires={...profile,sire:{"StMark'sBasilica":{n:100,w:16.5/120,t:34.5/120,f:5}},sireDistance:{"StMark'sBasilica|6":{n:40,w:9.5/60,t:20.5/60,f:4.2}}};
+ const [f]=narPedigreeFactors(sires,{sire:"St Mark's Basilica"},1200);
+ assert.deepEqual(f,{label:'血統適性',samples:40,impact:0,wins:8,top3:16,winRate:20,top3Rate:40,averageFinish:4.2,baseline:30,subject:"St Mark's Basilica産駒・1200〜1399m"});
+ assert.deepEqual(narPedigreeFactors(sires,{sire:"St Mark's Basilica"},1600),[]);
+ assert.deepEqual(narPedigreeFactors(profile,{sire:'未集計'},1200),[]);assert.deepEqual(narPedigreeFactors(sires,{},1200),[]);
+ const ranked=narRank({profile:sires,model},[{...horse(1),sire:"St Mark's Basilica"},horse(2)],context);
+ assert.equal(ranked.find(h=>h.number===1).historyFactors.find(f=>f.label==='血統適性').baseline,30);
 });
 test('result popularity uses exact class o, not gate; cancelled runners separate',()=>{
  const row=(n,finish)=>`<tr class="tBorder"><td class="a">${finish}</td><td class="b courseNum">8</td><td class="c">${n}</td><td class="horseName">馬${n}</td><td class="o popularNum">2</td><td class="p">3.4</td></tr>`;

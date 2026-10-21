@@ -2,14 +2,61 @@
 Initial bootstrap uses archived history once. Later refreshes read only the small
 aggregate state and newly completed daily archives. No rounded-rate reversal.
 """
-import gzip,hashlib,io,json,os,tarfile,urllib.request
+import gzip,hashlib,html,io,json,os,random,re,tarfile,time,unicodedata,urllib.request
 from pathlib import Path
 from datetime import datetime,timedelta,timezone
 import pandas as pd
 from baken_academia.rein_history import _key
 from nar_live_model import normalize_courses
 
+PEDIGREE_URL='https://www.keiba.go.jp/KeibaWeb/DataRoom/RaceHorseInfo'
+# Sire progeny counts are sums of each offspring's exact horse-level counts.
+SIRE_GROUPS={'sire':'horse','sireSurface':'horseSurface','sireDistance':'horseDistance','sireCourse':'horseCourse'}
 GROUPS={'horse':['horse_id'],'horseSurface':['horse_id','surface'],'horseDistance':['horse_id','distance_bucket'],'horseCourse':['horse_id','racecourse'],'jockey':['jockey_id'],'trainer':['trainer_id'],'course':['racecourse','surface','distance_bucket','going'],'gate':['racecourse','surface','distance_bucket','gate']}
+
+
+def lineage_name(value):
+    # Same key as the web runtime: the card and horse pages differ only in spacing.
+    return re.sub(r'\s+','',unicodedata.normalize('NFKC',html.unescape(value or '')))
+
+
+def parse_pedigree(page):
+    """[sire, dam sire] from the official horse page, or None if no pedigree table."""
+    sire=re.search(r'class="fathername"[^>]*>([^<]*)<',page)
+    dam_sire=re.search(r'>\s*母父\s*</td>\s*<td[^>]*>([^<]*)<',page)
+    if not sire or not html.unescape(sire.group(1)).strip():return None
+    return [html.unescape(sire.group(1)).strip(),html.unescape(dam_sire.group(1)).strip() if dam_sire else '']
+
+
+def collect_pedigrees(state,priority,budget_seconds,fetch=None,delay=(3.0,4.0),clock=time.monotonic,sleep=time.sleep):
+    """Fill state['pedigree'] politely within a time budget; the rest waits for the next refresh."""
+    pedigree=state.setdefault('pedigree',{});fetch=fetch or (lambda horse:get(f'{PEDIGREE_URL}?k_lineageLoginCode={horse}&k_activeCode=1').decode('utf-8','replace'))
+    counts=state['counts']['horse'];seen=set();queue=[]
+    for horse in [*priority,*sorted(state.get('knownHorses',[]),key=lambda h:-counts.get(_key(h),[0])[0])]:
+        key=_key(horse)
+        if key and key not in pedigree and key not in seen:seen.add(key);queue.append(str(horse))
+    deadline=clock()+budget_seconds;added=failures=streak=0
+    for horse in queue:
+        if clock()>=deadline or streak>=20:break
+        try:
+            found=parse_pedigree(fetch(horse));streak=0
+            # A page without a pedigree table is recorded so it is not refetched daily.
+            pedigree[_key(horse)]=found or ['',''];added+=bool(found)
+        except Exception as exc:
+            failures+=1;streak+=1;print('Pedigree unavailable',horse,exc,flush=True)
+        sleep(random.uniform(*delay))
+    return {'added':added,'failures':failures,'remaining':sum(_key(h) not in pedigree for h in queue)}
+
+
+def sire_counts(state):
+    pedigree=state.get('pedigree',{});output={group:{} for group in SIRE_GROUPS}
+    for group,source in SIRE_GROUPS.items():
+        for key,value in state['counts'][source].items():
+            horse,_,rest=key.partition('|');sire=lineage_name((pedigree.get(horse) or [''])[0])
+            if not sire:continue
+            key=sire+('|'+rest if rest else '');old=output[group].get(key,[0,0,0,0])
+            output[group][key]=[a+b for a,b in zip(old,value)]
+    return output
 
 
 def broker(body):
@@ -54,6 +101,10 @@ def profile(state):
         return dict(n=n,w=round((w+1.5)/(n+20),5),t=round((t+4.5)/(n+20),5),f=round(f/n,3))
     output={'meta':{**state['meta'],'version':'history-v2','leakagePolicy':'target race dateより前の確定結果のみ'}}
     output.update({group:{key:rate(v) for key,v in rows.items()} for group,rows in state['counts'].items()})
+    if state.get('pedigree'):
+        sires=sire_counts(state);output.update({group:{key:rate(v) for key,v in rows.items()} for group,rows in sires.items()})
+        starts=sum(v[0] for v in state['counts']['horse'].values())
+        output['meta']['pedigreeCoverage']=round(sum(v[0] for v in sires['sire'].values())/starts,4) if starts else 0
     output['horseRecent5']={key:rate([len(v),sum(x==1 for x in v),sum(1<=x<=3 for x in v),sum(v)]) for key,v in state['recent'].items()}
     return output
 
@@ -81,7 +132,7 @@ def main():
         d=pd.concat([pd.read_parquet(p) for p in paths],ignore_index=True);d=d.loc[pd.to_datetime(d.race_date).le(previous)]
         state={'schema':1,'meta':dict(races=0,runners=0,horses=0),'counts':{g:{} for g in GROUPS},'recent':{}}
         state=append(state,d)
-    initial_races=state['meta']['races'];initial_rows=state['meta']['runners']
+    initial_races=state['meta']['races'];initial_rows=state['meta']['runners'];recent=[]
     day=pd.Timestamp(previous).date()+timedelta(days=1)
     while day<=end:
         path=f'daily/nar/{day.year}/{day}.tar.gz'
@@ -92,7 +143,10 @@ def main():
             if len(members)!=1:raise ValueError('Daily archive must contain one race table')
             d=pd.read_parquet(io.BytesIO(t.extractfile(members[0]).read()))
         if not pd.to_datetime(d.race_date).dt.date.eq(day).all():raise ValueError('Unexpected daily archive date')
-        state=append(state,d);print('Added day',day,flush=True);day+=timedelta(days=1)
+        state=append(state,d);recent+=[str(h) for h in d.horse_id.dropna().unique()];print('Added day',day,flush=True);day+=timedelta(days=1)
+    # Newest runners first, then horses with the most starts in the aggregates.
+    pedigree=collect_pedigrees(state,recent[::-1],float(os.environ.get('NAR_PEDIGREE_BUDGET_MINUTES','20'))*60)
+    print('Pedigrees',json.dumps(pedigree),flush=True)
     payload=profile(state)
     for kind,value in [('profile',payload),('state',state)]:
         raw=gzip.compress(json.dumps(value,ensure_ascii=False,separators=(',',':')).encode(),compresslevel=9,mtime=0)
@@ -104,7 +158,7 @@ def main():
         else:state_sha=sha
     result=broker({'action':'publish-nar-history','previousSha':current['profileSha'],'profileSha':profile_sha,'stateSha':state_sha,'meta':payload['meta']})
     if not result.get('published'):raise ValueError('Profile publication failed')
-    summary={'status':'refreshed','previousHistoryThrough':previous,'historyThrough':payload['meta']['dateTo'],'addedRaces':state['meta']['races']-initial_races,'addedRunners':state['meta']['runners']-initial_rows,'coefficientsUnchanged':True,'profileSha':profile_sha,'stateSha':state_sha}
+    summary={'status':'refreshed','previousHistoryThrough':previous,'historyThrough':payload['meta']['dateTo'],'addedRaces':state['meta']['races']-initial_races,'addedRunners':state['meta']['runners']-initial_rows,'coefficientsUnchanged':True,'pedigree':pedigree,'pedigreeCoverage':payload['meta'].get('pedigreeCoverage'),'profileSha':profile_sha,'stateSha':state_sha}
     (out/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2));print(json.dumps(summary),flush=True)
 
 if __name__=='__main__':main()

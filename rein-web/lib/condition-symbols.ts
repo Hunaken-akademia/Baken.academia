@@ -18,7 +18,9 @@ export function availableConditionRows(horses: Horse[]) {
 export function conditionSymbol(horse: Pick<Horse, "parameterFactors" | "historyFactors" | "jockey">, label: string) {
   const factors = historyFactors(horse), factor = factors.find(f => f.label === label);
   const career = factors.find(f => f.label === "通算成績");
-  const rate = historyRate(factor, "top3"), diff = factor ? careerDifference(factor, career) : null;
+  const rate = historyRate(factor, "top3");
+  const baseline = factor?.baseline !== undefined && Number.isFinite(factor.baseline) ? factor.baseline : null;
+  const diff = !factor ? null : careerDifference(factor, career) ?? (rate !== null && baseline !== null ? rate - baseline : null);
   const samples = factor?.samples ?? 0;
   const confidence = rate === null ? "missing" : samples < 5 ? "reference" : "standard";
   // Keep sparse observed records visible; shrink differences rather than discarding the record.
@@ -29,6 +31,6 @@ export function conditionSymbol(horse: Pick<Horse, "parameterFactors" | "history
     : adjustedRate! >= 60 ? "◎" : adjustedRate! >= 40 ? "○" : adjustedRate! >= 20 ? "△" : "×";
   // The official card gives today's jockey's record on this horse, including first rides.
   const rider = label === "騎手相性" && factor?.record ? (horse.jockey?.trim() ? `${horse.jockey.trim()}騎手` : "今回の騎手") : "";
-  const reason = rate === null ? rider ? `${rider}とは初コンビ（騎乗実績なし）` : "該当実績なし・未取得" : `${rider ? `${rider}で${factor!.record}・` : ""}${samples}走・3着内率 ${rate.toFixed(1)}%${diff === null ? "・実績率による参考評価" : `・通算比 ${diff > 0 ? "+" : ""}${diff.toFixed(1)}pt`}`;
+  const reason = rate === null ? rider ? `${rider}とは初コンビ（騎乗実績なし）` : "該当実績なし・未取得" : `${rider ? `${rider}で${factor!.record}・` : ""}${factor?.subject ? `${factor.subject} ` : ""}${samples}走・3着内率 ${rate.toFixed(1)}%${diff === null ? "・実績率による参考評価" : `・${baseline !== null ? `産駒全体（${baseline.toFixed(1)}%）比` : "通算比"} ${diff > 0 ? "+" : ""}${diff.toFixed(1)}pt`}`;
   return { symbol, samples, rate, diff, confidence, adjustedRate, detail: `${reason}${confidence === "reference" ? "・少数実績の参考判定（補正あり）" : ""}` };
 }

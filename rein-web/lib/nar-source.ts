@@ -98,11 +98,12 @@ export function parseNarCard(html: string, raceId: string) {
     // Only the past-race timing cells contain time + passing order + final 3f.
     const positions = [...block.matchAll(/\d+:\d{2}\.\d\s*[　\s]+(\d{1,2}(?:-\d{1,2}){1,3})\s*[　\s]+\d+\.\d/g)].map(m=>m[1]).slice(0,5);
     const early = positions.length ? positions.reduce((s,p,i)=>s+Number(p.split("-")[0])*(5-i),0)/positions.reduce((s,_,i)=>s+5-i,0) : null;
-    const weightCarried = narText(block).match(/(?:生|毛)\s+(\d{2,3}\.\d)\s+/)?.[1];
     // The cell after the birthday holds the apprentice mark, weight carried and
     // today's jockey's record on this horse, e.g. "☆ 55.0　0-0-0-3".
-    const ride = [...block.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m=>narText(m[1]).match(/^\D{0,2}\d{2,3}\.\d\s+(\d+)-(\d+)-(\d+)-(\d+)$/)).find(Boolean);
-    const jockeyRecord = ride ? (([w,s2,t,o])=>({starts:w+s2+t+o,wins:w,seconds:s2,thirds:t}))(ride.slice(1,5).map(Number)) : undefined;
+    const ride = [...block.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m=>narText(m[1]).match(/^\D{0,2}(\d{2,3}\.\d)\s+(\d+)-(\d+)-(\d+)-(\d+)$/)).find(Boolean);
+    // Apprentice marks (☆▲△★◇) sit between the birthday and the weight.
+    const weightCarried = ride?.[1] ?? narText(block).match(/(?:生|毛)\s+(?:[☆▲△★◇]\s*)?(\d{2,3}\.\d)\s+/)?.[1];
+    const jockeyRecord = ride ? (([w,s2,t,o])=>({starts:w+s2+t+o,wins:w,seconds:s2,thirds:t}))(ride.slice(2,6).map(Number)) : undefined;
     // Pedigree is the last three plain three-column cells: sire, dam, (dam sire).
     // Other plain cells of that width (such as best times) come before them.
     const lineage = [...block.matchAll(/<td\b[^>]*colspan=["']?3["']?[^>]*>([^<]*)<\/td>/gi)].map(m=>narText(m[1])).slice(-3);

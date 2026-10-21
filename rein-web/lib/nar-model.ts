@@ -59,6 +59,15 @@ export function narJockeyFactors(horse: Pick<NarHorse,"jockeyRecord">): HistoryF
   const top3 = r.wins + r.seconds + r.thirds, rate = (n:number) => r.starts ? Math.round(n / r.starts * 1000) / 10 : 0;
   return [{label:"騎手相性",samples:r.starts,impact:0,wins:r.wins,top3,winRate:rate(r.wins),top3Rate:rate(top3),record:`${r.wins}-${r.seconds}-${r.thirds}-${r.starts-top3}`}];
 }
+// Sire progeny at today's distance band, compared with all of the sire's progeny.
+export function narPedigreeFactors(profile:HistoryBundle,horse:Pick<NarHorse,"sire">,distanceM:number): HistoryFactor[] {
+  const sire=(horse.sire??"").normalize("NFKC").replace(/\s+/g,""),bucket=Math.floor(distanceM/200);
+  const all=sire?profile.sire?.[sire]:undefined,band=sire?profile.sireDistance?.[`${sire}|${bucket}`]:undefined;
+  if(!all||!band)return [];
+  const counts=(r:{n:number;w:number;t:number})=>({wins:Math.max(0,Math.round(r.w*(r.n+20)-1.5)),top3:Math.max(0,Math.round(r.t*(r.n+20)-4.5))});
+  const {wins,top3}=counts(band),overall=counts(all).top3;
+  return [{label:"血統適性",samples:band.n,impact:0,wins,top3,winRate:Math.round(wins/band.n*1000)/10,top3Rate:Math.round(top3/band.n*1000)/10,averageFinish:band.f,baseline:Math.round(overall/all.n*1000)/10,subject:`${horse.sire}産駒・${bucket*200}〜${bucket*200+199}m`}];
+}
 export function narRank(runtime:NarRuntime,horses:NarHorse[],context:{racecourse:string;surface:string;distanceM:number;date:string;going?:string}) {
   // A rolling aggregate must never be used to reconstruct a date inside its own
   // training period. Historical reviews use authentic stored prestart snapshots.
@@ -87,7 +96,7 @@ export function narRank(runtime:NarRuntime,horses:NarHorse[],context:{racecourse
     const factors:HistoryFactor[]=rows[i].factors.map(f=>{const j=labels.indexOf(f.label)*4+2;return {...f,impact:Math.round((rows[i].values[j]-means[j])*1000)/10};});
     const recent=runtime.profile.horseRecent5[clean(horse.horseId)];
     if(recent){const all=horses.map(h=>runtime.profile.horseRecent5[clean(h.horseId)]?.t??4.5/20);const wins=Math.max(0,Math.round(recent.w*(recent.n+20)-1.5)),top3=Math.max(0,Math.round(recent.t*(recent.n+20)-4.5));factors.push({label:"近5走",samples:recent.n,impact:Math.round((recent.t-all.reduce((s,v)=>s+v,0)/n)*1000)/10,wins,top3,winRate:Math.round(wins/recent.n*1000)/10,top3Rate:Math.round(top3/recent.n*1000)/10,averageFinish:recent.f});}
-    factors.push(...narJockeyFactors(horse));
+    factors.push(...narJockeyFactors(horse),...narPedigreeFactors(runtime.profile,horse,context.distanceM));
     return {...horse,probabilityKind:"ranking-share" as const,score:Math.round((pts[0]+pts[1]+pts[2])/3),firstProbability:shares[0][i],secondProbability:shares[1][i],thirdProbability:shares[2][i],firstSuitability:pts[0],secondSuitability:pts[1],thirdSuitability:pts[2],historySamples:rows[i].samples,historyFactors:factors,parameterFactors:factors,positives:factors.filter(f=>f.samples>=5&&f.impact>0).sort((a,b)=>b.impact-a.impact).slice(0,3).map(f=>`${f.label} ${f.samples}走・3着内${f.top3Rate}%`),cautions:rows[i].samples<5?["取得済みの地方履歴が少ないため参考評価"]:[],verdict:runtime.model.release?.validatedRanking?"地方専用ハイブリッド評価":"地方履歴からの暫定評価",mark:""};
   }).sort((a,b)=>b.score-a.score||a.number-b.number);
 }
