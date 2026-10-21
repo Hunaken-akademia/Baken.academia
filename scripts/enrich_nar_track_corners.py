@@ -5,6 +5,8 @@ Checkpoints survive individual HTTP failures and are uploaded by the workflow.
 """
 import argparse
 import asyncio
+import gzip
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -12,6 +14,28 @@ from pathlib import Path
 import pandas as pd
 
 from baken_academia.nar_backfill import PoliteNarClient, parse_result_page
+
+
+def is_maintenance(payload):
+    return 'システムメンテナンス' in payload.decode('utf-8-sig', errors='replace')
+
+
+def archive_unavailable_cache(cache_dir, url):
+    digest = hashlib.sha256(url.encode()).hexdigest()
+    path = cache_dir / digest[:2] / f'{digest}.html.gz'
+    if not path.exists():
+        return
+    raw = gzip.decompress(path.read_bytes())
+    try:
+        valid = bool(parse_result_page(raw, url))
+    except ValueError:
+        valid = False
+    if not valid:
+        backup = path.with_name(f'{digest}.unavailable-{hashlib.sha256(raw).hexdigest()[:12]}.html.gz')
+        if backup.exists():
+            path.unlink()
+        else:
+            path.rename(backup)
 
 
 def merge_corners(frame, records):
@@ -53,8 +77,13 @@ async def run(args):
     async with PoliteNarClient(args.output / "raw-results", 3, 3) as client:
         for number, (rid, race) in enumerate(races.iterrows(), 1):
             mask = data.race_id.eq(rid)
+            maintenance = False
             try:
+                archive_unavailable_cache(client.cache_dir, race.source_url)
                 raw = await client.fetch(race.source_url)
+                if is_maintenance(raw):
+                    maintenance = True
+                    raise RuntimeError('Official NAR site is under system maintenance; checkpoint saved without further requests')
                 records = parse_result_page(raw, race.source_url)
                 updated, count = merge_corners(data.loc[mask], records)
                 data.loc[mask, "corner_positions"] = updated.corner_positions
@@ -63,13 +92,14 @@ async def run(args):
             except Exception as error:
                 log.append({"race_id": rid, "source_url": race.source_url, "status": "error", "error": str(error)})
                 consecutive_errors += 1
-            stop = consecutive_errors >= 3
+            stop = maintenance or consecutive_errors >= 3
             if number % 25 == 0 or number == len(races) or stop:
                 data.to_parquet(checkpoint, index=False)
                 (args.output / "corner-collection.json").write_text(json.dumps({"planned_races": len(races), "completed_races": number, "pilot": bool(args.limit), "records": log}, ensure_ascii=False, indent=2))
                 print(f"{number}/{len(races)} races; updated {sum(r.get('updated', 0) for r in log)} passing orders; errors {sum(r['status']=='error' for r in log)}", flush=True)
             if stop:
-                print('Stopped after three consecutive source errors; checkpoint retained. No continued requests to a blocked or changed source.', flush=True)
+                reason = 'official site maintenance' if maintenance else 'three consecutive source errors'
+                print(f'Stopped due to {reason}; checkpoint retained. No further requests.', flush=True)
                 break
     if not any(r.get("updated", 0) for r in log):
         raise RuntimeError("No matching official passing orders restored")

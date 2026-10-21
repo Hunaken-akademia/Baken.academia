@@ -102,3 +102,26 @@ def test_missing_recent_starts_do_not_keep_old_styles_alive():
             rows.append(dict(race_id=str(i),race_date=f'2025-01-{i+1:02}',horse_id=str(n),horse_number=n,corner_positions='1-2-3-4' if i<2 else None))
     result=prior_styles(pd.DataFrame(rows))
     assert set(result.loc[result.race_date.eq('2025-01-09'),'prior_style'])=={'unknown'}
+
+
+def test_maintenance_cache_is_preserved_and_removed_from_active_path(tmp_path):
+    import gzip
+    import hashlib
+    from scripts.enrich_nar_track_corners import archive_unavailable_cache, is_maintenance
+
+    url = "https://www.keiba.go.jp/test-result"
+    raw = "<html><title>システムメンテナンスのお知らせ</title></html>".encode()
+    digest = hashlib.sha256(url.encode()).hexdigest()
+    active = tmp_path / digest[:2] / f"{digest}.html.gz"
+    active.parent.mkdir()
+    active.write_bytes(gzip.compress(raw))
+    assert is_maintenance(raw)
+    archive_unavailable_cache(tmp_path, url)
+    assert not active.exists()
+    backups = list(active.parent.glob("*.unavailable-*.html.gz"))
+    assert len(backups) == 1
+    assert gzip.decompress(backups[0].read_bytes()) == raw
+    active.write_bytes(gzip.compress(raw))
+    archive_unavailable_cache(tmp_path, url)
+    assert not active.exists()
+    assert len(list(active.parent.glob("*.unavailable-*.html.gz"))) == 1
