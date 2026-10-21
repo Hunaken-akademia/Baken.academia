@@ -1,0 +1,37 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+const uri=code=>'data:text/javascript;base64,'+Buffer.from(code).toString('base64');
+const compile=name=>ts.transpileModule(readFileSync(new URL(`../lib/${name}.ts`,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+const research=uri(compile('horse-research').replace('"./marks"',JSON.stringify(uri(compile('marks')))));
+const {conditionSymbol}=await import(uri(compile('condition-symbols').replace('"./horse-research"',JSON.stringify(research))));
+const {popularityGroup,popularityPattern,buildDayTrends}=await import(uri(compile('race-day-trends')));
+const horse=(rate,samples=10,career=20)=>({parameterFactors:[{label:'通算成績',samples:career,top3Rate:40},{label:'距離適性',samples,top3Rate:rate}]});
+test('condition symbols use each horse career with explicit thresholds and sufficient samples',()=>{
+  for(const [rate,symbol] of [[55,'◎'],[45,'○'],[35,'△'],[34.9,'×'],[0,'×']])assert.equal(conditionSymbol(horse(rate),'距離適性').symbol,symbol);
+  assert.equal(conditionSymbol(horse(80,9),'距離適性').symbol,'—');
+  assert.equal(conditionSymbol(horse(80,10,19),'距離適性').symbol,'—');
+  assert.equal(conditionSymbol(horse(80),'馬場適性').symbol,'—');
+  assert.equal(conditionSymbol({historyFactors:[{label:'騎手傾向',samples:500,top3Rate:80}]},'騎手相性').symbol,'—');
+});
+test('popularity boundaries cover A to D and never invent missing popularity',()=>{
+  for(const [value,group] of [[1,'A'],[3,'A'],[4,'B'],[6,'B'],[7,'C'],[9,'C'],[10,'D'],[18,'D']]) assert.equal(popularityGroup(value),group);
+  for(const value of [0,-1,1.5,19,NaN,Infinity,null,undefined,'3'])assert.equal(popularityGroup(value),null);
+});
+const finishers=[{number:1,finish:1,popularity:3},{number:5,finish:2,popularity:5},{number:3,finish:3,popularity:1}];
+test('example result is A-B-A in finish order and rejects ambiguous or incomplete results',()=>{
+  assert.equal(popularityPattern([...finishers].reverse()).pattern,'A-B-A');
+  assert.equal(popularityPattern(finishers).source,'結果掲載人気');
+  assert.equal(popularityPattern(finishers.slice(0,2)),null);
+  assert.equal(popularityPattern([...finishers,{number:9,finish:3,popularity:2}]),null);
+  assert.equal(popularityPattern([...finishers,{number:1,finish:4,popularity:2}]),null);
+  assert.equal(popularityPattern(finishers.map(f=>({...f,popularity:undefined}))),null);
+  assert.equal(popularityPattern(finishers.map(f=>({...f,popularity:undefined})),finishers).source,'保存時点の人気');
+});
+test('day patterns use only earlier same-venue results captured before target cutoff',()=>{
+  const target={raceId:'202610213008',date:'2026-10-21',course:'ダート1000m',startsAt:Date.parse('2026-10-21T10:00:00Z')};
+  const race={...target,raceId:'202610213001',title:'門別1R',condition:'重',startsAt:target.startsAt-3600000,capturedAt:'2026-10-21T09:30:00Z',isFinished:true,horses:finishers,finishers};
+  const out=buildDayTrends(target,[race,{...race,raceId:target.raceId},{...race,raceId:'202610213002',capturedAt:'2026-10-21T11:00:00Z'}],target.startsAt);
+  assert.equal(out.raceCount,1);assert.equal(out.races[0].popularity.pattern,'A-B-A');
+});
