@@ -1,0 +1,563 @@
+{
+  "allowed_hosts": [
+    "www.kasamatsu-keiba.com",
+    "www.sagakeiba.net"
+  ],
+  "sources": [
+    {
+      "venue": "佐賀（仕様・工事資料）",
+      "url": "https://www.sagakeiba.net/raceinfo/course/",
+      "article": true
+    },
+    {
+      "venue": "佐賀（仕様・工事資料）",
+      "url": "https://www.sagakeiba.net/notice/notification/2026/07/03/713451/",
+      "article": true
+    },
+    {
+      "venue": "佐賀（仕様・工事資料）",
+      "url": "https://www.sagakeiba.net/notice/notification/2023/06/16/349219/",
+      "article": true
+    },
+    {
+      "venue": "佐賀（仕様・工事資料）",
+      "url": "https://www.sagakeiba.net/?s=%E7%A0%82%E5%85%A5%E6%9B%BF",
+      "article": true
+    },
+    {
+      "venue": "佐賀（仕様・工事資料）",
+      "url": "https://www.sagakeiba.net/?s=%E7%A0%82%E5%8E%9A",
+      "article": true
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2026&m=10",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2026&m=9",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2026&m=8",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2026&m=7",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2026&m=6",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2026&m=5",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2026&m=4",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2026&m=3",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2026&m=2",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2026&m=1",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2025&m=12",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2025&m=11",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2025&m=10",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2025&m=9",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2025&m=8",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2025&m=7",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2025&m=6",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2025&m=5",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2025&m=4",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2025&m=3",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2025&m=2",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2025&m=1",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2024&m=12",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2024&m=11",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2024&m=10",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2024&m=9",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2024&m=8",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2024&m=7",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2024&m=6",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2024&m=5",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2024&m=4",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2024&m=3",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2024&m=2",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2024&m=1",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2023&m=12",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2023&m=11",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2023&m=10",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2023&m=9",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2023&m=8",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2023&m=7",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2023&m=6",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2023&m=5",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2023&m=4",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2023&m=3",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2023&m=2",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2023&m=1",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2022&m=12",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2022&m=11",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2022&m=10",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2022&m=9",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2022&m=8",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2022&m=7",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2022&m=6",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2022&m=5",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2022&m=4",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2022&m=3",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2022&m=2",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2022&m=1",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2021&m=12",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2021&m=11",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2021&m=10",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2021&m=9",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2021&m=8",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2021&m=7",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2021&m=6",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2021&m=5",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2021&m=4",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2021&m=3",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2021&m=2",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2021&m=1",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2020&m=12",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2020&m=11",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2020&m=10",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2020&m=9",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2020&m=8",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2020&m=7",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2020&m=6",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2020&m=5",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2020&m=4",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2020&m=3",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2020&m=2",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2020&m=1",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2019&m=12",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2019&m=11",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2019&m=10",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2019&m=9",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2019&m=8",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2019&m=7",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2019&m=6",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2019&m=5",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2019&m=4",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2019&m=3",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2019&m=2",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2019&m=1",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2018&m=12",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2018&m=11",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2018&m=10",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2018&m=9",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2018&m=8",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2018&m=7",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2018&m=6",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2018&m=5",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2018&m=4",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2018&m=3",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2018&m=2",
+      "article": false
+    },
+    {
+      "venue": "笠松（過去月別記事）",
+      "url": "https://www.kasamatsu-keiba.com/news?y=2018&m=1",
+      "article": false
+    }
+  ]
+}
