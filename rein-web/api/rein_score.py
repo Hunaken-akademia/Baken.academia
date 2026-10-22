@@ -87,13 +87,13 @@ def get_runtime(token: str) -> Any:
     with _runtime_lock:
         if _runtime is not None and time.monotonic() - _runtime_checked_at < RUNTIME_CHECK_SECONDS:
             return _runtime
-        from rein_augmented_runtime import ReinRuntime
-
         registry = _request_registry(token)
         version = registry["model"]["version"]
         if _runtime is not None and version == _runtime_version:
             _runtime_checked_at = time.monotonic()
             return _runtime
+        from rein_augmented_runtime import ReinRuntime
+
         _, bundle = _request_bundle(token, registry)
         destination = Path(tempfile.gettempdir()) / "rein-runtime" / version
         with _inference_lock:
@@ -104,6 +104,8 @@ def get_runtime(token: str) -> Any:
                 archive_path.write_bytes(bundle)
                 with tarfile.open(archive_path, "r:gz") as archive:
                     _safe_extract(archive, destination.parent)
+            # Release the compressed download before allocating history/model frames.
+            del bundle
             loaded = ReinRuntime.load(destination, version)
             _runtime, _runtime_version = loaded, version
             _runtime_checked_at = time.monotonic()

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVercelOidcToken } from "@vercel/oidc";
+import { serverJson } from "@/lib/server-json";
 import { getCache, waitUntil } from "@vercel/functions";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { loadHistory, scoreHistory } from "@/lib/history";
@@ -761,8 +762,8 @@ async function analyze(request: NextRequest) {
             body: JSON.stringify(modelPayload),
           },
         );
-        scored = (await modelResponse.json()) as RoleScore;
-        if (!modelResponse.ok || !scored.runners?.length)
+        scored = await serverJson<RoleScore>(modelResponse, "REIN inference");
+        if (!scored.runners?.length)
           throw new Error(scored.error || "着順モデルの応答が不正です");
         try {
           await sharedCache.set(modelCacheKey, scored, {

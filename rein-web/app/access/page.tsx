@@ -8,7 +8,7 @@ function messageFor(membership: ReinMembership | null, now: Date) {
   if (!membership) {
     return {
       title: "CAMPFIRE会員情報を確認できません",
-      body: "CAMPFIREで登録したGoogleアドレスと、現在ログインしているGoogleアカウントが一致しているか確認してください。",
+      body: "CAMPFIRE登録時に申請したGoogleアドレスでログインし直してください。同じアドレスでも表示される場合は、会員登録の反映待ちの可能性があります。",
     };
   }
   if (membership.status === "paused") {
@@ -82,6 +82,9 @@ export default async function AccessPage() {
               別のGoogleアカウントでログイン
             </button>
           </form>
+          <p className="mt-4 text-sm leading-6 text-slate-400">
+            解決しない場合は、<a href="https://community.camp-fire.jp/projects/view/986462" className="text-cyan-300 underline">CAMPFIREの馬券アカデミア</a>から運営者へお問い合わせください。
+          </p>
         </section>
       </div>
     </main>
