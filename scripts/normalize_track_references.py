@@ -7,6 +7,7 @@ import argparse
 from collections import Counter
 from datetime import date
 import hashlib
+import io
 import json
 from pathlib import Path
 import re
@@ -126,9 +127,28 @@ def parse_jra_fragment(doc, moisture=False):
     return result
 
 
+def parse_jra_pdf(raw, url):
+    import pdfplumber
+    try:
+        from scripts.collect_track_conditions import VENUES, parse_text
+    except ModuleNotFoundError:
+        from collect_track_conditions import VENUES, parse_text
+    match = re.fullmatch(r"https://www\.jra\.go\.jp/keiba/baba/archive/(20\d{2})pdf/([a-z]+)\d+\.pdf", url)
+    if not match or match[2] not in VENUES:
+        return None
+    with pdfplumber.open(io.BytesIO(raw)) as pdf:
+        text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+    if f"{match[1]}年" not in norm(text):
+        raise ValueError("PDF does not confirm archive year")
+    rows = parse_text(text, int(match[1]), VENUES[match[2]], url)
+    if not rows:
+        raise ValueError("No dated measurements parsed")
+    return rows
+
+
 def run(inputs, output):
     output.mkdir(parents=True, exist_ok=True)
-    sources, failures, candidates, errors, versions = {}, [], [], [], []
+    sources, failures, candidates, errors, versions, dated = {}, [], [], [], [], []
     for root in inputs:
         manifest = json.loads((root / "manifest.json").read_text())
         for source in manifest["records"]:
@@ -150,6 +170,20 @@ def run(inputs, output):
                 raise ValueError(f"Source hash mismatch: {url}")
             record = dict(source, classification="document_only", parsed_records=0)
             sources[url] = record
+            if source.get("format") == "pdf" and "/keiba/baba/archive/" in url:
+                try:
+                    rows = parse_jra_pdf(raw, url)
+                    if rows is None:
+                        raise ValueError("Unsupported JRA archive URL")
+                    record.update(classification="dated_measurement_pdf", parsed_records=len(rows))
+                    for row in rows:
+                        row.update(source_sha256=source["raw_sha256"], retrieved_at=source["retrieved_at"],
+                                   production_applied=False, prestart_verified=False)
+                    dated.extend(rows)
+                except Exception as error:
+                    record["classification"] = "parse_error"
+                    errors.append(dict(source_url=url, error=str(error)))
+                continue
             if source.get("format") != "html":
                 record["classification"] = "attachment_needs_review"
                 continue
@@ -178,11 +212,17 @@ def run(inputs, output):
                 record["classification"] = "parse_error"
                 errors.append(dict(source_url=url, error=str(error)))
     (output / "references.json").write_text(json.dumps(candidates, ensure_ascii=False, indent=2))
+    # Keep dated observations separate from notice cells and undated fragments.
+    keys = [(r["venue"], r["date"]) for r in dated]
+    if len(keys) != len(set(keys)):
+        raise ValueError("Duplicate venue/date in archived measurement PDFs")
+    (output / "dated-jra-measurements.json").write_text(json.dumps(dated, ensure_ascii=False, indent=2))
     (output / "source-index.json").write_text(json.dumps(list(sources.values()), ensure_ascii=False, indent=2))
     (output / "unavailable.json").write_text(json.dumps(failures, ensure_ascii=False, indent=2))
     (output / "source-versions.json").write_text(json.dumps(versions, ensure_ascii=False, indent=2))
     report = dict(source_documents=len(sources), source_formats=dict(Counter(r["format"] for r in sources.values())),
                   structured_sources=sum(bool(r["parsed_records"]) for r in sources.values()), records=len(candidates),
+                  dated_jra_venue_days=len(dated),
                   kinds=dict(Counter(r["kind"] for r in candidates)), venues=dict(Counter(r["venue"] for r in candidates)),
                   document_classifications=dict(Counter(r["classification"] for r in sources.values())), parse_errors=errors,
                   production_applied=False, caveats=["Publication dates are not effective dates or measurement times", "Missing years are not inferred", "Not a complete daily history; no forward-fill", "Image/PDF geometry still needs review", "No predictive benefit or causal effect asserted"])
