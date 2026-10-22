@@ -1,0 +1,38 @@
+name: Normalize archived track references
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/normalize-track-reference-request.json]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - run: pip install lxml pytest
+      - run: python -m pytest tests/test_normalize_track_references.py tests/test_track_reference.py -q
+      - name: Read the two archived collections
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p input/current input/history
+          gh api repos/${{ github.repository }}/actions/artifacts/12391020850/zip > input/current.zip
+          gh api repos/${{ github.repository }}/actions/artifacts/12391031902/zip > input/history.zip
+          unzip -q input/current.zip -d input/current
+          unzip -q input/history.zip -d input/history
+      - name: Build references and review queue without fetching official sites
+        run: python scripts/normalize_track_references.py --input input/current --input input/history --output artifacts/normalized-track-reference
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: normalized-track-reference-${{ github.run_id }}
+          path: artifacts/normalized-track-reference
+          retention-days: 90
+          if-no-files-found: error
