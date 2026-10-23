@@ -28,7 +28,7 @@ function jstDate(day: ScheduleDay) {
   return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1, date: now.getUTCDate() };
 }
 
-export function monthlyVenueSeeds(html: string, targetDate: number): VenueSeed[] {
+function monthlyVenueSeeds(html: string, targetDate: number): VenueSeed[] {
   const venues = new Set(["札幌", "函館", "福島", "新潟", "東京", "中山", "中京", "京都", "阪神", "小倉"]);
   return [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)].flatMap((row) => {
     const text = decode(row[1]);
