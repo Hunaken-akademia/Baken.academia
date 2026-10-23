@@ -391,7 +391,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
         }
       }}
     >
-      <div className="mx-auto max-w-6xl px-4 pb-20 pt-5 sm:px-6">
+      <div className="mx-auto w-full min-w-0 max-w-[1600px] px-[clamp(4px,1vw,12px)] pb-20 pt-5">
         <header className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {showBack && (
@@ -1023,12 +1023,11 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
             <TabsTrigger key={value} value={value} className="min-h-11 px-1 text-[11px] sm:text-sm">{label}</TabsTrigger>
           ))}
         </TabsList>
-        {data.race.league === "nar" && <div id="race-condition-matrix" className="scroll-mt-28">
+        <div id="race-condition-matrix" className="min-w-0 scroll-mt-28">
           <ConditionMatrix key={data.race.raceId} horses={data.horses} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
-        </div>}
+        </div>
         <TabsContent value="prediction">
           {hasGradedRaceHistory(data.race) && <GradedRaceHistory race={data.race} onSimulate={(id,label)=>{setHistoricalScenario(old=>({id,label,version:(old?.version??0)+1}));changeAnalysisTab("formation");}} />}
-          {data.race.league !== "nar" && <ConditionMatrix key={data.race.raceId} horses={data.horses} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />}
           <PopularityForecast key={data.race.raceId} horses={data.horses} race={data.race} rolesReady={rolesReady} finished={data.review?.isFinished ?? false} predictionSafe={patternPredictionSafe(data.prediction, data.race.startsAt, data.review?.isFinished ?? false)} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
           <PickCards data={data} onHorse={onHorse}>
             <TicketSummary data={data} onOpen={openTickets} />
