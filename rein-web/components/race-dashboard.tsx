@@ -27,6 +27,7 @@ import { reasonViews } from "@/lib/feature-labels";
 import { longshotRoleOrder } from "@/lib/longshot-roles";
 import { roleOrder, type RoleKey, type Picks, type MarkPick } from "@/lib/marks";
 import type { Horse } from "@/lib/horse-types";
+import { TrackReferencePanel } from "@/components/track-reference-panel";
 import { ConditionMatrix } from "@/components/condition-matrix";
 import { patternPredictionSafe } from "@/lib/popularity-forecast";
 import { PopularityForecast } from "@/components/popularity-forecast";
@@ -1015,6 +1016,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           </div>
         </section>
       )}
+      <TrackReferencePanel key={data.race.raceId} race={data.race} />
       <OddsTrendPanel race={data.race} horses={data.horses} />
       <div ref={analysisNav} />
       <Tabs value={analysisTab} onValueChange={changeAnalysisTab} onSwipeBack={onBack}>
