@@ -1,4 +1,5 @@
 "use client";
+import { CushionComparison } from "@/components/cushion-comparison";
 import { useEffect, useState } from "react";
 import { cushionImpact, cushionDescription, displayTrackEntries, JRA_TRACK_VENUES, safeTrackSource, validTrackDate, type TrackReferenceData, type TrackRecord } from "@/lib/track-reference";
 import { NAR_COURSES } from "@/lib/nar-source";
@@ -57,6 +58,7 @@ export function TrackReferencePanel({ race }: { race: Race }) {
     <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-white">馬場の参考情報{venue ? ` ・ ${venue}` : ""}</h2><span className="rounded bg-slate-700/60 px-2 py-1 text-xs">参考表示</span></div>
     {league === "jra" ? <p className="mt-2 text-xs leading-5 text-slate-400">クッション値は芝の表面の硬さの目安です。ダートの評価や、逃げ・差しの有利不利をこの値だけで判断するものではありません。</p> : <p className="mt-2 text-xs leading-5 text-slate-400">地方のクッション値は取得できていません。取得済みの砂厚の測定記録・整備告知を表示します。砂厚はクッション値とは別の指標です。</p>}
     {!venue || !validTrackDate(date) ? <p className="mt-3">対象の競馬場・開催日を確認できません。</p> : !data ? <p role="status" className="mt-3">{state.key === key && state.error ? <>{state.error}<button type="button" onClick={() => setAttempt(n => n+1)} className="ml-2 min-h-11 text-cyan-200 underline">再取得</button></> : "公式の参考情報を確認中…"}</p> : <>
+      {league === "jra" && turf && typeof (data.live?.value ?? (latest?.payload.kind === "measurement" ? latest.payload.cushion : null)) === "number" && <CushionComparison venue={venue} date={date} distance={Number(race.course.match(/(\d{3,4})m/)?.[1])} value={(data.live?.value ?? (latest?.payload.kind === "measurement" ? latest.payload.cushion : null))!} />}
       {data.live && <div className="mt-3 rounded-xl border border-cyan-300/20 bg-cyan-300/5 p-3">
         <p className="text-xs text-cyan-200">公式の直近掲載（対象日の値とは未照合）</p>
         <p className="mt-1 font-bold text-white">芝クッション値 <span className="text-2xl">{data.live.value.toFixed(1)}</span> ・ {cushionDescription(data.live.value)}</p>
