@@ -8,7 +8,23 @@ export function validTrackDate(value: string) {
   return /^20\d{2}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
 }
 export function cushionDescription(value: number) {
-  return value >= 12 ? "硬め" : value >= 10 ? "やや硬め" : value >= 8 ? "標準" : value >= 7 ? "やや軟らかめ" : "軟らかめ";
+  return value >= 12 ? "硬め" : value >= 10 ? "やや硬め" : value >= 8 ? "標準" : value > 7 ? "やや軟らかめ" : "軟らかめ";
+}
+// General physical interpretation from JRA; not a fitted race/style advantage.
+export function cushionImpact(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 20) return null;
+  const label = cushionDescription(value);
+  const effect = value >= 10
+    ? "着地時に馬場から受ける反発が比較的大きく、芝の表層は硬めの状態です。"
+    : value >= 8
+      ? "芝の表層の硬さ・反発は、JRAの参考区分では標準的な範囲です。"
+      : "着地時の馬場の反発は比較的小さく、芝の表層は軟らかめの状態です。";
+  const check = value >= 10
+    ? "同じ競馬場でクッション値が近かった過去の走りを、時計・着順・馬場状態と合わせて確認。硬めというだけで高速決着や特定の馬の好走は決まりません。"
+    : value >= 8
+      ? "極端な硬さ・軟らかさを前提にせず、含水率、芝の傷み、当日の時計や脚質傾向も合わせて確認。"
+      : "同じ競馬場の近いクッション値での実績を確認。低い値は含水率や芝の種類にも左右されるため、数値だけで重馬場・パワー型向きとは決められません。";
+  return { label, effect, check };
 }
 export function safeTrackSource(value: string) {
   try { const u = new URL(value); return u.protocol === "https:" && ["jra.go.jp","keiba.or.jp","sonoda-himeji.jp","iwatekeiba.or.jp","urawa-keiba.jp","kawasaki-keiba.jp","funabashi-keiba.jp","f-keiba.com","monbetsu-keiba.jp"].some(host => u.hostname === host || u.hostname.endsWith(`.${host}`)); } catch { return false; }
