@@ -18,7 +18,7 @@ test('notice stays open on save failure, disappears after server success, stays 
   let onAuth, owner = 'account-a', fail = false;
   const confirmed = new Set();
   globalThis.__noticeAuth = { auth: { onAuthStateChange: callback => { onAuth = callback; return { data: { subscription: { unsubscribe() {} } } }; } } };
-  const id = 'odds-trends-20261013-v1';
+  const id = 'race-finder-20261028-v1';
   globalThis.fetch = async (_url, options) => {
     assert.equal(options.cache, 'no-store');
     if (options.method === 'POST') { if (fail) return Response.json({}, { status: 500 }); confirmed.add(owner); }
@@ -31,7 +31,8 @@ test('notice stays open on save failure, disappears after server success, stays 
   const { UpdateNotice } = await import(uri(code));
   const container = document.getElementById('root'); let root = createRoot(container);
   await act(async () => { root.render(React.createElement(UpdateNotice)); });
-  assert.match(container.textContent, /中央9・地方1/);
+  assert.match(container.textContent, /条件でレースを探す/);
+  assert.match(container.textContent, /73.7%（168\/228R/);
   fail = true;
   await act(async () => { container.querySelector('button').click(); });
   assert.match(container.textContent, /確認記録を保存できませんでした/);

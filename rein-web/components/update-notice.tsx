@@ -64,9 +64,9 @@ export function UpdateNotice() {
       <h2 id="rein-update-title" className="text-base font-bold sm:text-lg">{UPDATE_NOTICE.title}</h2>
       <p className="mt-2 text-sm leading-relaxed text-slate-200">{UPDATE_NOTICE.summary}</p>
       <details className="mt-3 text-sm text-slate-300">
-        <summary className="cursor-pointer py-1 font-semibold text-cyan-200">追加した参考傾向を見る</summary>
+        <summary className="cursor-pointer py-1 font-semibold text-cyan-200">{UPDATE_NOTICE.detailsLabel}</summary>
         <ul className="mt-2 list-disc space-y-1 pl-5">{UPDATE_NOTICE.patterns.map(pattern => <li key={pattern}>{pattern}</li>)}</ul>
-        <p className="mt-3 leading-relaxed">3つの検証期間すべてで回収率90%を超え、各期間の最大払戻1件を除いても90%を超えた条件を掲載しています。各買い目には、さらにオッズなどの条件があります。</p>
+        <p className="mt-3 leading-relaxed">{UPDATE_NOTICE.detailsNote}</p>
       </details>
       <p className="mt-3 text-xs leading-relaxed text-slate-400">{UPDATE_NOTICE.caution}</p>
       {error && <p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
