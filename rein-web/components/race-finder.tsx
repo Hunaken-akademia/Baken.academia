@@ -7,6 +7,14 @@ const yen = (n: number) => `${n.toLocaleString()}円`;
 const timeJst = (iso: string | null) => iso && Number.isFinite(Date.parse(iso)) ? new Date(Date.parse(iso) + 9 * 3600_000).toISOString().slice(11, 16) : null;
 const tone: Record<RaceKind, string> = { solid: "bg-sky-300 text-[#07111f]", middle: "bg-amber-300 text-[#07111f]", rough: "bg-rose-400 text-[#07111f]" };
 const closed = (row: FinderRow, now: number) => row.startsAt !== null && row.startsAt <= now;
+// The cron refreshes each race's odds from this many minutes before post (analysis-cache NEAR_START_MINUTES).
+const JUDGE_FROM_MINUTES = 75;
+const clock = (ms: number) => new Date(ms + 9 * 3600_000).toISOString().slice(11, 16);
+function waiting(row: FinderRow, now: number) {
+  if (row.startsAt === null) return "オッズ待ち";
+  const from = row.startsAt - JUDGE_FROM_MINUTES * 60_000;
+  return from > now ? `${clock(from)}ごろから判定` : "オッズ集計中";
+}
 const judged = (row: FinderRow, now: number) => closed(row, now) && row.verified && row.kind && row.result ? finderHit(row.kind, row.result.payout) : null;
 
 export function RaceFinder({ league, onOpen }: { league: League; onOpen: (raceId: string) => void }) {
@@ -27,7 +35,7 @@ export function RaceFinder({ league, onOpen }: { league: League; onOpen: (raceId
     return () => { controller.abort(); clearInterval(timer); };
   }, [league]);
   const reference = FINDER_REFERENCE[league], ref = reference.kinds[kind], meta = RACE_KINDS[kind];
-  const all = finder?.rows ?? [], pendingOdds = all.filter(row => !row.kind && !closed(row, now)).length;
+  const all = finder?.rows ?? [], pending = all.filter(row => !row.kind && !closed(row, now));
   const rows = all.filter(row => row.kind === kind && (ended || !closed(row, now)));
   const results = ended ? rows.map(row => judged(row, now)).filter((v): v is boolean => v !== null) : [];
   return <section aria-label="条件でレースを探す" data-testid="race-finder" className="mt-5 rounded-2xl border border-rose-400/30 bg-[#0c192a] p-4 sm:p-5">
@@ -53,7 +61,7 @@ export function RaceFinder({ league, onOpen }: { league: League; onOpen: (raceId
       : !finder ? <p role="status" className="mt-3 text-sm text-slate-400">確認中…</p>
       : <>
         {ended && results.length > 0 && <p data-testid="finder-review" className="mt-3 rounded-lg bg-black/20 px-3 py-2 text-sm font-bold">終了したレースの結果　<span className="text-emerald-300">○{results.filter(Boolean).length}</span>　<span className="text-rose-300">✕{results.filter(v => !v).length}</span>（{pct(results.filter(Boolean).length, results.length)}）</p>}
-        {rows.length ? <ul className="mt-2 divide-y divide-slate-800">{rows.map(row => {
+        {rows.length ? <ul data-testid="finder-list" className="mt-2 divide-y divide-slate-800">{rows.map(row => {
           const done = closed(row, now), hit = judged(row, now);
           return <li key={row.raceId}><button type="button" onClick={() => onOpen(row.raceId)} className="flex w-full items-center gap-3 py-3 text-left hover:bg-white/[.03]">
             <span className="w-12 shrink-0 text-center"><span className="block text-sm font-semibold text-cyan-200">{row.start || "--:--"}</span><span className="text-[10px] text-slate-500">{done ? "締切済" : `あと${Math.max(1, Math.ceil(((row.startsAt ?? now) - now) / 60_000))}分`}</span></span>
@@ -66,7 +74,16 @@ export function RaceFinder({ league, onOpen }: { league: League; onOpen: (raceId
             </> : <span className={`rounded px-2 py-1 text-xs font-bold ${tone[kind]}`}>{meta.label}</span>}</span>
           </button></li>;
         })}</ul> : <p className="mt-3 text-sm text-slate-400">{ended ? `本日、${meta.label}に分類されたレースはまだありません。` : `これから発走のレースに、${meta.label}に分類されたレースはありません。「終了したレースも見る」で今日の結果を振り返れます。`}</p>}
-        {pendingOdds > 0 && <p className="mt-2 text-[11px] text-slate-500">オッズ未取得などで未分類：{pendingOdds}R</p>}
+        {pending.length > 0 && <details data-testid="finder-pending" open={!rows.length} className="mt-3 rounded-lg bg-black/20 p-3 text-xs">
+          <summary className="cursor-pointer font-semibold text-slate-300">判定待ちのレース {pending.length}R</summary>
+          <p className="mt-1 leading-5 text-slate-400">各レースは発走{JUDGE_FROM_MINUTES}分前ごろからオッズを取り込み、全頭のオッズがそろった時点で分類します。</p>
+          <ul className="mt-2 divide-y divide-slate-800">{pending.slice(0, 8).map(row => <li key={row.raceId}><button type="button" onClick={() => onOpen(row.raceId)} className="flex w-full gap-3 py-2 text-left hover:bg-white/[.03]">
+            <span className="w-11 shrink-0 text-cyan-200">{row.start || "--:--"}</span>
+            <span className="min-w-0 flex-1 truncate">{row.venue}{row.number}R</span>
+            <span className="shrink-0 text-slate-400">{waiting(row, now)}</span>
+          </button></li>)}</ul>
+          {pending.length > 8 && <p className="mt-1 text-slate-500">ほか{pending.length - 8}R</p>}
+        </details>}
       </>}
     <details className="mt-3 text-xs leading-6 text-slate-400"><summary className="cursor-pointer font-semibold text-slate-300">判定の仕組み</summary>
       <p>単勝オッズを人気の割れ具合に換算し、何頭分に人気が分かれているかで分類します（1頭に集中＝1、全頭同じ＝出走頭数）。区切りは発走約5分前に保存したオッズの前半2週間で決め、後半2週間で上の成績を確かめました。</p>
