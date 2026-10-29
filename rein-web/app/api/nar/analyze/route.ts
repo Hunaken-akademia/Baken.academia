@@ -32,5 +32,5 @@ export async function GET(request:NextRequest) {
     const body=await refreshNarRace(id,preview,request.nextUrl.searchParams.get("release")??undefined);
     if(!body)return NextResponse.json({status:"preparing"},{status:202,headers});
     return NextResponse.json(body,{headers:{...headers,"x-rein-persisted":"1","x-rein-fallback":body.capture.complete?"0":"1"}});
-  }catch(e){console.error("NAR analysis",e instanceof Error?e.message:"unknown");return NextResponse.json({error:"地方レースの保存データを取得できませんでした。"},{status:503,headers});}
+  }catch(e){console.error("NAR analysis",e instanceof Error?e.message:"unknown");return NextResponse.json({error:"地方レースの保存データを取得できませんでした。少し時間をおいて再読み込みしてください。"},{status:503,headers:{...headers,"retry-after":"5"}});}
 }
