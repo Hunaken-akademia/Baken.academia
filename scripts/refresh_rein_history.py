@@ -2,13 +2,14 @@
 Runs only in the authorized model-publishing workflow. No model retraining.
 """
 from pathlib import Path
-import argparse, asyncio, hashlib, json, os, tarfile, time, urllib.error, urllib.request
+import argparse, asyncio, hashlib, json, os, sys, tarfile, time, urllib.error, urllib.request
 from datetime import datetime,timedelta,timezone
 import pandas as pd
 from baken_academia import jra_backfill, jra_pedigree
 from baken_academia.rein_history import build as profile_build
-from build_graded_trends import fetch_grade_pages, recent_runs
-from jra_condition_reference import official_grade_schedule
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # imported as scripts.refresh_rein_history by the tests
+from build_graded_trends import fetch_grade_pages, recent_runs  # noqa: E402
+from jra_condition_reference import official_grade_schedule  # noqa: E402
 
 # Bump when the profile gains fields, so the next refresh rebuilds it even without new races.
 PROFILE_SCHEMA=2
