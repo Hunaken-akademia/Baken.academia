@@ -25,6 +25,8 @@ on:
       - "src/baken_academia/history_features.py"
       - ".github/workflows/rein-role-model-to-supabase.yml"
       - "supabase/functions/github-rein-model/**"
+      - ".github/graded-trends-sources.json"
+      - "scripts/build_graded_trends.py"
 
 permissions:
   actions: read
