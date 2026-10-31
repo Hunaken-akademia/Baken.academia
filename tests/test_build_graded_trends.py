@@ -102,3 +102,14 @@ def test_official_schedule_grades_open_races_and_adds_older_editions():
     assert race["results"][0]["year"] == 2018 and race["results"][0]["rows"][0]["name"] == "馬2"
     # Without the schedule the オープン label hides the grade, so 2018 is not an edition.
     assert build(pd.DataFrame(rows), REFERENCE, {}, 2023)["races"]["天皇賞秋"]["editions"] == 5
+
+
+def test_only_the_latest_ten_years_are_editions():
+    rows = history().to_dict("records")
+    # 2013 is outside 2014-2023 and only supplies previous starts.
+    for year in (2013, 2014):
+        rows += [runner(f"r{year}", f"{year}-10-27", "天皇賞(秋)", h, f, p, cls="G1", jockey=f"J{h}") for h, f, p in (("1", 1, 1), ("2", 2, 3), ("3", 3, 2))]
+    payload = build(pd.DataFrame(rows), REFERENCE, {}, 2023)
+    race = payload["races"]["天皇賞秋"]
+    assert race["yearFrom"] == 2014 and race["editions"] == 6
+    assert payload["limitations"][0].startswith("前走・GI勝ち・コース実績・騎乗回数は2013年以降")

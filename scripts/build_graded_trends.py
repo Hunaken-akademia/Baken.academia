@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from baken_academia.rein_history import _key  # noqa: E402
 
 VERSION = "jra-graded-trends-v1"
+TREND_YEARS = 10  # older results only supply previous starts
 
 
 def _corner(value: object, index: int) -> int | None:
@@ -153,7 +154,7 @@ SCRATCHED = {"取消", "除外"}
 
 
 def build_race(d: pd.DataFrame, entry: dict, pedigree: dict, through_year: int, starts: dict) -> dict | None:
-    editions = [e for e in entry["editions"] if e["year"] <= through_year]
+    editions = [e for e in entry["editions"] if through_year - TREND_YEARS < e["year"] <= through_year]
     frames = []
     for e in editions:
         rows = edition_rows(d, e, entry["key"])
@@ -269,9 +270,10 @@ def build(raw: pd.DataFrame, reference: dict, pedigree: dict, through_year: int,
         print("Pedigrees", json.dumps(jra_pedigree.collect(runners, store, pedigree_minutes * 60)), flush=True)
     starts = {horse: group for horse, group in d.groupby("horse", sort=False)}
     races = [r for r in (build_race(d, entry, pedigree, through_year, starts) for entry in reference["gradedRaces"]) if r]
-    return {"version": VERSION, "throughYear": through_year, "dateFrom": str(d["race_date"].min().date()),
+    since = d["race_date"].min()
+    return {"version": VERSION, "throughYear": through_year, "dateFrom": str(since.date()),
             "races": {r["key"]: r for r in races},
-            "limitations": ["前走・GI勝ち・コース実績・騎乗回数は2019年以降のJRAのレースだけで判定（海外・地方の前走は含まない）。",
+            "limitations": [f"前走・GI勝ち・コース実績・騎乗回数は{since.year}年以降のJRAのレースだけで判定（海外・地方の前走は含まない）。",
                             "人気は確定人気。過去の集計で、今回の的中確率ではない。"]}
 
 
