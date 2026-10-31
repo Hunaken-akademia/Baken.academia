@@ -49,6 +49,7 @@ import { PredictionDataStatus } from "@/components/prediction-data-status";
 import { OddsTrendPanel } from "@/components/odds-trend-panel";
 import { OddsTrendBoard } from "@/components/odds-trend-board";
 import { RaceFinder } from "@/components/race-finder";
+import { GradedTrends } from "@/components/graded-trends";
 import { UpdateNotice } from "@/components/update-notice";
 import { RaceCalendar } from "@/components/race-calendar";
 import { ReinCloudProvider } from "@/components/rein-cloud-provider";
@@ -1031,6 +1032,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           <ConditionMatrix key={data.race.raceId} horses={data.horses} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
         </div>
         <TabsContent value="prediction">
+          {data.race.league !== "nar" && hasGradedRaceHistory(data.race) && <GradedTrends race={data.race} />}
           {hasGradedRaceHistory(data.race) && <GradedRaceHistory race={data.race} onSimulate={(id,label)=>{setHistoricalScenario(old=>({id,label,version:(old?.version??0)+1}));changeAnalysisTab("formation");}} />}
           <PopularityForecast key={data.race.raceId} horses={data.horses} race={data.race} rolesReady={rolesReady} finished={data.review?.isFinished ?? false} predictionSafe={patternPredictionSafe(data.prediction, data.race.startsAt, data.review?.isFinished ?? false)} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
           <PickCards data={data} onHorse={onHorse}>

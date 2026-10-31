@@ -32,12 +32,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ${{ contains(github.event.head_commit.message, '[cushion-research]') && 'rein-cushion-research' || 'rein-role-model-to-supabase' }}
+  group: ${{ contains(github.event.head_commit.message, '[cushion-research]') && 'rein-cushion-research' || contains(github.event.head_commit.message, '[graded-trends]') && 'rein-graded-trends' || 'rein-role-model-to-supabase' }}
   cancel-in-progress: false
 
 jobs:
   build-and-publish:
-    if: github.event_name != 'workflow_run' && !contains(github.event.head_commit.message, '[cushion-research]') && !contains(github.event.head_commit.message, '[history-refresh]')
+    if: github.event_name != 'workflow_run' && !contains(github.event.head_commit.message, '[cushion-research]') && !contains(github.event.head_commit.message, '[graded-trends]') && !contains(github.event.head_commit.message, '[history-refresh]')
     runs-on: ubuntu-latest
     timeout-minutes: 55
     env:
@@ -158,5 +158,44 @@ jobs:
         with:
           name: jra-cushion-research-${{ github.run_id }}
           path: artifacts/jra-cushion
+          retention-days: 90
+          if-no-files-found: error
+
+  graded-trends:
+    # Read-only: builds the graded-race trend cards for the web app as an artifact.
+    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[graded-trends]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-rein-model"
+      ARCHIVE_OBJECT_PATH: "jra/2019-01-01_2026-09-18/jra-backfill-result.tar.gz"
+      ARCHIVE_OUTPUT: ".dataset/jra-backfill-result.tar.gz"
+      OIDC_AUDIENCE: "rein-supabase-model-v1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q tests/test_build_graded_trends.py
+      - name: Read licensed history and the active sire table
+        run: |
+          mkdir -p .dataset
+          bash scripts/download_supabase_archive.sh
+          tar --no-same-owner -xzf .dataset/jra-backfill-result.tar.gz
+          python scripts/fetch_active_pedigree.py .dataset/pedigree.json
+      - name: Build graded-race trends
+        run: |
+          python scripts/build_graded_trends.py \
+            --history data/raw/jra/races-2019-2026.parquet \
+            --reference rein-web/lib/jra-condition-reference.json \
+            --pedigree .dataset/pedigree.json \
+            --through-year 2025 \
+            --output artifacts/jra-graded-trends.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jra-graded-trends-v1
+          path: artifacts/jra-graded-trends.json
           retention-days: 90
           if-no-files-found: error
