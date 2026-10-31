@@ -1,3 +1,4 @@
+import http.client
 import io
 import unittest
 import urllib.error
@@ -29,6 +30,14 @@ class HistoryRetryTest(unittest.TestCase):
                 open_with_retry('https://example.test', 30)
             self.assertEqual(request.call_count, 5)
             self.assertEqual([call.args[0] for call in sleep.call_args_list], [2, 4, 8, 16])
+
+    def test_connection_closed_without_response_recovers(self):
+        response = io.BytesIO(b'{"value":"test"}')
+        failure = http.client.RemoteDisconnected('Remote end closed connection without response')
+        with patch('urllib.request.urlopen', side_effect=[failure, response]) as request, patch('time.sleep') as sleep:
+            self.assertIs(open_with_retry('https://example.test', 30), response)
+            self.assertEqual(request.call_count, 2)
+            sleep.assert_called_once_with(2)
 
 
 if __name__ == '__main__':

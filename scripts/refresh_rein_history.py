@@ -2,7 +2,7 @@
 Runs only in the authorized model-publishing workflow. No model retraining.
 """
 from pathlib import Path
-import argparse, asyncio, hashlib, json, os, sys, tarfile, time, urllib.error, urllib.request
+import argparse, asyncio, hashlib, http.client, json, os, sys, tarfile, time, urllib.error, urllib.request
 from datetime import datetime,timedelta,timezone
 import pandas as pd
 from baken_academia import jra_backfill, jra_pedigree
@@ -28,7 +28,8 @@ def open_with_retry(request, timeout):
             if error.code not in {408, 429, 500, 502, 503, 504} or attempt == 4:
                 raise
             reason = f"HTTP {error.code}"
-        except (urllib.error.URLError, TimeoutError) as error:
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException) as error:
+            # RemoteDisconnected is raised from getresponse() unwrapped, so it is not a URLError.
             if attempt == 4:
                 raise
             reason = type(error).__name__
