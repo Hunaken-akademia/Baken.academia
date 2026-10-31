@@ -32,6 +32,7 @@ export type Horse = {
   weightChange?: number;
   pedigree?: string;
   sire?: string;
+  recent?: { g1: number; runs: Array<[string, string, string, number | null, number | null, number | null, string]> };
   dam?: string;
   damSire?: string;
   jockey?: string;

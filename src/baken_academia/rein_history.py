@@ -57,7 +57,7 @@ def _rate_profile(frame: pd.DataFrame, keys: list[str]) -> dict[str, dict[str, f
 
 
 def build(input_path: Path, output_path: Path, pedigree: dict[str, list[str]] | None = None,
-          pairs: bool = False) -> dict[str, object]:
+          pairs: bool = False, extras: dict[str, object] | None = None) -> dict[str, object]:
     df = pd.read_parquet(input_path)
     df["race_date"] = pd.to_datetime(df["race_date"])
     df = df.sort_values(["race_date", "race_id", "horse_number"])
@@ -86,6 +86,7 @@ def build(input_path: Path, output_path: Path, pedigree: dict[str, list[str]] | 
     }
     if pairs:
         payload["horseJockey"] = _pair_counts(df)
+    payload.update(extras or {})
     if pedigree:
         # Progeny records by sire; horses without a collected sire are left out.
         df["sire"] = df["horse_id"].map(lambda h: lineage_name((pedigree.get(_key(h)) or [""])[0]))

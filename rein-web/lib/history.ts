@@ -33,7 +33,12 @@ export type HistoryBundle = {
   // JRA only: progeny by sire, surface and distance band; exact horse x jockey records.
   sireSurfaceDistance?: Rates;
   horseJockey?: Record<string, number[]>;
+  // JRA only: last starts per active horse (scripts/build_graded_trends.py recent_runs).
+  horseRecent?: Record<string, RecentRuns>;
 };
+// [date, race name key, grade, finish, 上がり rank, 4角, jockey], newest first.
+export type RecentRun = [string, string, string, number | null, number | null, number | null, string];
+export type RecentRuns = { g1: number; runs: RecentRun[] };
 
 export type HistoryInput = {
   horseId: string;

@@ -1,0 +1,54 @@
+name: JRA results before the licensed history (graded trends)
+
+# Same polite JRA collector as the licensed backfill (one request at a time, 3-4 s
+# apart). 2015 is included so 2016 runners have a previous start.
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: Start date (YYYY-MM-DD)
+        required: true
+        default: "2015-01-01"
+      end_date:
+        description: End date (YYYY-MM-DD)
+        required: true
+        default: "2018-12-31"
+  push:
+    branches: [main]
+    paths:
+      - .github/jra-graded-backfill-request.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jra-graded-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      START_DATE: ${{ inputs.start_date || '2015-01-01' }}
+      END_DATE: ${{ inputs.end_date || '2018-12-31' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Collect JRA results sequentially
+        run: >-
+          python -m baken_academia.jra_backfill
+          --start-date "$START_DATE" --end-date "$END_DATE"
+          --output data/raw/jra/races-before-2019.parquet
+          --work-dir .jra-older --min-delay 3 --max-delay 4
+          --continue-on-error --permission-confirmed
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jra-history-2015-2018
+          path: data/raw/jra/races-before-2019.parquet
+          retention-days: 90
+          if-no-files-found: error

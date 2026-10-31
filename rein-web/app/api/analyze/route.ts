@@ -572,6 +572,7 @@ async function analyze(request: NextRequest) {
         weightChange: change,
         pedigree,
         ...lineage,
+        ...(history.horseRecent?.[horseId] ? { recent: history.horseRecent[horseId] } : {}),
         jockey,
         trainer,
         earlyPosition: styleProfile.earlyPosition,
