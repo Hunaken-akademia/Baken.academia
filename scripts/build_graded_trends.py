@@ -188,6 +188,22 @@ def build_race(d: pd.DataFrame, entry: dict, pedigree: dict, through_year: int, 
     }
 
 
+def recent_runs(raw: pd.DataFrame, days: int = 730, limit: int = 5) -> dict[str, dict]:
+    """Last starts per active horse for the live field pages: newest first,
+    [date, race name key, grade, finish, 上がり rank, 4角, jockey], plus JRA GI wins since 2019."""
+    d = prepare(raw)
+    d = d.loc[d["finish_position"].notna() | ~d["finish_status"].isin(SCRATCHED)]
+    active = set(d.loc[d["race_date"] >= d["race_date"].max() - pd.Timedelta(days=days), "horse"])
+    out = {}
+    for horse, group in d.loc[d["horse"].isin(active)].groupby("horse", sort=False):
+        tail = group.tail(limit).iloc[::-1]
+        out[horse] = {"g1": int((group["race_grade"].eq("G1") & group["finish_position"].eq(1)).sum()), "runs": [[
+            r.race_date.date().isoformat(), r.name_key, r.race_grade or "", int(r.finish_position) if pd.notna(r.finish_position) else None,
+            int(r.last3f_rank) if pd.notna(r.last3f_rank) else None, int(r.corner4) if pd.notna(r.corner4) else None, r.jockey,
+        ] for r in tail.itertuples()]}
+    return out
+
+
 def build(raw: pd.DataFrame, reference: dict, pedigree: dict, through_year: int) -> dict:
     d = prepare(raw)
     starts = {horse: group for horse, group in d.groupby("horse", sort=False)}

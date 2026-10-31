@@ -76,3 +76,16 @@ def test_races_with_fewer_than_five_editions_are_skipped():
     payload = build(history(), REFERENCE, {}, 2022)
     assert payload["races"] == {}
     assert json.dumps(payload, ensure_ascii=False)
+
+
+def test_recent_runs_are_newest_first_without_scratches():
+    from build_graded_trends import recent_runs
+    runs = recent_runs(history())
+    one = runs["1"]
+    # Horse 1: 2019 宝塚記念 plus five 天皇賞(秋) wins (all G1) and five 札幌記念 starts; last five, newest first.
+    assert one["g1"] == 6
+    assert [r[0] for r in one["runs"]] == ["2023-10-27", "2023-08-20", "2022-10-27", "2022-08-20", "2021-10-27"]
+    assert one["runs"][0] == ["2023-10-27", "天皇賞秋", "G1", 1, 1, 2, "J1"]
+    assert one["runs"][1][1:3] == ["札幌記念", "G2"]
+    # Horse 4 was only ever scratched.
+    assert "4" not in runs

@@ -7,6 +7,10 @@ from datetime import datetime,timedelta,timezone
 import pandas as pd
 from baken_academia import jra_backfill, jra_pedigree
 from baken_academia.rein_history import build as profile_build
+from build_graded_trends import recent_runs
+
+# Bump when the profile gains fields, so the next refresh rebuilds it even without new races.
+PROFILE_SCHEMA=2
 
 
 def digest(path):
@@ -57,8 +61,10 @@ async def main():
     summary={'previous_version':model['version'],'previous_history_through':model['history_through'],'checked_through':str(end),'models_retrained':False}
     # Sire lookups catch up across refreshes, so a day without new races still
     # publishes their progress until every history horse is covered.
-    lineage_done=(model.get('metrics') or {}).get('historyRefresh',{}).get('pedigree',{}).get('remaining')==0
-    if start>end and lineage_done:
+    refresh=(model.get('metrics') or {}).get('historyRefresh',{})
+    lineage_done=refresh.get('pedigree',{}).get('remaining')==0
+    schema_current=refresh.get('profileSchema')==PROFILE_SCHEMA
+    if start>end and lineage_done and schema_current:
         summary['status']='unchanged';(out/'summary.json').write_text(json.dumps(summary,indent=2));return
     if start<=end and (end-start).days>45:raise ValueError('History gap exceeds bounded refresh window')
     with open_with_retry(active['bundle_url'],timeout=60) as r:bundle=r.read()
@@ -82,23 +88,23 @@ async def main():
     known=len(store.get('horses',{}))
     lineage=jra_pedigree.collect(merged,store,float(os.environ.get('JRA_PEDIGREE_BUDGET_MINUTES','20'))*60)
     print('Pedigrees',json.dumps(lineage),flush=True)
-    if not result.get('races') and lineage['horses']==known:
+    if not result.get('races') and lineage['horses']==known and schema_current:
         summary.update(status='unchanged',source=result,pedigree=lineage);(out/'summary.json').write_text(json.dumps(summary,indent=2));return
     lineage_path.write_text(json.dumps(store,ensure_ascii=False,separators=(',',':')))
     history=root/'data/history.parquet'
     if result.get('races'):merged.to_parquet(history,index=False,compression='zstd',compression_level=12)
-    profile=root/'history-profile.json.gz';profile_build(history,profile,pedigree=store['horses'],pairs=True)
+    profile=root/'history-profile.json.gz';profile_build(history,profile,pedigree=store['horses'],pairs=True,extras={'horseRecent':recent_runs(merged)})
     # The web runtime rejects profiles over 16 MB; never publish one it cannot load.
     if profile.stat().st_size>15_000_000:raise ValueError('History profile too large')
     for name,sha in frozen.items():
         if digest(root/name)!=sha:raise ValueError('A model or schema changed during history refresh')
-    key=digest(history)+digest(lineage_path)+''.join(frozen[name] for name in sorted(frozen))
+    key=digest(history)+digest(lineage_path)+f'schema{PROFILE_SCHEMA}'+''.join(frozen[name] for name in sorted(frozen))
     version='rein-role-v4-'+hashlib.sha256(key.encode()).hexdigest()[:40]
     newroot=root.with_name(version);root.rename(newroot);root=newroot
     manifest={**old,'version':version,'history_through':str(merged.race_date.max().date()),'history_rows':len(merged),'history_races':int(merged.race_id.nunique()),'source_commit':os.environ['GITHUB_SHA'],'created_at':datetime.now(timezone.utc).isoformat()}
     manifest['files']=[{'path':p.relative_to(root).as_posix(),'sha256':digest(p),'size_bytes':p.stat().st_size} for p in sorted(root.rglob('*')) if p.is_file() and p.name!='manifest.json']
     (root/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
-    summary.update(status='refreshed',new_version=version,history_through=manifest['history_through'],added_rows=len(merged)-len(base),added_races=int(merged.race_id.nunique()-base.race_id.nunique()),profileSha=digest(root/'history-profile.json.gz'),pedigree=lineage,frozen_model_files=frozen)
+    summary.update(status='refreshed',new_version=version,history_through=manifest['history_through'],added_rows=len(merged)-len(base),added_races=int(merged.race_id.nunique()-base.race_id.nunique()),profileSha=digest(root/'history-profile.json.gz'),profileSchema=PROFILE_SCHEMA,pedigree=lineage,frozen_model_files=frozen)
     (out/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2))
     metrics={'comparison':{**model.get('metrics',{}),'historyRefresh':summary}}
     (out/'metrics.json').write_text(json.dumps(metrics,ensure_ascii=False))
