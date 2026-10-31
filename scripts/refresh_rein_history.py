@@ -7,7 +7,8 @@ from datetime import datetime,timedelta,timezone
 import pandas as pd
 from baken_academia import jra_backfill, jra_pedigree
 from baken_academia.rein_history import build as profile_build
-from build_graded_trends import recent_runs
+from build_graded_trends import fetch_grade_pages, recent_runs
+from jra_condition_reference import official_grade_schedule
 
 # Bump when the profile gains fields, so the next refresh rebuilds it even without new races.
 PROFILE_SCHEMA=2
@@ -93,7 +94,7 @@ async def main():
     lineage_path.write_text(json.dumps(store,ensure_ascii=False,separators=(',',':')))
     history=root/'data/history.parquet'
     if result.get('races'):merged.to_parquet(history,index=False,compression='zstd',compression_level=12)
-    profile=root/'history-profile.json.gz';profile_build(history,profile,pedigree=store['horses'],pairs=True,extras={'horseRecent':recent_runs(merged)})
+    profile=root/'history-profile.json.gz';profile_build(history,profile,pedigree=store['horses'],pairs=True,extras={'horseRecent':recent_runs(merged,schedule=official_grade_schedule(fetch_grade_pages(range(merged.race_date.min().year,end.year+1),out/'jyusyo')))})
     # The web runtime rejects profiles over 16 MB; never publish one it cannot load.
     if profile.stat().st_size>15_000_000:raise ValueError('History profile too large')
     for name,sha in frozen.items():

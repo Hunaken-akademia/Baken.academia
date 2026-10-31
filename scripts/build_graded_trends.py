@@ -18,7 +18,7 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from jra_condition_reference import grade_from_row, normalized_text, race_name_key  # noqa: E402
+from jra_condition_reference import grade_from_row, normalized_text, official_grade_schedule, race_name_key  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from baken_academia.rein_history import _key  # noqa: E402
@@ -35,7 +35,44 @@ def _corner(value: object, index: int) -> int | None:
     return numbers[index] if numbers else None
 
 
-def prepare(raw: pd.DataFrame) -> pd.DataFrame:
+def fetch_grade_pages(years, directory: Path, delay: float = 2.0) -> Path:
+    """JRA's yearly 重賞 result list (one page per year), saved for official_grade_schedule."""
+    import time
+    import urllib.request
+    directory.mkdir(parents=True, exist_ok=True)
+    for i, year in enumerate(years):
+        target = directory / f"{year}.html"
+        if target.exists():
+            continue
+        if i:
+            time.sleep(delay)
+        request = urllib.request.Request(f"https://www.jra.go.jp/datafile/seiseki/replay/{year}/jyusyo.html", headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(request, timeout=60) as response:
+            target.write_bytes(response.read())
+    return directory
+
+
+def race_grades(d: pd.DataFrame, schedule: dict[str, tuple[str, str]] | None) -> pd.Series:
+    """Grade per race. JRA's result pages often say only オープン, so the official
+    重賞 schedule decides, matched like jra_condition_reference.summarize_races."""
+    by_condition: dict[str, list[tuple[str, str]]] = {}
+    for key, (grade, _) in (schedule or {}).items():
+        condition, name = key.rsplit("|", 1)
+        by_condition.setdefault(condition, []).append((name, grade))
+    grades = {}
+    for race_id, first in d.drop_duplicates("race_id").set_index("race_id").iterrows():
+        condition = f"{first['race_date'].date()}|{first['venue']}|{normalized_text(first['surface'])}|{int(first['distance_m']) if pd.notna(first['distance_m']) else 0}"
+        official = (schedule or {}).get(f"{condition}|{first['name_key']}")
+        if official is None:
+            similar = [g for name, g in by_condition.get(condition, []) if SequenceMatcher(None, first["name_key"], name).ratio() >= 0.5]
+            grade = similar[0] if len(similar) == 1 else None
+        else:
+            grade = official[0]
+        grades[race_id] = grade or grade_from_row(first)
+    return d["race_id"].map(grades)
+
+
+def prepare(raw: pd.DataFrame, schedule: dict[str, tuple[str, str]] | None = None) -> pd.DataFrame:
     d = raw.copy()
     d["race_date"] = pd.to_datetime(d["race_date"])
     for column in ("finish_position", "popularity", "gate", "horse_number", "age", "horse_weight", "avg_1f", "distance_m"):
@@ -44,7 +81,7 @@ def prepare(raw: pd.DataFrame) -> pd.DataFrame:
     d["venue"] = d["racecourse"].map(normalized_text)
     d["jockey"] = d["jockey_id"].map(lambda v: _key(v) if pd.notna(v) else "")
     d["name_key"] = d["race_name"].map(race_name_key)
-    d["race_grade"] = d.apply(grade_from_row, axis=1)
+    d["race_grade"] = race_grades(d, schedule)
     d["corner4"] = d["corner_positions"].map(lambda v: _corner(v, -1))
     # 上がり3F (JRA's 推定上り, stored as avg_1f) ranked within each race among finishers.
     finished = d["finish_position"].notna() & d["avg_1f"].gt(0)
@@ -188,10 +225,10 @@ def build_race(d: pd.DataFrame, entry: dict, pedigree: dict, through_year: int, 
     }
 
 
-def recent_runs(raw: pd.DataFrame, days: int = 730, limit: int = 5) -> dict[str, dict]:
+def recent_runs(raw: pd.DataFrame, days: int = 730, limit: int = 5, schedule: dict[str, tuple[str, str]] | None = None) -> dict[str, dict]:
     """Last starts per active horse for the live field pages: newest first,
     [date, race name key, grade, finish, 上がり rank, 4角, jockey], plus JRA GI wins since 2019."""
-    d = prepare(raw)
+    d = prepare(raw, schedule)
     d = d.loc[d["finish_position"].notna() | ~d["finish_status"].isin(SCRATCHED)]
     active = set(d.loc[d["race_date"] >= d["race_date"].max() - pd.Timedelta(days=days), "horse"])
     out = {}
@@ -204,8 +241,32 @@ def recent_runs(raw: pd.DataFrame, days: int = 730, limit: int = 5) -> dict[str,
     return out
 
 
-def build(raw: pd.DataFrame, reference: dict, pedigree: dict, through_year: int) -> dict:
-    d = prepare(raw)
+def older_editions(d: pd.DataFrame, entry: dict) -> list[dict]:
+    """Editions before the reference's first year, found by exact race-name key and an official grade."""
+    first = min(e["year"] for e in entry["editions"])
+    rows = d.loc[d["name_key"].eq(entry["key"]) & d["race_grade"].isin(["G1", "G2", "G3"]) & d["race_date"].dt.year.lt(first)]
+    out = []
+    for year, group in rows.groupby(rows["race_date"].dt.year):
+        races = group.drop_duplicates("race_id")
+        if len(races) != 1:  # a reused or duplicated name in one year is ambiguous
+            continue
+        r = races.iloc[0]
+        out.append({"date": r["race_date"].date().isoformat(), "year": int(year), "venue": r["venue"], "grade": r["race_grade"],
+                    "surface": r["surface"], "distanceM": int(r["distance_m"]), "going": normalized_text(r.get("going")) or "不明"})
+    return out
+
+
+def build(raw: pd.DataFrame, reference: dict, pedigree: dict, through_year: int,
+          schedule: dict[str, tuple[str, str]] | None = None, pedigree_minutes: float = 0) -> dict:
+    d = prepare(raw, schedule)
+    reference = {"gradedRaces": [{**e, "editions": older_editions(d, e) + e["editions"]} for e in reference["gradedRaces"]]}
+    if pedigree_minutes > 0:
+        # Horses that never ran after the sire collection started are looked up on their own pages.
+        from baken_academia import jra_pedigree
+        keys = {(e["date"], e["venue"]) for entry in reference["gradedRaces"] for e in entry["editions"] if e["year"] <= through_year}
+        runners = d.loc[[(str(t.date()), v) in keys for t, v in zip(d["race_date"], d["venue"])]]
+        store = {"horses": pedigree, "missingCards": []}
+        print("Pedigrees", json.dumps(jra_pedigree.collect(runners, store, pedigree_minutes * 60)), flush=True)
     starts = {horse: group for horse, group in d.groupby("horse", sort=False)}
     races = [r for r in (build_race(d, entry, pedigree, through_year, starts) for entry in reference["gradedRaces"]) if r]
     return {"version": VERSION, "throughYear": through_year, "dateFrom": str(d["race_date"].min().date()),
@@ -221,9 +282,17 @@ def main() -> None:
     parser.add_argument("--pedigree", type=Path)
     parser.add_argument("--through-year", type=int, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--older-history", type=Path, help="Extra JRA results before the licensed history")
+    parser.add_argument("--grade-dir", type=Path, help="JRA 重賞 schedule pages (jyusyo.html per year)")
+    parser.add_argument("--pedigree-minutes", type=float, default=0)
     args = parser.parse_args()
     pedigree = json.loads(args.pedigree.read_text()).get("horses", {}) if args.pedigree else {}
-    payload = build(pd.read_parquet(args.history), json.loads(args.reference.read_text()), pedigree, args.through_year)
+    raw = pd.read_parquet(args.history)
+    if args.older_history:
+        older = pd.read_parquet(args.older_history)
+        raw = pd.concat([older.loc[pd.to_datetime(older["race_date"]) < pd.to_datetime(raw["race_date"]).min()], raw], ignore_index=True)
+    schedule = official_grade_schedule(args.grade_dir) if args.grade_dir else None
+    payload = build(raw, json.loads(args.reference.read_text()), pedigree, args.through_year, schedule, args.pedigree_minutes)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
     print(json.dumps({"races": len(payload["races"]), "bytes": args.output.stat().st_size,

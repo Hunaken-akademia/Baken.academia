@@ -165,7 +165,7 @@ jobs:
     # Read-only: builds the graded-race trend cards for the web app as an artifact.
     if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[graded-trends]')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 300
     env:
       SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-rein-model"
       ARCHIVE_OBJECT_PATH: "jra/2019-01-01_2026-09-18/jra-backfill-result.tar.gz"
@@ -185,12 +185,30 @@ jobs:
           bash scripts/download_supabase_archive.sh
           tar --no-same-owner -xzf .dataset/jra-backfill-result.tar.gz
           python scripts/fetch_active_pedigree.py .dataset/pedigree.json
+      - name: Choose the collected pre-2019 results, if any
+        id: older
+        run: echo "run=$(jq -r '.olderHistoryRunId // empty' .github/graded-trends-sources.json)" >> "$GITHUB_OUTPUT"
+      - if: steps.older.outputs.run != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: jra-history-2015-2018
+          path: .dataset/older
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.older.outputs.run }}
       - name: Build graded-race trends
         run: |
+          older=(); minutes=0
+          if [ -f .dataset/older/races-before-2019.parquet ]; then older=(--older-history .dataset/older/races-before-2019.parquet); minutes=200; fi
+          python - <<'PY'
+          import sys; sys.path.insert(0, 'scripts')
+          from pathlib import Path
+          from build_graded_trends import fetch_grade_pages
+          fetch_grade_pages(range(2015, 2027), Path('.jra-grades'))
+          PY
           python scripts/build_graded_trends.py \
-            --history data/raw/jra/races-2019-2026.parquet \
+            --history data/raw/jra/races-2019-2026.parquet "${older[@]}" \
             --reference rein-web/lib/jra-condition-reference.json \
-            --pedigree .dataset/pedigree.json \
+            --pedigree .dataset/pedigree.json --grade-dir .jra-grades --pedigree-minutes "$minutes" \
             --through-year 2025 \
             --output artifacts/jra-graded-trends.json
       - uses: actions/upload-artifact@v4

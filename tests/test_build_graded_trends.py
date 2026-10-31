@@ -89,3 +89,16 @@ def test_recent_runs_are_newest_first_without_scratches():
     assert one["runs"][1][1:3] == ["札幌記念", "G2"]
     # Horse 4 was only ever scratched.
     assert "4" not in runs
+
+
+def test_official_schedule_grades_open_races_and_adds_older_editions():
+    rows = history().to_dict("records")
+    # A 2018 edition labelled only オープン on the result page; the schedule says G1.
+    rows += [runner("r2018", "2018-10-28", "天皇賞(秋)", h, f, p, cls="オープン", jockey=f"J{h}") for h, f, p in (("1", 2, 1), ("2", 1, 5), ("3", 3, 2))]
+    schedule = {"2018-10-28|東京|芝|2000|天皇賞秋": ("G1", "天皇賞(秋)")}
+    payload = build(pd.DataFrame(rows), REFERENCE, {}, 2023, schedule)
+    race = payload["races"]["天皇賞秋"]
+    assert race["yearFrom"] == 2018 and race["editions"] == 6
+    assert race["results"][0]["year"] == 2018 and race["results"][0]["rows"][0]["name"] == "馬2"
+    # Without the schedule the オープン label hides the grade, so 2018 is not an edition.
+    assert build(pd.DataFrame(rows), REFERENCE, {}, 2023)["races"]["天皇賞秋"]["editions"] == 5

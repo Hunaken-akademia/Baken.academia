@@ -1,0 +1,8 @@
+{
+  "source": "JRA公式",
+  "purpose": "重賞の過去10年傾向（2016〜2018年の不足分）",
+  "start_date": "2015-01-01",
+  "end_date": "2018-12-31",
+  "parallel_requests": 1,
+  "minimum_delay_seconds": 3
+}
