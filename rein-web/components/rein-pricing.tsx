@@ -1,0 +1,7 @@
+import {REIN_2027_PLANS} from '@/lib/renewal-plans';
+export function ReinPricing(){return <details className="my-3 rounded-xl border border-cyan-400/30 bg-slate-950/30 p-3 text-sm">
+ <summary className="cursor-pointer font-bold text-cyan-200">2027年分｜まとめ払い・早割のご案内（11/7まで）</summary>
+ <div className="mt-3 space-y-3 leading-relaxed"><a href="/rein-2027-early-renewal.webp" target="_blank" rel="noreferrer"><img src="/rein-2027-early-renewal.webp" alt="REIN 2027年分まとめ払い・早割料金表。地方または中央は月800円、オールは月1000円" loading="lazy" width={1024} height={1536} className="mx-auto w-full max-w-lg rounded-xl"/></a><p>半年・年間プランのお申し込みは、この運営チャットから。「希望プラン」と「半年／年間」をお送りください。運営から料金とお支払い方法をご案内します。</p>
+ <div className="overflow-x-auto"><table className="w-full min-w-[500px] border-collapse text-left text-xs"><thead><tr>{['プラン','月額','半年通常','半年早割','年間通常','年間早割'].map(x=><th className="border border-slate-700 p-2" key={x}>{x}</th>)}</tr></thead><tbody>{REIN_2027_PLANS.map(p=><tr key={p.name}>{[p.name,...[p.monthly,p.half,p.halfEarly,p.year,p.yearEarly].map(v=>v.toLocaleString('ja-JP')+'円')].map((v,i)=><td className={`border border-slate-700 p-2 ${i===3||i===5?'font-bold text-amber-200':''}`} key={i}>{v}</td>)}</tr>)}</tbody></table></div>
+ <p>半年：2027年1月1日〜6月30日<br/>年間：2027年1月1日〜12月31日</p><p className="font-bold text-amber-200">早割は2026年11月7日（土）23:59までのお支払いが対象です。</p><p>11月8日以降は通常のまとめ払い料金です。今回のお支払いは2027年分で、現在の利用期間とは重なりません。</p>
+ </div></details>;}
