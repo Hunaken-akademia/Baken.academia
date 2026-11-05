@@ -1,4 +1,5 @@
 {
   "requested_at": "2026-11-05",
+  "rerun": "2: wide and bracket-quinella hits now match the ticket tables when the support prunes runners",
   "scope": "Research only: staged search over 30,000 prediction and ticket configurations (source, market combination, temperatures, scenario tilt, day-bias gate, support) with 2025 selection and 2026 audit"
 }
