@@ -14,6 +14,7 @@ on:
     branches: [main]
     paths:
       - ".github/jra-cushion-research-request.json"
+      - ".github/rein-v7-research-request.json"
       - "scripts/rein_ticket_research_v4.py"
       - "scripts/rein_research.py"
       - "scripts/rein_research_v3.py"
@@ -34,12 +35,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ${{ contains(github.event.head_commit.message, '[cushion-research]') && 'rein-cushion-research' || contains(github.event.head_commit.message, '[graded-trends]') && 'rein-graded-trends' || 'rein-role-model-to-supabase' }}
+  group: ${{ contains(github.event.head_commit.message, '[rein-v7-research]') && 'rein-v7-research' || contains(github.event.head_commit.message, '[cushion-research]') && 'rein-cushion-research' || contains(github.event.head_commit.message, '[graded-trends]') && 'rein-graded-trends' || 'rein-role-model-to-supabase' }}
   cancel-in-progress: false
 
 jobs:
   build-and-publish:
-    if: github.event_name != 'workflow_run' && !contains(github.event.head_commit.message, '[cushion-research]') && !contains(github.event.head_commit.message, '[graded-trends]') && !contains(github.event.head_commit.message, '[history-refresh]')
+    if: github.event_name != 'workflow_run' && !contains(github.event.head_commit.message, '[rein-v7-research]') && !contains(github.event.head_commit.message, '[cushion-research]') && !contains(github.event.head_commit.message, '[graded-trends]') && !contains(github.event.head_commit.message, '[history-refresh]')
     runs-on: ubuntu-latest
     timeout-minutes: 55
     env:
@@ -217,5 +218,52 @@ jobs:
         with:
           name: jra-graded-trends-v1
           path: artifacts/jra-graded-trends.json
+          retention-days: 90
+          if-no-files-found: error
+
+  rein-v7-research:
+    # Read-only research: learned market stacking and the REIN index. Publishes nothing.
+    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[rein-v7-research]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      SUPABASE_BROKER_URL: "https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-rein-model"
+      ARCHIVE_OBJECT_PATH: "jra/2019-01-01_2026-09-18/jra-backfill-result.tar.gz"
+      ARCHIVE_OUTPUT: ".dataset/jra-backfill-result.tar.gz"
+      OIDC_AUDIENCE: "rein-supabase-model-v1"
+      OPENBLAS_NUM_THREADS: '2'
+      OMP_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt pdfplumber==0.11.9
+      - run: python -m pytest tests/test_rein_index.py tests/test_market_stack.py tests/test_track_conditions.py -q
+      - name: Read licensed history without publishing a model
+        run: |
+          mkdir -p .dataset
+          bash scripts/download_supabase_archive.sh
+          tar --no-same-owner -xzf .dataset/jra-backfill-result.tar.gz
+          test -s data/raw/jra/races-2019-2026.parquet
+      - name: Collect official daily cushion and moisture PDFs
+        # The index still runs without them (variant prior 0) if collection fails.
+        continue-on-error: true
+        run: python scripts/collect_track_conditions.py --output artifacts/rein-v7/track-conditions --start-year 2018 --end-year 2026
+      - name: Compare market stacking and REIN index against production
+        env:
+          REIN_HISTORY_PATH: data/raw/jra/races-2019-2026.parquet
+          REIN_V7_MEASUREMENTS: artifacts/rein-v7/track-conditions/measurements.json
+          REIN_V7_OUTPUT: reports/rein-v7-research
+        run: python scripts/rein_v7_research.py
+      - run: cat reports/rein-v7-research/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: rein-v7-research-${{ github.run_id }}
+          path: reports/rein-v7-research
           retention-days: 90
           if-no-files-found: error
