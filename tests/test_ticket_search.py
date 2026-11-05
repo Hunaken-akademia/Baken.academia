@@ -61,3 +61,27 @@ def test_hits_are_nan_when_not_eligible():
     races.finish[0, :] = np.where(races.mask[0], 1, 0)  # every runner "1st": dead heat
     hits = evaluate_hits(races, roles, weights)
     assert all(np.isnan(hits[bet][0]) for bet in hits)
+
+
+def test_hits_match_ticket_tables_when_support_prunes_runners():
+    """Large fields: wide needs only its own pair inside the support, and a
+    bracket can be covered by other runners in the winning gates."""
+    races, roles, _, frame = _races(R=120, seed=11)
+    single = roles[:, :, 0, :]
+    hits = evaluate_hits(races, single, support=9)
+    outcomes, eligible = build_outcomes(frame)
+    pruned = 0
+    for r in range(len(races.field)):
+        n = races.field[r]
+        horses = frame.loc[frame.race_id.eq(f"r{r}")].reset_index(drop=True)
+        marginals = {k: single[r, :n, j] for j, k in enumerate(("first", "second", "third"))}
+        frames = mixture_candidates(horses, {}, marginals, None, support=9)
+        tickets = pick_tickets(frames, BET_CAPS, GROUPS).assign(race_id=f"r{r}")
+        checked = tickets.merge(outcomes.assign(hit=True), on=["race_id", "bet_type", "selection"], how="left")
+        for bet in hits:
+            if f"r{r}" not in eligible[bet]:
+                continue
+            expected = bool(checked.loc[checked.bet_type.eq(bet), "hit"].eq(True).any())
+            assert hits[bet][r] == float(expected), (r, n, bet)
+        pruned += n > 9
+    assert pruned >= 30

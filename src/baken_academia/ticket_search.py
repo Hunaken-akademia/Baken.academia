@@ -118,14 +118,23 @@ def evaluate_hits(
     out["trifecta"] = _rank_hit(trifecta, np.where(ok123, trifecta[r, a, b, c], 0), TOTAL_CAPS["trifecta"])
     s3 = np.sort(np.stack([a, b, c], axis=1), axis=1)
     out["trio"] = _rank_hit(trio, np.where(ok123, trio[r, s3[:, 0], s3[:, 1], s3[:, 2]], 0), TOTAL_CAPS["trio"])
-    ga, gb = gate[r, a], gate[r, b]
-    out["bracket_quinella"] = _rank_hit(bracket, np.where(ok12, bracket[r, np.minimum(ga, gb), np.maximum(ga, gb)], 0),
+    # Brackets are gates: the winning gate pair can be covered by other
+    # support runners in the same gates, so read the finishers' gates from the
+    # full field, not from the pruned support.
+    full_finish = np.where(races.mask, races.finish, 0)
+    full_gate = {p: np.where(full_finish == p, races.gate, 0).max(axis=1) for p in (1, 2)}
+    full_ok12 = ((full_finish == 1).any(axis=1) & (full_finish == 2).any(axis=1)
+                 & (full_gate[1] > 0) & (full_gate[2] > 0))
+    ga, gb = np.clip(full_gate[1], 0, 8), np.clip(full_gate[2], 0, 8)
+    out["bracket_quinella"] = _rank_hit(bracket, np.where(full_ok12, bracket[r, np.minimum(ga, gb), np.maximum(ga, gb)], 0),
                                         TOTAL_CAPS["bracket_quinella"])
-    # Multi-answer bets: hit when the best-ranked winning selection is inside the cap.
+    # Multi-answer bets: hit when the best-ranked winning selection is inside
+    # the cap.  A wide pair only needs its own two runners in the support.
     wide_best = np.zeros(R)
-    for x, y in ((a, b), (a, c), (b, c)):
+    for (px, x), (py, y) in (((1, a), (2, b)), ((1, a), (3, c)), ((2, b), (3, c))):
         lo3, hi3 = np.minimum(x, y), np.maximum(x, y)
-        wide_best = np.maximum(wide_best, np.where(ok123, wide[r, lo3, hi3], 0))
+        both = present[px] & present[py]
+        wide_best = np.maximum(wide_best, np.where(both, wide[r, lo3, hi3], 0))
     out["wide"] = _rank_hit(wide, wide_best, TOTAL_CAPS["wide"])
     place_count = np.where(races.field >= 8, 3, np.where(races.field >= 5, 2, 0))
     placed = (finish > 0) & (finish <= place_count[:, None])
