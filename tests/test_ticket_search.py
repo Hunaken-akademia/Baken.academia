@@ -85,3 +85,32 @@ def test_hits_match_ticket_tables_when_support_prunes_runners():
             assert hits[bet][r] == float(expected), (r, n, bet)
         pruned += n > 9
     assert pruned >= 30
+
+
+def test_web_caps_skip_same_gate_brackets_and_trifecta():
+    from types import SimpleNamespace
+    from baken_academia.ticket_search import WEB_CAPS
+    web = {"win": (1, 1, 1), "place": (1, 1, 1), "bracket_quinella": (3, 4, 4), "quinella": (5, 6, 6),
+           "wide": (4, 5, 5), "exacta": (8, 10, 10), "trio": (10, 12, 12)}
+    assert {k: sum(v) for k, v in web.items()} == WEB_CAPS
+    races, roles, _, frame = _races(R=80, seed=5)
+    single = roles[:, :, 0, :]
+    hits = evaluate_hits(races, single, support=9, caps=WEB_CAPS, same_gate_bracket=False)
+    assert "trifecta" not in hits
+    outcomes, eligible = build_outcomes(frame)
+    caps = {k: SimpleNamespace(main=v[0], counter=v[1], longshot=v[2]) for k, v in web.items()}
+    for r in range(len(races.field)):
+        n = races.field[r]
+        horses = frame.loc[frame.race_id.eq(f"r{r}")].reset_index(drop=True)
+        marginals = {k: single[r, :n, j] for j, k in enumerate(("first", "second", "third"))}
+        frames = mixture_candidates(horses, {}, marginals, None, support=9)
+        frames = {k: v for k, v in frames.items() if k in web}
+        b = frames["bracket_quinella"]
+        frames["bracket_quinella"] = b.loc[[s[0] != s[1] for s in b.selection]]
+        tickets = pick_tickets(frames, caps, GROUPS).assign(race_id=f"r{r}")
+        checked = tickets.merge(outcomes.assign(hit=True), on=["race_id", "bet_type", "selection"], how="left")
+        for bet in hits:
+            if f"r{r}" not in eligible[bet]:
+                continue
+            expected = bool(checked.loc[checked.bet_type.eq(bet), "hit"].eq(True).any())
+            assert hits[bet][r] == float(expected), (r, n, bet)

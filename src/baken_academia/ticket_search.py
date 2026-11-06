@@ -18,6 +18,10 @@ import numpy as np
 BET_TYPES = ("win", "place", "bracket_quinella", "quinella", "wide", "exacta", "trio", "trifecta")
 TOTAL_CAPS = {"win": 3, "place": 4, "bracket_quinella": 12, "quinella": 19,
               "wide": 16, "exacta": 30, "trio": 37, "trifecta": 67}
+# The web app (rein-web/lib/tickets.ts) uses smaller caps, no trifecta, and
+# skips same-gate brackets.
+WEB_CAPS = {"win": 3, "place": 3, "bracket_quinella": 11, "quinella": 17,
+            "wide": 14, "exacta": 28, "trio": 34}
 MIN_FIELD = {"win": 2, "place": 5, "bracket_quinella": 9, "quinella": 3,
              "wide": 4, "exacta": 3, "trio": 4, "trifecta": 4}
 
@@ -48,12 +52,18 @@ def evaluate_hits(
     roles: np.ndarray,
     weights: np.ndarray | None = None,
     support: int = 10,
+    caps: dict[str, int] | None = None,
+    same_gate_bracket: bool = True,
 ) -> dict[str, np.ndarray]:
     """Per-race hit flags (NaN when the race is not eligible for that bet).
 
     ``roles`` is (R, N, 3) for one scenario or (R, N, S, 3) with ``weights``
     (R, S).  Role vectors are renormalised over the support runners.
+    ``caps`` overrides the total ticket count per bet type (bet types it leaves
+    out are not scored); ``same_gate_bracket=False`` drops same-gate brackets
+    as the web app does.
     """
+    caps = TOTAL_CAPS if caps is None else caps
     if roles.ndim == 3:
         roles = roles[:, :, None, :]
         weights = np.ones((roles.shape[0], 1))
@@ -102,7 +112,8 @@ def evaluate_hits(
     gj = np.tile(gate, (1, K)).ravel()
     lo, hi = np.minimum(gi, gj), np.maximum(gi, gj)
     np.add.at(bracket, (rr, lo, hi), (exacta + exacta.transpose(0, 2, 1)).ravel() / 2)
-    bracket = np.where(np.triu(np.ones((9, 9), dtype=bool))[None], bracket, 0.0)
+    keep_bracket = np.triu(np.ones((9, 9), dtype=bool), 0 if same_gate_bracket else 1)
+    bracket = np.where(keep_bracket[None], bracket, 0.0)
 
     pos = {p: np.where(finish == p, 1, 0).argmax(axis=1) for p in (1, 2, 3)}
     present = {p: (finish == p).any(axis=1) for p in (1, 2, 3)}
@@ -111,13 +122,13 @@ def evaluate_hits(
     out: dict[str, np.ndarray] = {}
     ok12 = present[1] & present[2]
     ok123 = ok12 & present[3]
-    out["win"] = _rank_hit(win, np.where(present[1], win[r, a], 0), TOTAL_CAPS["win"])
-    out["exacta"] = _rank_hit(exacta, np.where(ok12, exacta[r, a, b], 0), TOTAL_CAPS["exacta"])
+    out["win"] = _rank_hit(win, np.where(present[1], win[r, a], 0), caps.get("win", 0))
+    out["exacta"] = _rank_hit(exacta, np.where(ok12, exacta[r, a, b], 0), caps.get("exacta", 0))
     lo2, hi2 = np.minimum(a, b), np.maximum(a, b)
-    out["quinella"] = _rank_hit(quinella, np.where(ok12, quinella[r, lo2, hi2], 0), TOTAL_CAPS["quinella"])
-    out["trifecta"] = _rank_hit(trifecta, np.where(ok123, trifecta[r, a, b, c], 0), TOTAL_CAPS["trifecta"])
+    out["quinella"] = _rank_hit(quinella, np.where(ok12, quinella[r, lo2, hi2], 0), caps.get("quinella", 0))
+    out["trifecta"] = _rank_hit(trifecta, np.where(ok123, trifecta[r, a, b, c], 0), caps.get("trifecta", 0))
     s3 = np.sort(np.stack([a, b, c], axis=1), axis=1)
-    out["trio"] = _rank_hit(trio, np.where(ok123, trio[r, s3[:, 0], s3[:, 1], s3[:, 2]], 0), TOTAL_CAPS["trio"])
+    out["trio"] = _rank_hit(trio, np.where(ok123, trio[r, s3[:, 0], s3[:, 1], s3[:, 2]], 0), caps.get("trio", 0))
     # Brackets are gates: the winning gate pair can be covered by other
     # support runners in the same gates, so read the finishers' gates from the
     # full field, not from the pruned support.
@@ -127,7 +138,7 @@ def evaluate_hits(
                  & (full_gate[1] > 0) & (full_gate[2] > 0))
     ga, gb = np.clip(full_gate[1], 0, 8), np.clip(full_gate[2], 0, 8)
     out["bracket_quinella"] = _rank_hit(bracket, np.where(full_ok12, bracket[r, np.minimum(ga, gb), np.maximum(ga, gb)], 0),
-                                        TOTAL_CAPS["bracket_quinella"])
+                                        caps.get("bracket_quinella", 0))
     # Multi-answer bets: hit when the best-ranked winning selection is inside
     # the cap.  A wide pair only needs its own two runners in the support.
     wide_best = np.zeros(R)
@@ -135,15 +146,17 @@ def evaluate_hits(
         lo3, hi3 = np.minimum(x, y), np.maximum(x, y)
         both = present[px] & present[py]
         wide_best = np.maximum(wide_best, np.where(both, wide[r, lo3, hi3], 0))
-    out["wide"] = _rank_hit(wide, wide_best, TOTAL_CAPS["wide"])
+    out["wide"] = _rank_hit(wide, wide_best, caps.get("wide", 0))
     place_count = np.where(races.field >= 8, 3, np.where(races.field >= 5, 2, 0))
     placed = (finish > 0) & (finish <= place_count[:, None])
     place_best = np.where(placed, place, 0).max(axis=1)
-    out["place"] = _rank_hit(place, place_best, TOTAL_CAPS["place"])
+    out["place"] = _rank_hit(place, place_best, caps.get("place", 0))
 
     eligible = races.eligible
     result = {}
     for bet in BET_TYPES:
+        if bet not in caps:
+            continue
         ok = eligible & (races.field >= MIN_FIELD[bet])
         result[bet] = np.where(ok, out[bet].astype(float), np.nan)
     return result
