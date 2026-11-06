@@ -10,3 +10,10 @@ v7・v9で両年の採用基準を通った「学習した市場合成」を、�
 - 書き出し：2025〜2026年で学習し直した係数を `REIN_STACK_JSON` としてログに出し、`rein-web/lib/market-stack-v1.json` に固定する。影運用ではこの係数を変えない。
 
 実行：`main` へのコミットメッセージに `[rein-stack-export]` を含め、`.github/rein-stack-export-request.json` を更新すると `rein-stack-export` ジョブだけが動く。
+
+## 影運用の集計
+
+- `src/baken_academia/shadow_tickets.py`：保存済みの発走前予想（`rein_race_snapshots` の prestart）と確定結果・払戻（live）から、本番の買い目（Web版と同じ計算）と影の買い目（固定した市場合成）を作り、券種・日ごとの的中レース数・点数・払戻を返す読み取り専用のSQLを生成する。Pythonの参照実装とSQLの結果が完全に一致することをテストで確認（`REIN_TEST_PGHOST` を設定したときだけ動く）。
+- 本番データ（2026-10-01〜11-05、294R）で、SQLで計算し直した本番の買い目が保存済みの買い目と全券種・全レースで一致した。
+- `scripts/rein_shadow_report.py sql --from … --to …` でSQLを出し、結果（JSON）を `summary` に渡すと、日単位ブートストラップ95%区間つきの表になる。固定日より前の発走前予想は「振り返り」として分けて表示する。
+- 判断：4週間ほど回して、影が本番を的中率・回収率とも下回らないこと（区間の下限が大きく負にならないこと）を確認してから切り替えを提案する。
