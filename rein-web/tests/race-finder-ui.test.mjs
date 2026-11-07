@@ -16,6 +16,14 @@ test('finder lists upcoming races by kind, reviews finished ones with ○✕ and
     const tick=()=>new Promise(r=>setTimeout(r,120));await tick();
     const doc=dom.window.document,section=doc.querySelector('[data-testid="race-finder"]');
     const tab=label=>[...section.querySelectorAll('[aria-label="レースの区分"] button')].find(b=>b.textContent.startsWith(label));
+    const guide=section.querySelector('[aria-label="今日のレース選びガイド"]');
+    assert.match(guide.textContent,/利益や的中のおすすめ順ではありません/);
+    assert.match(guide.textContent,/判断を保留・更新確認 2R/);
+    assert.equal(guide.querySelectorAll(':scope > ul > li').length,2);
+    const firstGuide=guide.querySelector(':scope > ul > li button');
+    assert.match(firstGuide.textContent,/門別4R/);
+    firstGuide.click();
+    assert.equal(doc.getElementById('opened').textContent,'202610283604');
     assert.equal(tab('荒れそう').getAttribute('aria-pressed'),'true');
     assert.match(tab('荒れそう').textContent,/荒れそう1$/);
     assert.match(section.querySelector('[data-testid="finder-reference"]').textContent,/3連単万馬券 73.7%（168\/228R）/);

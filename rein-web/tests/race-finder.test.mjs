@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 const code=ts.transpileModule(readFileSync(new URL('../lib/race-finder.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
-const {effectiveContenders,classifyRace,finderHit,trifectaResult,finderRow,FINDER_REFERENCE}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const {effectiveContenders,classifyRace,finderHit,trifectaResult,finderRow,FINDER_REFERENCE,readingGuide,nextRacesToRead}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
 test('effective contenders match the SQL used for validation and reject incomplete markets',()=>{
   // Niigata 1R on 2026-10-25: the validation query gives 8.38157004909969.
   const niigata=[2.6,5.3,5.2,9,10.4,15.3,27.9,14.1,25.2,30.1,43,64.7,97.9];
@@ -43,4 +43,21 @@ test('trifecta is read under both league labels; rows judge only prestart-saved 
   assert.equal(row.number,4);assert.equal(row.verified,true);assert.deepEqual(row.favorite,{name:'馬1',odds:2.1});assert.equal(row.result.payout,19960);assert.equal(row.field,6);
   assert.equal(finderRow('202610203604','nar','門別',payload('rebuilt','2026-10-20T08:00:00Z')).verified,false);
   assert.equal(finderRow('202610203604','nar','門別',{...payload('prestart','2026-10-20T07:15:10Z'),horses:horses.slice(0,4)}).kind,null);
+});
+
+test('reading order excludes ended, incomplete, stale and unknown-time races',()=>{
+ const now=Date.parse('2026-11-07T06:00:00Z');
+ const row=(id,minutes,extra={})=>({raceId:id,startsAt:now+minutes*60_000,kind:'solid',oddsAt:new Date(now-60_000).toISOString(),...extra});
+ const fresh=row('fresh',20), sooner=row('sooner',10);
+ assert.equal(readingGuide(row('ended',0),now).state,'ended');
+ assert.equal(readingGuide(row('waiting',10,{kind:null}),now).state,'waiting');
+ assert.equal(readingGuide(row('unknown',10,{startsAt:null}),now).state,'waiting');
+ for(const oddsAt of [null,'invalid',new Date(now+1).toISOString(),new Date(now-15*60_000).toISOString()]) assert.equal(readingGuide(row('old',10,{oddsAt}),now).state,'refresh');
+ assert.equal(readingGuide(fresh,now).state,'ready');
+ assert.match(readingGuide(fresh,now).reason,/軸候補/);
+ assert.match(readingGuide({...fresh,kind:'rough'},now).reason,/絞り込み/);
+ const input=[fresh,row('ended',-1),row('waiting',3,{kind:null}),sooner,row('third',30),row('fourth',40)];
+ assert.deepEqual(nextRacesToRead(input,now).map(r=>r.raceId),['sooner','fresh','third']);
+ assert.equal(input[0],fresh);
+ assert.equal(readingGuide(sooner,now+11*60_000).state,'ended');
 });

@@ -89,3 +89,20 @@ export function finderRow(raceId: string, league: League, venue: string, payload
     result: payload.review?.isFinished ? trifectaResult(payload.review.payouts) : null, verified,
   };
 }
+
+// An operational reading order, not a profitability or prediction-confidence score.
+export type ReadingState = "ready" | "waiting" | "refresh" | "ended";
+export function readingGuide(row: FinderRow, now: number): { state: ReadingState; reason: string; next: string } {
+  if (row.startsAt !== null && row.startsAt <= now) return { state: "ended", reason: "発走時刻を過ぎています", next: "結果を振り返る" };
+  if (row.startsAt === null || !Number.isFinite(row.startsAt)) return { state: "waiting", reason: "発走時刻を確認できません", next: "レース情報を確認" };
+  if (!row.kind) return { state: "waiting", reason: "分類に必要な全頭のオッズがそろっていません", next: "オッズがそろってから判断" };
+  const at = row.oddsAt ? Date.parse(row.oddsAt) : NaN;
+  if (!Number.isFinite(at) || at > now || now - at >= 15 * 60_000) return { state: "refresh", reason: "オッズの取得時刻が不明、または15分以上経過しています", next: "最新オッズを確認してから判断" };
+  const reason = row.kind === "solid" ? "人気が上位に集中。まず軸候補と相手の着順適性を確認" : row.kind === "rough" ? "人気が分散。軸を決める前に展開と候補の絞り込みを確認" : "人気がほどよく分散。上位人気と穴候補の評価差を確認";
+  return { state: "ready", reason, next: "まとめで根拠を確認" };
+}
+
+export function nextRacesToRead(rows: FinderRow[], now: number): FinderRow[] {
+  return rows.filter(row => readingGuide(row, now).state === "ready")
+    .sort((a, b) => (a.startsAt as number) - (b.startsAt as number) || a.raceId.localeCompare(b.raceId)).slice(0, 3);
+}

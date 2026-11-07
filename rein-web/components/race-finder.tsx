@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { FINDER_REFERENCE, KIND_ORDER, RACE_KINDS, finderHit, type FinderRow, type League, type RaceFinder as Finder, type RaceKind } from "@/lib/race-finder";
+import { FINDER_REFERENCE, KIND_ORDER, RACE_KINDS, finderHit, readingGuide, nextRacesToRead, type FinderRow, type League, type RaceFinder as Finder, type RaceKind } from "@/lib/race-finder";
 
 const pct = (n: number, d: number) => d ? `${Math.round(n / d * 1000) / 10}%` : "—";
 const yen = (n: number) => `${n.toLocaleString()}円`;
@@ -31,16 +31,38 @@ export function RaceFinder({ league, onOpen }: { league: League; onOpen: (raceId
       } catch (value) { if (!controller.signal.aborted) setError(value instanceof Error ? value.message : "レースの区分を取得できませんでした"); }
     }
     void load();
-    const timer = setInterval(() => { if (document.visibilityState === "visible") void load(); }, 60_000);
+    const timer = setInterval(() => { if (document.visibilityState === "visible") { setNow(Date.now()); void load(); } }, 60_000);
     return () => { controller.abort(); clearInterval(timer); };
   }, [league]);
   const reference = FINDER_REFERENCE[league], ref = reference.kinds[kind], meta = RACE_KINDS[kind];
-  const all = finder?.rows ?? [], pending = all.filter(row => !row.kind && !closed(row, now));
+  const all = finder?.rows ?? [];
+  const nextRows = nextRacesToRead(all, now);
+  const reviewRows = all.filter(row => ["waiting", "refresh"].includes(readingGuide(row, now).state));
+  const pending = all.filter(row => !row.kind && !closed(row, now));
   const rows = all.filter(row => row.kind === kind && (ended || !closed(row, now)));
   const results = ended ? rows.map(row => judged(row, now)).filter((v): v is boolean => v !== null) : [];
   return <section aria-label="条件でレースを探す" data-testid="race-finder" className="mt-5 rounded-2xl border border-rose-400/30 bg-[#0c192a] p-4 sm:p-5">
     <h2 className="font-bold text-rose-100">🎯 条件でレースを探す</h2>
     <p className="mt-1 text-xs leading-5 text-slate-400">単勝オッズの割れ具合から、本日のレースを固め・中穴・荒れそうに分けます。</p>
+    {finder && !error && <div aria-label="今日のレース選びガイド" className="mt-4 rounded-xl border border-cyan-300/25 p-3">
+      <h3 className="font-bold text-cyan-100">次に見るレース</h3>
+      <p className="mt-1 text-xs leading-5 text-slate-400">分類できる新しいオッズがあるレースを発走順に最大3件表示します。利益や的中のおすすめ順ではありません。</p>
+      {nextRows.length ? <ul className="mt-2 divide-y divide-slate-700">{nextRows.map(row => <li key={row.raceId}>
+        <button type="button" onClick={() => onOpen(row.raceId)} className="min-h-20 w-full py-3 text-left hover:bg-white/5">
+          <span className="block text-sm font-bold text-white">{row.start} {row.venue}{row.number}R <span className="text-xs font-normal text-cyan-200">{row.kind ? RACE_KINDS[row.kind].label : ""}</span></span>
+          <span className="mt-1 block text-xs leading-5 text-slate-300">{readingGuide(row, now).reason}</span>
+          <span className="block text-xs text-slate-400">{timeJst(row.oddsAt)}のオッズ・{readingGuide(row, now).next} →</span>
+        </button>
+      </li>)}</ul> : <p role="status" className="mt-3 text-sm text-slate-300">今は条件を満たすレースがありません。判定待ち・更新確認の一覧をご覧ください。</p>}
+      {reviewRows.length > 0 && <details className="mt-3 rounded-lg bg-black/20 p-3">
+        <summary className="min-h-11 cursor-pointer py-2 text-sm text-amber-100">判断を保留・更新確認 {reviewRows.length}R</summary>
+        <p className="text-xs leading-5 text-slate-400">情報の確認を優先するレースです。能力や期待回収率が低いという判定ではありません。</p>
+        <ul className="mt-2 divide-y divide-slate-700">{[...reviewRows].sort((a,b) => (a.startsAt ?? Infinity)-(b.startsAt ?? Infinity)).map(row => <li key={row.raceId}><button type="button" onClick={() => onOpen(row.raceId)} className="min-h-14 w-full py-2 text-left text-xs">
+          <span className="block font-bold text-slate-200">{row.start || "時刻未確認"} {row.venue}{row.number}R</span>
+          <span className="mt-1 block text-amber-200/80">{readingGuide(row, now).reason}</span>
+        </button></li>)}</ul>
+      </details>}
+    </div>}
     <div role="group" aria-label="レースの区分" className="mt-3 grid grid-cols-3 gap-1 rounded-lg bg-black/20 p-1 text-sm" data-no-swipe>
       {KIND_ORDER.map(k => <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)} className={`rounded-md px-2 py-2 font-bold ${kind === k ? tone[k] : "text-slate-300"}`}>
         {RACE_KINDS[k].label}<span className="ml-1 text-[11px] font-normal">{finder ? all.filter(row => row.kind === k && !closed(row, now)).length : ""}</span>
@@ -62,11 +84,11 @@ export function RaceFinder({ league, onOpen }: { league: League; onOpen: (raceId
       : <>
         {ended && results.length > 0 && <p data-testid="finder-review" className="mt-3 rounded-lg bg-black/20 px-3 py-2 text-sm font-bold">終了したレースの結果　<span className="text-emerald-300">○{results.filter(Boolean).length}</span>　<span className="text-rose-300">✕{results.filter(v => !v).length}</span>（{pct(results.filter(Boolean).length, results.length)}）</p>}
         {rows.length ? <ul data-testid="finder-list" className="mt-2 divide-y divide-slate-800">{rows.map(row => {
-          const done = closed(row, now), hit = judged(row, now);
+          const done = closed(row, now), hit = judged(row, now), guide = readingGuide(row, now);
           return <li key={row.raceId}><button type="button" onClick={() => onOpen(row.raceId)} className="flex w-full items-center gap-3 py-3 text-left hover:bg-white/[.03]">
             <span className="w-12 shrink-0 text-center"><span className="block text-sm font-semibold text-cyan-200">{row.start || "--:--"}</span><span className="text-[10px] text-slate-500">{done ? "締切済" : `あと${Math.max(1, Math.ceil(((row.startsAt ?? now) - now) / 60_000))}分`}</span></span>
             <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{row.venue}{row.number}R <span className="font-normal text-slate-300">{row.title.replace(/^\S+\s*\d+R\s*/, "")}</span></span>
-              <span className="block text-[11px] text-slate-400">{row.field}頭・人気の割れ {row.effective?.toFixed(1)}頭分{row.favorite ? `・1番人気 ${row.favorite.odds.toFixed(1)}倍` : ""}{!done && timeJst(row.oddsAt) ? `（${timeJst(row.oddsAt)}のオッズ）` : ""}</span></span>
+              <span className="block text-[11px] text-slate-400">{row.field}頭・人気の割れ {row.effective?.toFixed(1)}頭分{row.favorite ? `・1番人気 ${row.favorite.odds.toFixed(1)}倍` : ""}{!done && timeJst(row.oddsAt) ? `（${timeJst(row.oddsAt)}のオッズ）` : ""}</span>{!done && <span className={`mt-1 block text-[11px] ${guide.state === "ready" ? "text-cyan-200" : "text-amber-200"}`}>{guide.reason}</span>}</span>
             <span className="shrink-0 text-right">{row.result && done ? <>
               {hit !== null ? <b data-finder-hit={hit ? "hit" : "miss"} className={`mr-1 text-xl ${hit ? "text-emerald-300" : "text-rose-300"}`}>{hit ? "○" : "✕"}</b> : <span className="mr-1 text-[10px] text-slate-500">参考外</span>}
               <span className="text-sm font-bold">{yen(row.result.payout)}</span>{row.result.payout >= 10_000 && <span className="ml-1 rounded bg-amber-300 px-1 text-[10px] font-bold text-[#07111f]">万馬券</span>}
