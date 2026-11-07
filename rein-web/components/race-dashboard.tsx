@@ -828,7 +828,7 @@ function visibleMark(mark: string | undefined) {
 }
 
 function visibleVerdict(verdict: string | undefined) {
-  return verdict === "見送り" ? "候補" : verdict || "候補";
+  return verdict || "候補";
 }
 
 function overallReady(data: Analysis) {
@@ -861,7 +861,7 @@ function RaceConfidenceCard({ confidence, nar = false, reference }: { confidence
         <Target className="mt-0.5 shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-slate-400">上位3頭信頼度</p>
+            <p className="text-xs text-slate-400">上位3頭への評価集中度</p>
             {confidence ? (
               <Badge className="bg-white/10 text-current">{confidence.label}</Badge>
             ) : null}
@@ -1019,19 +1019,42 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           </div>
         </section>
       )}
-      <TrackReferencePanel key={data.race.raceId} race={data.race} />
-      <OddsTrendPanel race={data.race} horses={data.horses} />
+      <section aria-label="レースの判断ガイド" className="mb-4 rounded-2xl border border-cyan-300/30 bg-[#0c192a] p-4 text-white">
+        <h2 className="text-lg font-bold">このレース、まずここを見る</h2>
+        <p className="mt-2 text-sm text-cyan-100">{data.race.league === "nar" ? "近走の先行構成" : "展開の見立て"}：{data.pace.label}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-400">{data.pace.detail}</p>
+        {rolesReady ? <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {([["first", "1着で評価", "勝ち切る候補を確認"], ["second", "2着で評価", "2着の相手選びに"], ["third", "3着で評価", "3着の相手選びに"]] as const).map(([role, label, hint]) => {
+            const horse = roleOrder(data.horses, role)[0];
+            return horse ? <button key={role} type="button" onClick={() => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} className="min-h-20 rounded-xl border border-slate-700 p-3 text-left hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
+              <span className="block text-xs text-cyan-200">{label}・適性最上位</span>
+              <span className="mt-1 block font-bold">{horse.number}番 {horse.name}</span>
+              <span className="mt-1 block text-xs text-slate-400">{hint} → 根拠を見る</span>
+            </button> : null;
+          })}
+        </div> : <p className="mt-3 text-sm text-amber-200">着順適性は取得待ちです。保留中の評価を補って推奨することはありません。</p>}
+        <p className="mt-3 text-xs leading-5 text-slate-400">各着順の最上位を個別に表示しています。同じ馬が複数の着順に出る場合があります。この並びは買い目ではありません。</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {([["prediction", "まとめ・買い目"], ["comparison", "馬を比較"], ["formation", "展開の根拠"], ["review", "答え合わせ"]] as const).map(([tab, label]) => <button key={tab} type="button" onClick={() => changeAnalysisTab(tab)} className="min-h-11 rounded-lg border border-slate-600 px-3 text-sm hover:bg-white/5">{label}</button>)}
+        </div>
+      </section>
+      <details className="mb-4 rounded-xl border border-slate-700 p-3 text-slate-200">
+        <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">馬場データ・オッズの変化を確認</summary>
+        <TrackReferencePanel key={data.race.raceId} race={data.race} />
+        <OddsTrendPanel race={data.race} horses={data.horses} />
+      </details>
       <div ref={analysisNav} />
       <Tabs value={analysisTab} onValueChange={changeAnalysisTab} onSwipeBack={onBack}>
         <TabsList aria-label="レースの情報" className="sticky top-0 z-20 mb-4 grid h-auto min-h-24 w-full grid-cols-3 border border-slate-700 bg-[#0c192a] shadow-lg sm:min-h-12 sm:grid-cols-6">
-          {[["prediction", "予想"], ["comparison", "比較"], ["formation", "展開"], ["detail", "馬の詳細"], ["jockeys", "騎手"], ["review", "結果"]].map(([value, label]) => (
+          {[["prediction", "まとめ"], ["comparison", "比較"], ["formation", "展開"], ["detail", "馬の詳細"], ["jockeys", "騎手"], ["review", "結果"]].map(([value, label]) => (
             <TabsTrigger key={value} value={value} className="min-h-11 px-1 text-[11px] sm:text-sm">{label}</TabsTrigger>
           ))}
         </TabsList>
+        <TabsContent value="prediction">
         <div id="race-condition-matrix" className="min-w-0 scroll-mt-28">
           <ConditionMatrix key={data.race.raceId} horses={data.horses} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
         </div>
-        <TabsContent value="prediction">
+
           {data.race.league !== "nar" && hasGradedRaceHistory(data.race) && <GradedTrends race={data.race} horses={data.horses} />}
           {hasGradedRaceHistory(data.race) && <GradedRaceHistory race={data.race} onSimulate={(id,label)=>{setHistoricalScenario(old=>({id,label,version:(old?.version??0)+1}));changeAnalysisTab("formation");}} />}
           <PopularityForecast key={data.race.raceId} horses={data.horses} race={data.race} rolesReady={rolesReady} finished={data.review?.isFinished ?? false} predictionSafe={patternPredictionSafe(data.prediction, data.race.startsAt, data.review?.isFinished ?? false)} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
@@ -2054,7 +2077,7 @@ function horseParameters(horse: Horse): HorseParameter[] {
       label: "2着適性",
       value: horse.secondSuitability ?? 0,
       samples: horse.historySamples ?? 0,
-      detail: "連対する力",
+      detail: "2着になる適性",
     },
     {
       label: "3着適性",
