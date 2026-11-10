@@ -25,7 +25,7 @@ import { missingPredictionItems, updateScheduleText } from "@/lib/prediction-sta
 import { ownsHorizontalGesture } from "@/lib/touch-scroll";
 import { reasonViews } from "@/lib/feature-labels";
 import { longshotRoleOrder } from "@/lib/longshot-roles";
-import { roleOrder, type RoleKey, type Picks, type MarkPick } from "@/lib/marks";
+import { distinctLongshot, roleOrder, type RoleKey, type Picks, type MarkPick } from "@/lib/marks";
 import type { Horse } from "@/lib/horse-types";
 import { TrackReferencePanel } from "@/components/track-reference-panel";
 import { ConditionMatrix } from "@/components/condition-matrix";
@@ -954,6 +954,9 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
   const firstOrder = rolesReady ? roleOrder(data.horses, "first") : [];
   const firstRank = (horse: Horse) =>
     firstOrder.findIndex((item) => item.number === horse.number) + 1;
+  const marketFavorites = data.horses.filter((horse) => horse.popularity === 1 && horse.odds !== null);
+  const firstLeader = firstOrder[0];
+  const marketAgrees = firstLeader && marketFavorites.some((horse) => horse.number === firstLeader.number);
   return (
     <div className={`rounded-3xl border-2 p-3 transition-colors sm:p-4 ${completePrediction ? "border-emerald-400/70 bg-emerald-400/[.025]" : "border-amber-400/70 bg-amber-400/[.025]"}`}>
       <section aria-label="レース情報" className="mb-4 rounded-2xl border border-slate-700 bg-gradient-to-br from-[#10233a] to-[#0b1727] p-4 text-white sm:p-5">
@@ -1023,13 +1026,36 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
         <h2 className="text-lg font-bold">このレース、まずここを見る</h2>
         <p className="mt-2 text-sm text-cyan-100">{data.race.league === "nar" ? "近走の先行構成" : "展開の見立て"}：{data.pace.label}</p>
         <p className="mt-1 text-xs leading-5 text-slate-400">{data.pace.detail}</p>
+        <div className="mt-3 rounded-lg border border-slate-700 bg-black/20 p-3" data-testid="market-model-comparison">
+          <p className="text-xs font-semibold text-cyan-200">人気とREINの1着評価を照合</p>
+          {rolesReady && firstLeader && marketFavorites.length ? (
+            <>
+              <p className="mt-1 text-sm font-medium text-white">
+                {marketAgrees ? "人気とREINが一致" : "人気とREINの評価が異なる"}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-300">
+                1番人気：{marketFavorites.map((horse) => `${horse.number}番 ${horse.name}`).join("・")} ／ REINの1着最上位：{firstLeader.number}番 {firstLeader.name}（{firstLeader.popularity > 0 ? `${firstLeader.popularity}番人気` : "人気未確認"}）
+              </p>
+              <p className="mt-1 text-[11px] leading-5 text-slate-400">評価が異なること自体は期待値や的中率の優位性を意味しません。人気・着順適性・過去の根拠を見比べてください。</p>
+            </>
+          ) : (
+            <p className="mt-1 text-xs text-amber-200">1番人気または1着適性が確認できないため、比較を保留しています。</p>
+          )}
+        </div>
         {rolesReady ? <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {([["first", "1着で評価", "勝ち切る候補を確認"], ["second", "2着で評価", "2着の相手選びに"], ["third", "3着で評価", "3着の相手選びに"]] as const).map(([role, label, hint]) => {
-            const horse = roleOrder(data.horses, role)[0];
+            const ordered = roleOrder(data.horses, role);
+            const horse = ordered[0];
+            const nextHorse = ordered[1];
+            const roleReason = horse ? reasonViews(horse.roleReasons?.[role], 1)[0] : null;
             return horse ? <button key={role} type="button" onClick={() => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} className="min-h-20 rounded-xl border border-slate-700 p-3 text-left hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
               <span className="block text-xs text-cyan-200">{label}・適性最上位</span>
               <span className="mt-1 block font-bold">{horse.number}番 {horse.name}</span>
-              <span className="mt-1 block text-xs text-slate-400">{hint} → 根拠を見る</span>
+              <span className="mt-1 block text-xs text-slate-400">{horse.popularity > 0 ? `${horse.popularity}番人気` : "人気未確認"} ・ {hint}</span>
+              {nextHorse && <span className="mt-1 block text-[11px] leading-4 text-slate-300">次点：{nextHorse.number}番 {nextHorse.name}</span>}
+              {roleReason && <span className="mt-1 block text-[11px] leading-4 text-cyan-100">評価要因：{roleReason.label}</span>}
+              {!roleReason && horse.positives?.[0] && <span className="mt-1 block text-[11px] leading-4 text-cyan-100">参考履歴：{horse.positives[0]}</span>}
+              <span className="mt-1 block text-[11px] text-slate-400">詳しい根拠を見る →</span>
             </button> : null;
           })}
         </div> : <p className="mt-3 text-sm text-amber-200">着順適性は取得待ちです。保留中の評価を補って推奨することはありません。</p>}
@@ -2616,13 +2642,16 @@ function PickCards({ data, onHorse, children }: { data: Analysis; onHorse: (hors
       <LongshotRoles data={data} onHorse={onHorse} />
     </>;
   }
+  const extraLongshot = distinctLongshot(picks);
+  const longshotAlreadyTop = picks.longshot && !extraLongshot
+    && (picks.longshot.number === picks.main?.number || picks.longshot.number === picks.rival?.number);
   const slots: Array<{ title: string; pick: MarkPick | null; empty?: string }> = [
     { title: "本命", pick: picks.main },
     { title: "対抗", pick: picks.rival },
     {
       title: "穴候補",
-      pick: picks.longshot,
-      empty: picks.longshotStatus === "unavailable" ? "データ不足" : "該当なし",
+      pick: extraLongshot,
+      empty: longshotAlreadyTop ? "本命・対抗に含む" : picks.longshotStatus === "unavailable" ? "データ不足" : "該当なし",
     },
   ];
   return (
@@ -2633,6 +2662,7 @@ function PickCards({ data, onHorse, children }: { data: Analysis; onHorse: (hors
           const body = (
             <>
               <span className="text-xs text-slate-400">{title}</span>
+              {horse && title !== "穴候補" && horse.popularity >= 4 && <span className="ml-1 rounded bg-rose-300/10 px-1 text-[10px] text-rose-200">人気薄の{title}</span>}
               {horse && pick ? (
                 <>
                   <div className="mt-1 flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
