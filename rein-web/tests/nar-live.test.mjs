@@ -125,15 +125,17 @@ const validation={version:'nar-conditions-v1',periods:{audit:'2026'},ranking:{},
 const field=Array.from({length:10},(_,i)=>({number:i+1,popularity:10-i,firstProbability:(10-i)/55}));
 test('NAR references apply only adopted rules, require complete market, and never invent market probability',()=>{
  const result=narReferenceSignals(field,validation,context);
- assert.equal(result.picks.longshotCandidates.length,4);
- assert.equal(result.picks.longshotCandidates[0].firstRank,1);
+ assert.equal(result.picks.longshotCandidates.length,2);
+ assert.equal(result.picks.longshotCandidates[0].firstRank,3);
+ assert.ok(result.picks.longshotCandidates.every(h=>h.number!==result.picks.main.number && h.number!==result.picks.rival.number));
  assert.equal(result.picks.longshotCandidates[0].marketGap,undefined);
  assert.ok(result.reference.danger.numbers.includes(10));
  assert.ok(result.confidence);assert.match(result.confidence.detail,/1,000/);
  const missing=narReferenceSignals(field.map((h,i)=>i? h:{...h,popularity:0}),validation,context);
  assert.equal(missing.picks.longshotStatus,'unavailable');assert.equal(missing.reference.danger.status,'market-missing');
  const duplicate=narReferenceSignals(field.map((h,i)=>i? h:{...h,popularity:1}),validation,context);
- assert.equal(duplicate.reference.danger.status,'market-missing');
+ assert.equal(duplicate.reference.danger.status,'adopted');
+ assert.equal(duplicate.picks.status,'ready');
  const rejected=narReferenceSignals(field,{...validation,signals:{...validation.signals,longshot:{...signal,status:'rejected'}}},context);
  assert.equal(rejected.picks.longshotCandidates.length,0);
  assert.equal(narReferenceSignals(field.slice(0,5),validation,context).confidence,null);
