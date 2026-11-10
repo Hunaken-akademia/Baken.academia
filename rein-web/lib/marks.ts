@@ -120,3 +120,11 @@ export function selectPicks(
     longshotReason: "1着適性3〜6位に、4番人気以下かつ1着評価が市場を上回る馬がいません",
   };
 }
+
+// The saved prestart pick remains immutable; only the visible extra hole card is
+// deduplicated. A value candidate already shown as 本命/対抗 is still visible there.
+export function distinctLongshot(picks: Picks): MarkPick | null {
+  const shown = new Set([picks.main?.number, picks.rival?.number]);
+  return [picks.longshot, ...picks.longshotCandidates]
+    .find((candidate): candidate is MarkPick => !!candidate && !shown.has(candidate.number)) ?? null;
+}

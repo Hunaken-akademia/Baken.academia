@@ -16,10 +16,11 @@ export function withNarTickets<T extends TicketSnapshot>(body: T): T {
   const horses = body.horses;
   const ready = body.evaluation?.roleModel === "ready" && horses.length >= 3
     && new Set(horses.map(h => h.number)).size === horses.length
-    && new Set(horses.map(h => h.popularity)).size === horses.length
+    // Official NAR odds can legitimately share a popularity rank when odds tie.
+    // A duplicate rank is not a missing runner or an unsafe forecast.
     && horses.every(h => Number.isInteger(h.number) && h.number > 0
       && Number.isInteger(h.gate) && h.gate >= 1 && h.gate <= 8
-      && Number.isInteger(h.popularity) && h.popularity > 0
+      && Number.isInteger(h.popularity) && h.popularity >= 1 && h.popularity <= horses.length
       && typeof h.odds === "number" && Number.isFinite(h.odds) && h.odds > 0
       && [h.firstProbability, h.secondProbability, h.thirdProbability]
         .every(v => typeof v === "number" && Number.isFinite(v) && v > 0));

@@ -32,10 +32,32 @@ test("Missing model, role shares or complete market keeps tickets held", () => {
     s => s.horses[0].odds = null,
     s => s.horses[0].firstProbability = NaN,
     s => s.horses[0].popularity = 0,
-    s => s.horses[0].popularity = 2,
+    s => s.horses[0].popularity = 7,
   ]) {
     const source = snapshot(); change(source);
     const result = withNarTickets(source);
     assert.equal(result.evaluation.tickets, "held"); assert.deepEqual(result.tickets, []);
+  }
+});
+
+test("Same-price official popularity ties do not suppress NAR tickets", () => {
+  const source = snapshot();
+  source.horses[5].popularity = source.horses[4].popularity;
+  source.horses[5].odds = source.horses[4].odds;
+  const result = withNarTickets(source);
+  assert.equal(result.evaluation.tickets, "ready");
+  assert.deepEqual(result.tickets, buildTickets(source.horses.map(h => ({
+    ...h, reinScore: h.score, marketScore: 0,
+  }))));
+});
+test("Invalid race identity or incomplete odds still hold NAR tickets", () => {
+  for (const change of [
+    s => s.horses[0].number = s.horses[1].number,
+    s => s.horses[0].gate = 0,
+    s => s.horses[0].odds = null,
+  ]) {
+    const source = snapshot(); change(source);
+    const result = withNarTickets(source);
+    assert.equal(result.evaluation.tickets, "held");
   }
 });
