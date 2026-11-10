@@ -9,7 +9,7 @@ async function load(name) {
   return import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
 }
 const { featureLabel, reasonViews, OTHER_FEATURE_LABEL } = await load('feature-labels');
-const { selectPicks, roleOrder } = await load('marks');
+const { selectPicks, roleOrder, distinctLongshot } = await load('marks');
 const { isRunnerRow, isScratched, parseSexAge, horseName } = await load('race-card');
 
 const secondSchema = JSON.parse(readFileSync(new URL('../api/models/second_joint_v5.schema.json', import.meta.url), 'utf8'));
@@ -112,4 +112,23 @@ test('Yahoo gelding rows (せん) are runners and map to the training category',
   const scratched = { html: '<a href="/keiba/directory/horse/1/">', cells: ['3', '5', 'テスト 牡4/鹿毛', '騎手 57.0', '調教師', '父', '', '取消'] };
   assert.ok(isScratched(scratched));
   assert.deepEqual(parseSexAge(['1', '1', 'ウマ 牝3/栗毛']), { sex: '牝', age: 3 });
+});
+
+test('NAR historical overlapping hole is displayed once, without changing frozen picks', () => {
+  const historical = {
+    status:'ready',
+    main:{number:9,role:'本命',firstRank:1},
+    rival:{number:3,role:'対抗',firstRank:2},
+    longshot:{number:9,role:'穴候補',firstRank:1},
+    longshotCandidates:[
+      {number:9,role:'穴候補',firstRank:1},
+      {number:3,role:'穴候補',firstRank:2},
+      {number:6,role:'穴候補',firstRank:3},
+    ],
+    longshotStatus:'selected',
+  };
+  const snapshot=structuredClone(historical);
+  assert.equal(distinctLongshot(historical)?.number,6);
+  assert.deepEqual(historical,snapshot);
+  assert.equal(distinctLongshot({...historical,longshotCandidates:historical.longshotCandidates.slice(0,2)}),null);
 });
