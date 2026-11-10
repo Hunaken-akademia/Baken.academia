@@ -26,17 +26,19 @@ export function narReferenceSignals(horses:MarkHorse[],validation:NarConditionVa
   const order=roleOrder(horses,"first");
   const fullRanking=order.length===horses.length&&horses.length>=2;
   // No selection from partial popularity: rankings can move when missing odds arrive.
-  const marketReady=fullRanking&&horses.every(h=>Number.isInteger(h.popularity)&&h.popularity>=1&&h.popularity<=horses.length)&&new Set(horses.map(h=>h.popularity)).size===horses.length;
+  // Matching official odds may have the same popularity number. Only absent, out-of-range,
+  // or incomplete rankings should stop the reference conditions.
+  const marketReady=fullRanking&&new Set(horses.map(h=>h.number)).size===horses.length&&horses.every(h=>Number.isInteger(h.popularity)&&h.popularity>=1&&h.popularity<=horses.length);
   if(!validation || validation.version!=="nar-conditions-v1")return {picks,confidence:null,reference:null};
   const danger=validation.signals.danger,longshot=validation.signals.longshot;
   const dangerNumbers=marketReady&&danger.status==="adopted"&&danger.gap!==null?order.filter((h,i)=>h.popularity<=3&&i+1>=h.popularity+danger.gap!).map(h=>h.number):[];
   const rule=longshot.status==="adopted"?`4番人気以下・1着適性5位以内・人気順位より${longshot.gap}位以上高い馬。確定人気での監査であり、現在の人気は変動します。`:
     "地方データで改善基準を満たさなかったため、穴候補は採用していません。";
   if(longshot.status==="adopted" && marketReady && picks.status==="ready") {
-    const candidates:MarkPick[]=order.flatMap((h,i)=>h.popularity>=4&&i<5&&longshot.gap!==null&&h.popularity-(i+1)>=longshot.gap?[{number:h.number,role:"穴候補",firstRank:i+1}]:[]);
+    const candidates:MarkPick[]=order.flatMap((h,i)=>h.popularity>=4&&i>=2&&i<5&&longshot.gap!==null&&h.popularity-(i+1)>=longshot.gap?[{number:h.number,role:"穴候補",firstRank:i+1}]:[]);
     picks.longshotCandidates=candidates;picks.longshot=candidates[0]??null;
     picks.longshotStatus=candidates.length?"selected":"none";
-    picks.longshotReason=candidates.length?"地方の確定人気を用いた履歴監査に基づく参考候補。期待値・買い推奨ではありません。":"検証した地方の条件に該当する馬はいません。";
+    picks.longshotReason=candidates.length?"地方の確定人気を用いた履歴監査に基づく参考候補。期待値・買い推奨ではありません。":"本命・対抗とは別に表示する穴候補はありません。人気薄の本命・対抗はその欄に表示します。";
   } else picks.longshotReason=!marketReady?"全頭の人気がそろっていないため、地方の穴候補を保留しています。":rule;
   const signalText=(signal:Signal)=>signal.audit?`監査対象${signal.audit.samples.toLocaleString("ja-JP")}頭・3着内${pct(signal.audit.rate)}（同場・同人気・同頭数帯の基準${pct(signal.audit.baseline)}）。確定人気による事後監査で、回収率は未検証。`:"選択期間・監査期間の改善基準を満たしていません。";
   const reference={
