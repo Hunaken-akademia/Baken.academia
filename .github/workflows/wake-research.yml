@@ -54,7 +54,7 @@ jobs:
           restore-keys: wake-k-v1-
       - name: Fetch official results (K files)
         run: |
-          cd work && cp research/bet-modes-20261106/kfetch.py research/ashi-marks-20261112/kfetch.py
+          cd work && mkdir -p research/ashi-marks-20261112 && cp research/bet-modes-20261106/kfetch.py research/ashi-marks-20261112/kfetch.py
           python research/ashi-marks-20261112/kfetch.py 2021-10-17 2026-11-11 > ../logs/kfetch.log 2>&1 || (tail -5 ../logs/kfetch.log; exit 1)
           tail -1 ../logs/kfetch.log
       - name: Save official results cache
