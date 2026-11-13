@@ -71,7 +71,7 @@ jobs:
           path: work/research/ashi-marks-20261112/data_k
           key: wake-k-v1-${{ github.run_id }}
       - name: Restore model output (analyze-only mode)
-        if: contains(env.MODE, 'analyze')
+        if: contains(env.MODE, 'analyze') || contains(env.MODE, 'tickets')
         uses: actions/cache/restore@v4
         with:
           path: enc
@@ -103,6 +103,19 @@ jobs:
           set -euo pipefail
           if [[ "$MODE" == *analyze* ]]; then openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/out.enc | tar xz -C work/research/hit-miss-20261113; fi
           python work/research/hit-miss-20261113/analyze.py > logs/analyze.log 2>&1
+      - name: Ticket-building tests
+        if: contains(env.MODE, 'tickets')
+        run: |
+          set -euo pipefail
+          f=work/research/hit-miss-20261113; [ -f $f/out/races.npz ] || openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/out.enc | tar xz -C $f
+          python $f/tickets.py > logs/tickets.log 2>&1
+      - name: Upload encrypted model output
+        if: contains(env.MODE, 'tickets')
+        uses: actions/upload-artifact@v4
+        with:
+          name: out-enc
+          path: enc/out.enc
+          retention-days: 2
       - name: Save results (private table)
         if: always()
         run: |
@@ -119,7 +132,7 @@ jobs:
               print('token retry', e); time.sleep(5 * (i + 1))
           run = os.environ['GITHUB_RUN_ID']; base = pathlib.Path('work/research/hit-miss-20261113')
           files = {f'logs/{p.name}': p for p in pathlib.Path('logs').glob('*.log')}
-          for n in ('report.json', 'report_v4r.json', 'analysis.txt', 'analysis.json', 'v4r/wake-probability-model-v4.json', 'v4r/placement-v4-fixtures.json'):
+          for n in ('tickets.txt', 'report.json', 'report_v4r.json', 'analysis.txt', 'analysis.json', 'v4r/wake-probability-model-v4.json', 'v4r/placement-v4-fixtures.json'):
               if (base / n).exists(): files[n] = base / n
           for name, p in files.items():
               text = p.read_text(errors='replace')
