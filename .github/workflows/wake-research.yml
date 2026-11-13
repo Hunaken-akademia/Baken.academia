@@ -71,34 +71,37 @@ jobs:
           path: work/research/ashi-marks-20261112/data_k
           key: wake-k-v1-${{ github.run_id }}
       - name: Restore model output (analyze-only mode)
-        if: env.MODE == 'analyze'
+        if: contains(env.MODE, 'analyze')
         uses: actions/cache/restore@v4
         with:
           path: enc
           key: wake-hitmiss-out-v1-${{ github.run_id }}
           restore-keys: wake-hitmiss-out-v1-
       - name: Export
-        if: env.MODE != 'analyze' && env.K_OK == '1'
+        if: (contains(env.MODE, 'full') || contains(env.MODE, 'train')) && env.K_OK == '1'
         run: node work/research/hit-miss-20261113/export.mjs 2025-06-01 2026-11-11 > logs/export.log 2>&1
       - name: Smoke test
-        if: env.MODE != 'analyze' && env.K_OK == '1'
+        if: contains(env.MODE, 'full') && env.K_OK == '1'
         run: SMOKE=1 python work/research/hit-miss-20261113/hitmiss.py > logs/smoke.log 2>&1
       - name: Model (1 year, cross-fit)
-        if: env.MODE != 'analyze' && env.K_OK == '1'
+        if: contains(env.MODE, 'full') && env.K_OK == '1'
         run: |
           python work/research/hit-miss-20261113/hitmiss.py > logs/model.log 2>&1
           mkdir -p enc && tar cz -C work/research/hit-miss-20261113 out report.json | openssl enc -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -out enc/out.enc
       - name: Save model output cache
-        if: env.MODE != 'analyze' && env.K_OK == '1'
+        if: contains(env.MODE, 'full') && env.K_OK == '1'
         uses: actions/cache/save@v4
         with:
           path: enc
           key: wake-hitmiss-out-v1-${{ github.run_id }}
+      - name: Train v4 with race number
+        if: contains(env.MODE, 'train') && env.K_OK == '1'
+        run: python work/research/hit-miss-20261113/train_v4r.py > logs/train_v4r.log 2>&1
       - name: Analyse
-        if: env.K_OK == '1'
+        if: (contains(env.MODE, 'full') || contains(env.MODE, 'analyze')) && env.K_OK == '1'
         run: |
           set -euo pipefail
-          if [ "$MODE" = analyze ]; then openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/out.enc | tar xz -C work/research/hit-miss-20261113; fi
+          if [[ "$MODE" == *analyze* ]]; then openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/out.enc | tar xz -C work/research/hit-miss-20261113; fi
           python work/research/hit-miss-20261113/analyze.py > logs/analyze.log 2>&1
       - name: Save results (private table)
         if: always()
@@ -116,7 +119,7 @@ jobs:
               print('token retry', e); time.sleep(5 * (i + 1))
           run = os.environ['GITHUB_RUN_ID']; base = pathlib.Path('work/research/hit-miss-20261113')
           files = {f'logs/{p.name}': p for p in pathlib.Path('logs').glob('*.log')}
-          for n in ('report.json', 'analysis.txt', 'analysis.json'):
+          for n in ('report.json', 'report_v4r.json', 'analysis.txt', 'analysis.json', 'v4r/wake-probability-model-v4.json', 'v4r/placement-v4-fixtures.json'):
               if (base / n).exists(): files[n] = base / n
           for name, p in files.items():
               text = p.read_text(errors='replace')
