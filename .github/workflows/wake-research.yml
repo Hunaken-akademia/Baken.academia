@@ -1,0 +1,116 @@
+name: WAKE research (private bundle)
+
+# WAKE（競艇）の研究計算を、この公開リポジトリの Actions で回す（2026-11-13）。
+# コード一式は暗号化して置いてあり（.github/wake-research/bundle.enc）、鍵は Supabase の関数 github-wake-research が
+# GitHub の OIDC でこのワークフロー・このブランチからの実行だと確かめたときだけ渡す。
+# データの読み取りと結果の保存もその関数経由。ログには数字を出さない（結果は非公開の表に保存）。
+on:
+  push:
+    branches: [claude/project-thread-xrrwrr]
+    paths: [.github/wake-research/trigger.txt]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: wake-research
+  cancel-in-progress: false
+
+env:
+  WAKE_BROKER_URL: https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-wake-research
+  JOB: hit-miss-20261113
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q numpy scipy
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libarchive-dev >/dev/null
+      - name: Unpack private bundle
+        run: |
+          set -euo pipefail
+          tok=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=wake-research-v1" | jq -r .value)
+          key=$(curl -fsS -X POST "$WAKE_BROKER_URL" -H "Authorization: Bearer $tok" -H 'Content-Type: application/json' -d '{"action":"key"}' | jq -r .key)
+          echo "::add-mask::$key"
+          echo "WAKE_KEY=$key" >> "$GITHUB_ENV"
+          mkdir -p work logs
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$key" -in .github/wake-research/bundle.enc | tar xz -C work
+          echo "MODE=$(cat .github/wake-research/mode.txt)" >> "$GITHUB_ENV"
+      - name: Restore official results cache
+        uses: actions/cache/restore@v4
+        with:
+          path: work/research/ashi-marks-20261112/data_k
+          key: wake-k-v1-${{ github.run_id }}
+          restore-keys: wake-k-v1-
+      - name: Fetch official results (K files)
+        run: |
+          cd work && cp research/bet-modes-20261106/kfetch.py research/ashi-marks-20261112/kfetch.py
+          python research/ashi-marks-20261112/kfetch.py 2021-10-17 2026-11-11 > ../logs/kfetch.log 2>&1 || (tail -5 ../logs/kfetch.log; exit 1)
+          tail -1 ../logs/kfetch.log
+      - name: Save official results cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: work/research/ashi-marks-20261112/data_k
+          key: wake-k-v1-${{ github.run_id }}
+      - name: Restore model output (analyze-only mode)
+        if: env.MODE == 'analyze'
+        uses: actions/cache/restore@v4
+        with:
+          path: enc
+          key: wake-hitmiss-out-v1-${{ github.run_id }}
+          restore-keys: wake-hitmiss-out-v1-
+      - name: Export
+        if: env.MODE != 'analyze'
+        run: node work/research/hit-miss-20261113/export.mjs 2025-06-01 2026-11-11 > logs/export.log 2>&1
+      - name: Smoke test
+        if: env.MODE != 'analyze'
+        run: SMOKE=1 python work/research/hit-miss-20261113/hitmiss.py > logs/smoke.log 2>&1
+      - name: Model (1 year, cross-fit)
+        if: env.MODE != 'analyze'
+        run: |
+          python work/research/hit-miss-20261113/hitmiss.py > logs/model.log 2>&1
+          mkdir -p enc && tar cz -C work/research/hit-miss-20261113 out report.json | openssl enc -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -out enc/out.enc
+      - name: Save model output cache
+        if: env.MODE != 'analyze'
+        uses: actions/cache/save@v4
+        with:
+          path: enc
+          key: wake-hitmiss-out-v1-${{ github.run_id }}
+      - name: Analyse
+        run: |
+          set -euo pipefail
+          if [ "$MODE" = analyze ]; then openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/out.enc | tar xz -C work/research/hit-miss-20261113; fi
+          python work/research/hit-miss-20261113/analyze.py > logs/analyze.log 2>&1
+      - name: Save results (private table)
+        if: always()
+        run: |
+          python - <<'PY'
+          import os, json, urllib.request, pathlib
+          def tok():
+              r = urllib.request.Request(os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'] + '&audience=wake-research-v1',
+                                         headers={'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+              return json.load(urllib.request.urlopen(r))['value']
+          run = os.environ['GITHUB_RUN_ID']; base = pathlib.Path('work/research/hit-miss-20261113')
+          files = {f'logs/{p.name}': p for p in pathlib.Path('logs').glob('*.log')}
+          for n in ('report.json', 'analysis.txt', 'analysis.json'):
+              if (base / n).exists(): files[n] = base / n
+          for name, p in files.items():
+              text = p.read_text(errors='replace')
+              if name.startswith('logs/'): text = '\n'.join(text.splitlines()[-400:])
+              body = json.dumps({'action': 'save', 'job': os.environ['JOB'], 'name': f'{run}/{name}', 'content': text[:5_000_000]}).encode()
+              r = urllib.request.Request(os.environ['WAKE_BROKER_URL'], data=body, method='POST',
+                                         headers={'Authorization': 'Bearer ' + tok(), 'Content-Type': 'application/json'})
+              try: urllib.request.urlopen(r).read(); print('saved', name)
+              except Exception as e: print('save failed', name, e)
+          PY
