@@ -55,8 +55,15 @@ jobs:
       - name: Fetch official results (K files)
         run: |
           cd work && mkdir -p research/ashi-marks-20261112 && cp research/bet-modes-20261106/kfetch.py research/ashi-marks-20261112/kfetch.py
-          python research/ashi-marks-20261112/kfetch.py 2021-10-17 2026-11-11 > ../logs/kfetch.log 2>&1 || (tail -5 ../logs/kfetch.log; exit 1)
-          tail -1 ../logs/kfetch.log
+          # 公式の公開データ（Kファイル）。時間がかかるので100分で区切り、続きは次の実行で（キャッシュに残る）
+          timeout 100m python research/ashi-marks-20261112/kfetch.py 2021-10-17 2026-11-11 || true
+          n=$(ls research/ashi-marks-20261112/data_k | wc -l); echo "K files: $n"
+          python - <<'PY' >> "$GITHUB_ENV"
+          import datetime as dt, pathlib
+          d = pathlib.Path('research/ashi-marks-20261112/data_k'); have = {p.name[:10] for p in d.iterdir()}
+          a = dt.date(2021, 10, 17); b = dt.date(2026, 11, 11); miss = sum((a + dt.timedelta(i)).isoformat() not in have for i in range((b - a).days + 1))
+          print(f'K_MISSING={miss}'); print('K_OK=' + ('1' if miss <= 5 else '0'))
+          PY
       - name: Save official results cache
         if: always()
         uses: actions/cache/save@v4
@@ -71,23 +78,24 @@ jobs:
           key: wake-hitmiss-out-v1-${{ github.run_id }}
           restore-keys: wake-hitmiss-out-v1-
       - name: Export
-        if: env.MODE != 'analyze'
+        if: env.MODE != 'analyze' && env.K_OK == '1'
         run: node work/research/hit-miss-20261113/export.mjs 2025-06-01 2026-11-11 > logs/export.log 2>&1
       - name: Smoke test
-        if: env.MODE != 'analyze'
+        if: env.MODE != 'analyze' && env.K_OK == '1'
         run: SMOKE=1 python work/research/hit-miss-20261113/hitmiss.py > logs/smoke.log 2>&1
       - name: Model (1 year, cross-fit)
-        if: env.MODE != 'analyze'
+        if: env.MODE != 'analyze' && env.K_OK == '1'
         run: |
           python work/research/hit-miss-20261113/hitmiss.py > logs/model.log 2>&1
           mkdir -p enc && tar cz -C work/research/hit-miss-20261113 out report.json | openssl enc -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -out enc/out.enc
       - name: Save model output cache
-        if: env.MODE != 'analyze'
+        if: env.MODE != 'analyze' && env.K_OK == '1'
         uses: actions/cache/save@v4
         with:
           path: enc
           key: wake-hitmiss-out-v1-${{ github.run_id }}
       - name: Analyse
+        if: env.K_OK == '1'
         run: |
           set -euo pipefail
           if [ "$MODE" = analyze ]; then openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/out.enc | tar xz -C work/research/hit-miss-20261113; fi
