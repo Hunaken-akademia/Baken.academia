@@ -56,7 +56,7 @@ jobs:
         run: |
           cd work && mkdir -p research/ashi-marks-20261112 && cp research/bet-modes-20261106/kfetch.py research/ashi-marks-20261112/kfetch.py
           # 公式の公開データ（Kファイル）。時間がかかるので100分で区切り、続きは次の実行で（キャッシュに残る）
-          timeout 100m python research/ashi-marks-20261112/kfetch.py 2021-10-17 2026-11-11 || true
+          timeout 100m python research/ashi-marks-20261112/kfetch.py 2021-10-17 2026-11-11 | grep -v "^failed" || true
           n=$(ls research/ashi-marks-20261112/data_k | wc -l); echo "K files: $n"
           python - <<'PY' >> "$GITHUB_ENV"
           import datetime as dt, pathlib
