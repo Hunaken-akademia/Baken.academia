@@ -105,10 +105,15 @@ jobs:
         run: |
           python - <<'PY'
           import os, json, urllib.request, pathlib
+          import time
           def tok():
+            for i in range(5):
+             try:
               r = urllib.request.Request(os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'] + '&audience=wake-research-v1',
                                          headers={'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
               return json.load(urllib.request.urlopen(r))['value']
+             except Exception as e:
+              print('token retry', e); time.sleep(5 * (i + 1))
           run = os.environ['GITHUB_RUN_ID']; base = pathlib.Path('work/research/hit-miss-20261113')
           files = {f'logs/{p.name}': p for p in pathlib.Path('logs').glob('*.log')}
           for n in ('report.json', 'analysis.txt', 'analysis.json'):
@@ -119,6 +124,7 @@ jobs:
               body = json.dumps({'action': 'save', 'job': os.environ['JOB'], 'name': f'{run}/{name}', 'content': text[:5_000_000]}).encode()
               r = urllib.request.Request(os.environ['WAKE_BROKER_URL'], data=body, method='POST',
                                          headers={'Authorization': 'Bearer ' + tok(), 'Content-Type': 'application/json'})
-              try: urllib.request.urlopen(r).read(); print('saved', name)
-              except Exception as e: print('save failed', name, e)
+              for i in range(3):
+                  try: urllib.request.urlopen(r).read(); print('saved', name); break
+                  except Exception as e: print('save failed', name, e); time.sleep(5)
           PY
