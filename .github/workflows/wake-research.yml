@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 concurrency:
@@ -131,3 +131,12 @@ jobs:
                   try: urllib.request.urlopen(r).read(); print('saved', name); break
                   except Exception as e: print('save failed', name, e); time.sleep(5)
           PY
+      - name: Return files to the branch (encrypted)
+        if: always()
+        run: |
+          set -e
+          f=work/research/hit-miss-20261113; [ -d $f/v4r ] || exit 0
+          mkdir -p .github/wake-research/out
+          tar cz -C $f v4r | openssl enc -aes-256-cbc -pbkdf2 -salt -pass "pass:$WAKE_KEY" -out .github/wake-research/out/$GITHUB_RUN_ID.enc
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/wake-research/out && git commit -qm "WAKE研究：結果ファイル（暗号化）" && git pull -q --rebase origin claude/project-thread-xrrwrr && git push -q origin HEAD:claude/project-thread-xrrwrr
