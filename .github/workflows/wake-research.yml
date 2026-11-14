@@ -108,7 +108,7 @@ jobs:
         run: |
           set -euo pipefail
           f=work/research/hit-miss-20261113; [ -f $f/out/races.npz ] || openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/out.enc | tar xz -C $f
-          if [[ "$MODE" == *t5* ]]; then node $f/export_t5.mjs 2026-08-01 2026-11-11 > logs/export_t5.log 2>&1; python $f/t5check.py > logs/t5check.log 2>&1; else python $f/tickets.py > logs/tickets.log 2>&1; fi
+          if [[ "$MODE" == *t5* ]]; then node $f/export_t5.mjs 2026-08-01 2026-11-11 > logs/export_t5.log 2>&1; python $f/t5thr.py > logs/t5thr.log 2>&1; else python $f/tickets.py > logs/tickets.log 2>&1; fi
       - name: Upload encrypted model output
         if: contains(env.MODE, 'tickets')
         uses: actions/upload-artifact@v4
@@ -132,7 +132,7 @@ jobs:
               print('token retry', e); time.sleep(5 * (i + 1))
           run = os.environ['GITHUB_RUN_ID']; base = pathlib.Path('work/research/hit-miss-20261113')
           files = {f'logs/{p.name}': p for p in pathlib.Path('logs').glob('*.log')}
-          for n in ('t5check.txt', 'tickets.txt', 'report.json', 'report_v4r.json', 'analysis.txt', 'analysis.json', 'v4r/wake-probability-model-v4.json', 'v4r/placement-v4-fixtures.json'):
+          for n in ('t5thr.txt', 't5check.txt', 'tickets.txt', 'report.json', 'report_v4r.json', 'analysis.txt', 'analysis.json', 'v4r/wake-probability-model-v4.json', 'v4r/placement-v4-fixtures.json'):
               if (base / n).exists(): files[n] = base / n
           for name, p in files.items():
               text = p.read_text(errors='replace')
