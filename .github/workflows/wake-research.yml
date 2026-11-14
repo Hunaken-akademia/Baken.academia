@@ -71,7 +71,7 @@ jobs:
           path: work/research/ashi-marks-20261112/data_k
           key: wake-k-v1-${{ github.run_id }}
       - name: Restore model output (analyze-only mode)
-        if: contains(env.MODE, 'analyze') || contains(env.MODE, 'tickets') || contains(env.MODE, 'marks') || contains(env.MODE, 'tabs') || contains(env.MODE, 'honmei')
+        if: contains(env.MODE, 'analyze') || contains(env.MODE, 'tickets') || contains(env.MODE, 'marks') || contains(env.MODE, 'tabs') || contains(env.MODE, 'honmei') || contains(env.MODE, 'live')
         uses: actions/cache/restore@v4
         with:
           path: enc
@@ -130,6 +130,13 @@ jobs:
           f=work/research/hit-miss-20261113; [ -f $f/out/races.npz ] || openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/out.enc | tar xz -C $f
           openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in .github/wake-research/honmei.enc -out $f/honmei.py
           python $f/honmei.py $f/out > logs/honmei.log 2>&1
+      - name: Honmei A / confident D and live comparison export
+        if: contains(env.MODE, 'live')
+        run: |
+          set -euo pipefail
+          f=work/research/hit-miss-20261113; [ -f $f/out/races.npz ] || openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/out.enc | tar xz -C $f
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in .github/wake-research/live.enc -out $f/live.py
+          python $f/live.py $f/out > logs/live.log 2>&1
       - name: Upload encrypted model output
         if: contains(env.MODE, 'tickets')
         uses: actions/upload-artifact@v4
@@ -153,7 +160,7 @@ jobs:
               print('token retry', e); time.sleep(5 * (i + 1))
           run = os.environ['GITHUB_RUN_ID']; base = pathlib.Path('work/research/hit-miss-20261113')
           files = {f'logs/{p.name}': p for p in pathlib.Path('logs').glob('*.log')}
-          for n in ('honmei.txt', 'tabs.txt', 'marks.txt', 't5thr.txt', 't5check.txt', 'tickets.txt', 'report.json', 'report_v4r.json', 'analysis.txt', 'analysis.json', 'v4r/wake-probability-model-v4.json', 'v4r/placement-v4-fixtures.json'):
+          for n in ('live.txt', 'live_tabs.csv', 'honmei.txt', 'tabs.txt', 'marks.txt', 't5thr.txt', 't5check.txt', 'tickets.txt', 'report.json', 'report_v4r.json', 'analysis.txt', 'analysis.json', 'v4r/wake-probability-model-v4.json', 'v4r/placement-v4-fixtures.json'):
               if (base / n).exists(): files[n] = base / n
           for name, p in files.items():
               text = p.read_text(errors='replace')
