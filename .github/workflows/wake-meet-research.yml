@@ -28,6 +28,7 @@ jobs:
     timeout-minutes: 340
     outputs:
       k_ok: ${{ steps.k.outputs.k_ok }}
+      variants: ${{ steps.v.outputs.variants }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,6 +37,8 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install -q numpy scipy
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq libarchive-dev >/dev/null
+      - id: v
+        run: echo "variants=$(cat .github/wake-meet/variants.json)" >> "$GITHUB_OUTPUT"
       - name: Unpack private bundle
         run: |
           set -euo pipefail
@@ -79,7 +82,7 @@ jobs:
         with: { name: data-enc, path: enc/data.enc, retention-days: 3 }
       - name: Smoke test
         if: steps.k.outputs.k_ok == '1'
-        run: SMOKE=1 VARIANT=ALL python $F/feat.py > logs/smoke.log 2>&1
+        run: SMOKE=1 VARIANT=ADJ python $F/feat.py > logs/smoke.log 2>&1
       - name: Save logs
         if: always()
         run: python .github/wake-meet/save.py prep logs/*.log
@@ -92,7 +95,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [base, MST, MRES, EXC, EXSTD, ALL]
+        variant: ${{ fromJSON(needs.prep.outputs.variants) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -119,6 +122,7 @@ jobs:
           set -euo pipefail
           openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/data.enc | tar xz -C $F
           VARIANT=${{ matrix.variant }} python $F/feat.py > logs/fit_${{ matrix.variant }}.log 2>&1
+          mkdir -p $F/out_${{ matrix.variant }}; cp $F/marks_course.txt $F/out_${{ matrix.variant }}/ 2>/dev/null || true
           tar cz -C $F out_${{ matrix.variant }} | openssl enc -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -out enc/out_${{ matrix.variant }}.enc
       - uses: actions/upload-artifact@v4
         with:
@@ -127,7 +131,7 @@ jobs:
           retention-days: 7
       - name: Save logs
         if: always()
-        run: python .github/wake-meet/save.py fit-${{ matrix.variant }} logs/*.log $F/out_${{ matrix.variant }}/report.json
+        run: python .github/wake-meet/save.py fit-${{ matrix.variant }} logs/*.log $F/out_${{ matrix.variant }}/report.json $F/marks_course.txt
 
   eval:
     needs: fit
