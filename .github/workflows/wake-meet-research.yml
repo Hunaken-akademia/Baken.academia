@@ -1,0 +1,160 @@
+name: WAKE research meet-st (private bundle)
+
+# WAKE（競艇）の研究計算（2026-11-15）：節間ST・節間成績・今日の展示・展示ST の上乗せ効果を1年分で確かめる。
+# 作りは wake-research.yml（claude/project-thread-xrrwrr）と同じ。コードは暗号化して置き（.github/wake-meet/bundle.enc）、
+# 鍵・データの読み取り・結果の保存は Supabase の関数 github-wake-research が GitHub の OIDC で確かめたときだけ。ログには数字を出さない。
+on:
+  push:
+    branches: [claude/project-thread-sp0497]
+    paths: [.github/wake-meet/trigger.txt]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: wake-meet-research
+  cancel-in-progress: false
+
+env:
+  WAKE_BROKER_URL: https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-wake-research
+  JOB: meet-st-20261115
+  F: work/research/meet-st-20261115
+
+jobs:
+  prep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    outputs:
+      k_ok: ${{ steps.k.outputs.k_ok }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy scipy
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libarchive-dev >/dev/null
+      - name: Unpack private bundle
+        run: |
+          set -euo pipefail
+          tok=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=wake-research-v1" | jq -r .value)
+          key=$(curl -fsS -X POST "$WAKE_BROKER_URL" -H "Authorization: Bearer $tok" -H 'Content-Type: application/json' -d '{"action":"key"}' | jq -r .key)
+          echo "::add-mask::$key"; echo "WAKE_KEY=$key" >> "$GITHUB_ENV"
+          mkdir -p work logs
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$key" -in .github/wake-meet/bundle.enc | tar xz -C work
+      - name: Restore official results cache
+        uses: actions/cache/restore@v4
+        with:
+          path: work/research/ashi-marks-20261112/data_k
+          key: wake-meet-k-v1-${{ github.run_id }}
+          restore-keys: wake-meet-k-v1-
+      - name: Fetch official results (K files)
+        id: k
+        run: |
+          cd work && mkdir -p research/ashi-marks-20261112 && cp research/bet-modes-20261106/kfetch.py research/ashi-marks-20261112/kfetch.py
+          timeout 230m python research/ashi-marks-20261112/kfetch.py 2021-10-17 2026-11-11 | grep -v "^failed" || true
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import datetime as dt, pathlib
+          d = pathlib.Path('research/ashi-marks-20261112/data_k'); have = {p.name[:10] for p in d.iterdir()}
+          a = dt.date(2021, 10, 17); b = dt.date(2026, 11, 11); miss = sum((a + dt.timedelta(i)).isoformat() not in have for i in range((b - a).days + 1))
+          print('k_ok=' + ('1' if miss <= 5 else '0'))
+          PY
+      - name: Save official results cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: work/research/ashi-marks-20261112/data_k
+          key: wake-meet-k-v1-${{ github.run_id }}
+      - name: Export DB tables
+        if: steps.k.outputs.k_ok == '1'
+        run: |
+          set -euo pipefail
+          node $F/export.mjs 2025-06-01 2026-11-11 > logs/export.log 2>&1
+          node $F/export_t5.mjs 2026-08-01 2026-11-11 > logs/export_t5.log 2>&1
+          mkdir -p enc && tar cz -C $F data | openssl enc -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -out enc/data.enc
+      - uses: actions/upload-artifact@v4
+        if: steps.k.outputs.k_ok == '1'
+        with: { name: data-enc, path: enc/data.enc, retention-days: 3 }
+      - name: Smoke test
+        if: steps.k.outputs.k_ok == '1'
+        run: SMOKE=1 VARIANT=ALL python $F/feat.py > logs/smoke.log 2>&1
+      - name: Save logs
+        if: always()
+        run: python .github/wake-meet/save.py prep logs/*.log
+
+  fit:
+    needs: prep
+    if: needs.prep.outputs.k_ok == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [base, MST, MRES, EXC, EXSTD, ALL]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy scipy
+      - name: Unpack private bundle
+        run: |
+          set -euo pipefail
+          tok=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=wake-research-v1" | jq -r .value)
+          key=$(curl -fsS -X POST "$WAKE_BROKER_URL" -H "Authorization: Bearer $tok" -H 'Content-Type: application/json' -d '{"action":"key"}' | jq -r .key)
+          echo "::add-mask::$key"; echo "WAKE_KEY=$key" >> "$GITHUB_ENV"
+          mkdir -p work logs
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$key" -in .github/wake-meet/bundle.enc | tar xz -C work
+      - name: Restore official results cache
+        uses: actions/cache/restore@v4
+        with:
+          path: work/research/ashi-marks-20261112/data_k
+          key: wake-meet-k-v1-${{ github.run_id }}
+          restore-keys: wake-meet-k-v1-
+      - uses: actions/download-artifact@v4
+        with: { name: data-enc, path: enc }
+      - name: Fit
+        run: |
+          set -euo pipefail
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/data.enc | tar xz -C $F
+          VARIANT=${{ matrix.variant }} python $F/feat.py > logs/fit_${{ matrix.variant }}.log 2>&1
+          tar cz -C $F out_${{ matrix.variant }} | openssl enc -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -out enc/out_${{ matrix.variant }}.enc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: out-${{ matrix.variant }}
+          path: enc/out_${{ matrix.variant }}.enc
+          retention-days: 7
+      - name: Save logs
+        if: always()
+        run: python .github/wake-meet/save.py fit-${{ matrix.variant }} logs/*.log $F/out_${{ matrix.variant }}/report.json
+
+  eval:
+    needs: fit
+    if: always() && needs.fit.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy scipy
+      - name: Unpack private bundle
+        run: |
+          set -euo pipefail
+          tok=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=wake-research-v1" | jq -r .value)
+          key=$(curl -fsS -X POST "$WAKE_BROKER_URL" -H "Authorization: Bearer $tok" -H 'Content-Type: application/json' -d '{"action":"key"}' | jq -r .key)
+          echo "::add-mask::$key"; echo "WAKE_KEY=$key" >> "$GITHUB_ENV"
+          mkdir -p work logs
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$key" -in .github/wake-meet/bundle.enc | tar xz -C work
+      - uses: actions/download-artifact@v4
+        with: { path: enc, merge-multiple: true }
+      - name: Evaluate
+        run: |
+          set -euo pipefail
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/data.enc | tar xz -C $F
+          for f in enc/out_*.enc; do openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in $f | tar xz -C $F; done
+          python $F/evalv.py > logs/eval.log 2>&1
+      - name: Save results
+        if: always()
+        run: python .github/wake-meet/save.py eval logs/*.log $F/evalv.txt
