@@ -121,7 +121,12 @@ jobs:
         run: |
           set -euo pipefail
           openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/data.enc | tar xz -C $F
-          VARIANT=${{ matrix.variant }} python $F/feat.py > logs/fit_${{ matrix.variant }}.log 2>&1
+          if [ "${{ matrix.variant }}" = train ]; then
+            python $F/train_v4a.py > logs/fit_train.log 2>&1
+            mkdir -p $F/out_train && cp -r $F/v4a $F/ashi-marks-model.json $F/report_v4a.json $F/out_train/
+          else
+            VARIANT=${{ matrix.variant }} python $F/feat.py > logs/fit_${{ matrix.variant }}.log 2>&1
+          fi
           mkdir -p $F/out_${{ matrix.variant }}; cp $F/marks_course.txt $F/out_${{ matrix.variant }}/ 2>/dev/null || true
           tar cz -C $F out_${{ matrix.variant }} | openssl enc -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -out enc/out_${{ matrix.variant }}.enc
       - uses: actions/upload-artifact@v4
