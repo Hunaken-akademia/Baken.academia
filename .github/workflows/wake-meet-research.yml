@@ -163,7 +163,7 @@ jobs:
           set -euo pipefail
           openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/data.enc | tar xz -C $F
           for f in enc/out_*.enc; do openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in $f | tar xz -C $F; done
-          python $F/evalv.py > logs/eval.log 2>&1
+          python $F/preeval.py > logs/eval.log 2>&1
       - name: Save results
         if: always()
         run: python .github/wake-meet/save.py eval logs/*.log $F/evalv.txt
