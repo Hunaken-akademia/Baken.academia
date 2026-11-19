@@ -729,7 +729,7 @@ function FreeVenueScreen({
         <p className="text-sm font-semibold text-cyan-300">REIN 無料版・ログイン不要</p>
         <h1 className="mt-1 text-2xl font-black">本日の無料公開（{label}競馬）</h1>
         <p className="mt-2 text-sm leading-6 text-slate-300">
-          毎日、{label}競馬の1場を選んで（重賞のある場を優先）、全レースを会員版と同じ画面で公開しています。
+          毎日、{label}競馬の1場を選んで、全レースを会員版と同じ画面で公開しています（重賞のある場は会員版のみ）。
         </p>
         <p className="mt-1 text-xs text-slate-400">{schedule?.dateLabel || "本日の開催情報を取得中"}</p>
       </section>
@@ -769,7 +769,7 @@ function FreeVenueScreen({
       <a href={other.href} className="mt-4 block rounded-2xl border border-slate-700 bg-[#0c192a] p-4 text-sm font-bold text-slate-200 hover:border-cyan-400/60">
         {other.label}競馬の本日の無料公開も見る →
       </a>
-      <FreeLocked className="mt-5" title="ほかの場・明日の予想・過去の開催" text="会員版では、その日の全場・全レースに加えて、明日の予想、過去1年の開催、レース検索、オッズの動き一覧、成績、お気に入りが使えます。" />
+      <FreeLocked className="mt-5" title="ほかの場・明日の予想・過去の開催" text="会員版では、重賞を含むその日の全場・全レースに加えて、明日の予想、過去1年の開催、レース検索、オッズの動き一覧、成績、お気に入りが使えます。" />
     </>
   );
 }

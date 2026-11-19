@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCache } from "@vercel/functions";
 import { dateJst } from "@/lib/server-snapshots";
-import { freeLeagueOf, pickFreeVenue, venueHasRace } from "@/lib/free-day.mjs";
+import { freeLeagueOf, pickFreeVenue, raceGradeLevel, venueHasRace } from "@/lib/free-day.mjs";
 import { GET as jraSchedule } from "@/app/api/races/route";
 import { GET as narSchedule } from "@/app/api/nar/races/route";
 
@@ -34,7 +34,9 @@ export async function freeVenueToday(league: FreeLeague, origin: string) {
     venue = (pickFreeVenue(venues, date, league) as FreeVenue | null) ?? undefined;
     if (venue) await chosen.set(key, venue.eventId, { ttl: 36 * 3600 }).catch(() => {});
   }
-  return { date, schedule, venue: venue ?? null };
+  // 全場に重賞がある日でも、重賞レースそのものは無料版に出さない。
+  const open = venue ? { ...venue, races: venue.races.filter((race) => raceGradeLevel(race.title) === null) } : null;
+  return { date, schedule, venue: open?.races.length ? open : null };
 }
 
 // raceId が本日の無料公開レースか確かめる。通らなければエラーの返答を返す。

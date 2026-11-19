@@ -1,5 +1,6 @@
 // REIN 無料版：毎日「中央1場・地方1場」をログイン無しで公開する。WAKE 無料版（wake-free）と同じ考え方で、
-// その日に開催している場から日付（日本時間）を元に全員共通の1場を選ぶ。重賞のある場を優先する（G1/JpnI > G2 > G3）。
+// その日に開催している場から日付（日本時間）を元に全員共通の1場を選ぶ。重賞のある場は除く（重賞は会員版で見てもらう）。
+// 全場に重賞がある日だけ、いちばん格の低い場から選ぶ。
 // 他の場・他のレースを開けない制限はサーバー側（app/api/free/*）でかける。
 
 // 「ジャパンC(GI)」「JBCクラシック（JpnI）」「(G3)」などから格を読む。数字が小さいほど上の格。
@@ -29,8 +30,8 @@ function hash(text) {
 export function pickFreeVenue(venues, date, league) {
   const open = (venues ?? []).filter((venue) => venue?.eventId && venue.races?.length);
   if (!open.length) return null;
-  const best = Math.max(...open.map(venueGradeScore));
-  const candidates = open.filter((venue) => venueGradeScore(venue) === best)
+  const lowest = Math.min(...open.map(venueGradeScore));
+  const candidates = open.filter((venue) => venueGradeScore(venue) === lowest)
     .sort((a, b) => String(a.eventId).localeCompare(String(b.eventId)));
   return candidates[hash(`${date}:${league}`) % candidates.length];
 }

@@ -13,10 +13,15 @@ test("reads JRA and NAR grade marks from race titles", () => {
   assert.equal(raceGradeLevel("Gallop賞"), null);
 });
 
-test("prefers the venue holding the highest graded race", () => {
+test("leaves graded-race venues to members", () => {
   const venues = [venue("26050508", ["2歳未勝利", "京阪杯（G3）"]), venue("26080508", ["1勝クラス", "ジャパンC(GI)"]), venue("26090508", ["2歳新馬"])];
   assert.equal(venueGradeScore(venues[1]), 3);
-  for (const date of ["2026-11-29", "2026-11-30", "2026-12-01"]) assert.equal(pickFreeVenue(venues, date, "jra").eventId, "26080508");
+  for (const date of ["2026-11-29", "2026-11-30", "2026-12-01"]) assert.equal(pickFreeVenue(venues, date, "jra").eventId, "26090508");
+});
+
+test("when every venue has a graded race, picks the lowest grade", () => {
+  const venues = [venue("26050508", ["京阪杯（G3）"]), venue("26080508", ["ジャパンC(GI)"])];
+  assert.equal(pickFreeVenue(venues, "2026-11-29", "jra").eventId, "26050508");
 });
 
 test("picks the same venue for everyone on a date regardless of list order", () => {
