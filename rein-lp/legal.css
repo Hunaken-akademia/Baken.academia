@@ -1,0 +1,31 @@
+:root{--bg:#07111f;--card:#0f1f33;--line:#1f3a58;--text:#eef4fa;--sub:#a7b9cd;--mute:#7a8ea6;--gold:#22d3ee;--blue:#67e8f9}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,system-ui,sans-serif;line-height:1.85;-webkit-text-size-adjust:100%}
+a{color:var(--blue)}
+header{border-bottom:1px solid var(--line);background:rgba(7,17,31,.9)}
+header .in{max-width:860px;margin:0 auto;padding:0 16px;height:56px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-weight:900;letter-spacing:.18em;font-size:18px;color:var(--text);text-decoration:none}
+.logo span{color:var(--gold)}
+header nav a{font-size:13px;color:var(--sub);text-decoration:none}
+main{max-width:860px;margin:0 auto;padding:36px 16px 64px}
+h1{font-size:clamp(24px,5vw,32px);line-height:1.4;margin-bottom:8px}
+.updated{color:var(--mute);font-size:13px;margin-bottom:28px}
+.lead{color:var(--sub);margin-bottom:24px}
+h2{font-size:18px;margin:32px 0 10px;padding-left:10px;border-left:4px solid var(--gold);line-height:1.5}
+p,li{font-size:15px}
+p+p{margin-top:8px}
+ol,ul{padding-left:1.4em;display:grid;gap:6px;margin-top:6px}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th,td{padding:14px;border:1px solid var(--line);text-align:left;vertical-align:top;font-size:14.5px}
+th{width:28%;background:#0a1626;color:#a5f3fc;font-weight:700}
+td{background:var(--card)}
+td small{display:block;color:var(--mute);font-size:12.5px;margin-top:4px}
+.note{margin-top:28px;padding:16px;background:var(--card);border:1px solid var(--line);border-radius:12px;font-size:14px;color:var(--sub)}
+footer{border-top:1px solid var(--line);padding:24px 16px 40px;color:var(--mute);font-size:13px}
+footer .in{max-width:860px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px 20px}
+footer a{color:var(--sub);text-decoration:none}
+@media (max-width:600px){
+  table,tbody,tr,th,td{display:block;width:100%}
+  th{border-bottom:none}
+  td{margin-bottom:10px}
+}
