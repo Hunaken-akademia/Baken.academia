@@ -53,6 +53,7 @@ import { GradedTrends } from "@/components/graded-trends";
 import { UpdateNotice } from "@/components/update-notice";
 import { RaceCalendar } from "@/components/race-calendar";
 import { ReinCloudProvider } from "@/components/rein-cloud-provider";
+import { FreeLocked, FreeModeContext, MEMBER_PLANS_URL, useFreeMode } from "@/components/free-mode";
 import type { NarReference } from "@/lib/nar-validation";
 import type { JraRaceReference } from "@/lib/jra-reference";
 
@@ -162,7 +163,7 @@ const groupStyle = {
   穴: "bg-rose-100 text-rose-800",
 };
 
-export default function RaceDashboard({ area = "jra", children }: { area?: "jra" | "nar"; children?: React.ReactNode }) {
+export default function RaceDashboard({ area = "jra", children, free = false }: { area?: "jra" | "nar"; children?: React.ReactNode; free?: boolean }) {
   const api = area === "nar" ? "/api/nar" : "/api";
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [scheduleDay, setScheduleDay] = useState<ScheduleDay>("today");
@@ -194,7 +195,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
       setError("");
     }
     try {
-      const scheduleUrl = historicalDate ? `${api}/races?date=${historicalDate}` : `${api}/races?day=${day}`;
+      const scheduleUrl = free ? `/api/free/races?league=${area}` : historicalDate ? `${api}/races?date=${historicalDate}` : `${api}/races?day=${day}`;
       const response = await fetch(scheduleUrl);
       const result = (await response.json()) as Schedule & { error?: string };
       if (!response.ok)
@@ -237,7 +238,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
       setError(""); setFailedRace(null);
     }
     try {
-      const response = await fetch(`${api}/analyze?raceId=${race.raceId}${scheduleDay === "tomorrow" ? "&preview=1" : ""}${historicalDate ? `&date=${historicalDate}` : ""}`);
+      const response = await fetch(free ? `/api/free/analyze?raceId=${race.raceId}` : `${api}/analyze?raceId=${race.raceId}${scheduleDay === "tomorrow" ? "&preview=1" : ""}${historicalDate ? `&date=${historicalDate}` : ""}`);
       const result = (await response.json().catch(() => ({}))) as Analysis & { error?: string };
       if (serial !== analysisRequest.current || selectedRace.current !== key) return;
       if (response.status === 202) {
@@ -340,6 +341,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
   const suppressPageClickUntil = useRef(0);
 
   return (
+    <FreeModeContext.Provider value={free}>
     <main
       className="min-h-screen bg-[#07111f] text-slate-100"
       style={{ touchAction: "auto" }}
@@ -417,7 +419,9 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <a href={`/dictionary?area=${area}`} className="inline-flex min-h-11 items-center rounded-xl border border-cyan-300/30 px-3 text-sm font-bold text-cyan-200 hover:bg-cyan-300/10">辞典</a>
+            {free
+              ? <a href={MEMBER_PLANS_URL} className="inline-flex min-h-11 items-center rounded-xl bg-cyan-300 px-3 text-sm font-bold text-[#07111f] hover:bg-cyan-200">会員版へ</a>
+              : <a href={`/dictionary?area=${area}`} className="inline-flex min-h-11 items-center rounded-xl border border-cyan-300/30 px-3 text-sm font-bold text-cyan-200 hover:bg-cyan-300/10">辞典</a>}
             <Button
               aria-label={
                 data ? "最新の馬体重・馬場・オッズで再分析" : "開催情報を更新"
@@ -434,11 +438,11 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
               <RefreshCw className={loading ? "animate-spin" : ""} />
             </Button>
             <Badge className="border-cyan-400/25 bg-cyan-400/10 text-cyan-300">
-              会員版
+              {free ? "無料版" : "会員版"}
             </Badge>
           </div>
         </header>
-        <UpdateNotice />
+        {!free && <UpdateNotice />}
         {error && (
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 p-3 text-sm text-rose-200">
             <AlertTriangle className="size-4 shrink-0" />
@@ -478,6 +482,7 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
         {!venue && !data && (
           <VenueScreen
             area={area}
+            free={free}
             schedule={schedule}
             day={scheduleDay}
             loading={loading}
@@ -583,11 +588,13 @@ export default function RaceDashboard({ area = "jra", children }: { area?: "jra"
         )}
       </div>
     </main>
+    </FreeModeContext.Provider>
   );
 }
 
 function VenueScreen({
   area,
+  free = false,
   schedule,
   day,
   loading,
@@ -601,6 +608,7 @@ function VenueScreen({
   onOpenRace,
 }: {
   area: "jra" | "nar";
+  free?: boolean;
   schedule: Schedule | null;
   day: ScheduleDay;
   loading: boolean;
@@ -613,6 +621,7 @@ function VenueScreen({
   onSelectHistorical: (date: string, venue: Venue) => void;
   onOpenRace: (raceId: string) => void;
 }) {
+  if (free) return <FreeVenueScreen area={area} schedule={schedule} loading={loading} onSelect={onSelect} />;
   return (
     <>
       <section className="mb-5 rounded-2xl border border-slate-700 bg-gradient-to-br from-[#10233a] to-[#0b1727] p-5">
@@ -696,6 +705,71 @@ function VenueScreen({
       {!showCalendar && !historicalDate && day === "today" && <RaceFinder league={area} onOpen={onOpenRace} />}
       {!showCalendar && !historicalDate && day === "today" && <OddsTrendBoard league={area} onOpen={onOpenRace} />}
       {!showCalendar && <PerformanceDashboard league={area} />}
+    </>
+  );
+}
+
+function FreeVenueScreen({
+  area,
+  schedule,
+  loading,
+  onSelect,
+}: {
+  area: "jra" | "nar";
+  schedule: Schedule | null;
+  loading: boolean;
+  onSelect: (venue: Venue) => void;
+}) {
+  const label = area === "nar" ? "地方" : "中央";
+  const other = area === "nar" ? { href: "/free/jra", label: "中央" } : { href: "/free/nar", label: "地方" };
+  const venue = schedule?.venues[0];
+  return (
+    <>
+      <section className="mb-5 rounded-2xl border border-cyan-300/30 bg-gradient-to-br from-[#10233a] to-[#0b1727] p-5" data-testid="free-intro">
+        <p className="text-sm font-semibold text-cyan-300">REIN 無料版・ログイン不要</p>
+        <h1 className="mt-1 text-2xl font-black">本日の無料公開（{label}競馬）</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          毎日、{label}競馬の1場を選んで（重賞のある場を優先）、全レースを会員版と同じ画面で公開しています。
+        </p>
+        <p className="mt-1 text-xs text-slate-400">{schedule?.dateLabel || "本日の開催情報を取得中"}</p>
+      </section>
+      {loading && !schedule ? (
+        <div className="grid min-h-56 place-items-center rounded-2xl border border-slate-800 bg-[#0c192a]">
+          <RefreshCw className="size-8 animate-spin text-cyan-300" />
+        </div>
+      ) : venue ? (
+        <button
+          onClick={() => onSelect(venue)}
+          className="group w-full rounded-2xl border border-cyan-400/60 bg-[#0c192a] p-5 text-left transition hover:-translate-y-0.5 hover:bg-[#10233a]"
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold tracking-widest text-cyan-300">本日の無料公開場</p>
+              <h2 className="mt-1 text-3xl font-black">{venue.name}</h2>
+            </div>
+            <ChevronRight className="text-cyan-300 transition group-hover:translate-x-1" />
+          </div>
+          <div className="mt-6 flex items-end justify-between">
+            <div>
+              <p className="text-xs text-slate-500">次レース</p>
+              <p className="text-xl font-bold">
+                {venue.nextRace > 12 ? "本日の発走予定なし" : `${venue.nextRace}R`}{" "}
+                <span className="text-sm font-normal text-slate-400">{venue.nextStart}</span>
+              </p>
+            </div>
+            <Badge className="bg-cyan-400/10 text-cyan-300">全{venue.races.length}R 無料</Badge>
+          </div>
+        </button>
+      ) : schedule ? (
+        <div className="rounded-2xl border border-slate-700 bg-[#0c192a] p-8 text-center text-slate-300">
+          <p>本日の{label}競馬の開催はありません。</p>
+          <a href={other.href} className="mt-3 inline-flex min-h-11 items-center text-cyan-200 underline">{other.label}競馬の無料公開を見る →</a>
+        </div>
+      ) : null}
+      <a href={other.href} className="mt-4 block rounded-2xl border border-slate-700 bg-[#0c192a] p-4 text-sm font-bold text-slate-200 hover:border-cyan-400/60">
+        {other.label}競馬の本日の無料公開も見る →
+      </a>
+      <FreeLocked className="mt-5" title="ほかの場・明日の予想・過去の開催" text="会員版では、その日の全場・全レースに加えて、明日の予想、過去1年の開催、レース検索、オッズの動き一覧、成績、お気に入りが使えます。" />
     </>
   );
 }
@@ -912,7 +986,8 @@ function AnalysisScreen({
   onBack: () => void;
   onHorse: (horse: Horse) => void;
 }) {
-  return <ReinCloudProvider enabled={!!activeHorse}><AnalysisScreenContent key={data.race.raceId} data={data} activeHorse={activeHorse} danger={danger} loading={loading} onRetry={onRetry} onBack={onBack} onHorse={onHorse} /></ReinCloudProvider>;
+  const free = useFreeMode();
+  return <ReinCloudProvider enabled={!free && !!activeHorse}><AnalysisScreenContent key={data.race.raceId} data={data} activeHorse={activeHorse} danger={danger} loading={loading} onRetry={onRetry} onBack={onBack} onHorse={onHorse} /></ReinCloudProvider>;
 }
 
 function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, onBack, onHorse }: {
@@ -924,6 +999,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
   onBack: () => void;
   onHorse: (horse: Horse) => void;
 }) {
+  const free = useFreeMode();
   const [analysisTab, setAnalysisTab] = useState("prediction");
   const [showAllHorses, setShowAllHorses] = useState(false);
   const favorites = useFavorites(data.race.league ?? "jra");
@@ -1061,13 +1137,15 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
         </div> : <p className="mt-3 text-sm text-amber-200">着順適性は取得待ちです。保留中の評価を補って推奨することはありません。</p>}
         <p className="mt-3 text-xs leading-5 text-slate-400">各着順の最上位を個別に表示しています。同じ馬が複数の着順に出る場合があります。この並びは買い目ではありません。</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {([["prediction", "まとめ・買い目"], ["comparison", "馬を比較"], ["formation", "展開の根拠"], ["review", "答え合わせ"]] as const).map(([tab, label]) => <button key={tab} type="button" onClick={() => changeAnalysisTab(tab)} className="min-h-11 rounded-lg border border-slate-600 px-3 text-sm hover:bg-white/5">{label}</button>)}
+          {([["prediction", free ? "まとめ" : "まとめ・買い目"], ["comparison", "馬を比較"], ["formation", "展開の根拠"], ["review", "答え合わせ"]] as const).map(([tab, label]) => <button key={tab} type="button" onClick={() => changeAnalysisTab(tab)} className="min-h-11 rounded-lg border border-slate-600 px-3 text-sm hover:bg-white/5">{label}</button>)}
         </div>
       </section>
       <details className="mb-4 rounded-xl border border-slate-700 p-3 text-slate-200">
         <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">馬場データ・オッズの変化を確認</summary>
+        {free ? <FreeLocked className="mt-2" title="馬場データ・オッズの変化" text="クッション値・含水率の比較と、発売開始からのオッズの動きは会員版で見られます。" /> : <>
         <TrackReferencePanel key={data.race.raceId} race={data.race} />
         <OddsTrendPanel race={data.race} horses={data.horses} />
+        </>}
       </details>
       <div ref={analysisNav} />
       <Tabs value={analysisTab} onValueChange={changeAnalysisTab} onSwipeBack={onBack}>
@@ -1081,11 +1159,11 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           <ConditionMatrix key={data.race.raceId} horses={data.horses} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
         </div>
 
-          {data.race.league !== "nar" && hasGradedRaceHistory(data.race) && <GradedTrends race={data.race} horses={data.horses} />}
+          {!free && data.race.league !== "nar" && hasGradedRaceHistory(data.race) && <GradedTrends race={data.race} horses={data.horses} />}
           {hasGradedRaceHistory(data.race) && <GradedRaceHistory race={data.race} onSimulate={(id,label)=>{setHistoricalScenario(old=>({id,label,version:(old?.version??0)+1}));changeAnalysisTab("formation");}} />}
           <PopularityForecast key={data.race.raceId} horses={data.horses} race={data.race} rolesReady={rolesReady} finished={data.review?.isFinished ?? false} predictionSafe={patternPredictionSafe(data.prediction, data.race.startsAt, data.review?.isFinished ?? false)} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
           <PickCards data={data} onHorse={onHorse}>
-            <TicketSummary data={data} onOpen={openTickets} />
+            {free ? <FreeLocked className="mt-3" title="参考買い目（7券種・本線/対抗/穴）" text="REINの評価から作った単勝〜3連単の参考買い目は会員版で見られます。" /> : <TicketSummary data={data} onOpen={openTickets} />}
           </PickCards>
         <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-3">
           <RaceConfidenceCard confidence={data.confidence} nar={data.race.league === "nar"} reference={data.narReference} />
@@ -1198,7 +1276,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           {rolesReady && data.model?.roleAdjustment && <p className="mt-3 rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-3 text-xs leading-5 text-cyan-100">条件付き3着補助を試験採用中：阪神・良馬場では、2着への適性も参考に3着評価を補助しています。過去検証では改善傾向がありましたが、今後も成績を確認します。</p>}
           {rolesReady && <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">人気とREINの評価差を見る</summary><MarketReinComparison data={data} horses={listHorses} /></details>}
           {rankingReady && <details className="mt-4 rounded-xl border border-slate-700 bg-[#0c192a] p-4"><summary className="cursor-pointer text-sm font-semibold">総合評価の詳しい見方</summary><OverallAssessment data={data} insights={insights} onHorse={onHorse} /></details>}
-          <details ref={ticketDetails} className="mt-5 scroll-mt-28 rounded-xl border border-slate-700 bg-[#0c192a] p-4" data-testid="ticket-details">
+          {!free && <details ref={ticketDetails} className="mt-5 scroll-mt-28 rounded-xl border border-slate-700 bg-[#0c192a] p-4" data-testid="ticket-details">
             <summary className="cursor-pointer font-bold">参考買い目（7券種・本線/対抗/穴）を開く</summary>
             <div className="mt-4">
           {data.evaluation?.tickets === "held" && (
@@ -1241,7 +1319,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
             ))}
           </div>
             </div>
-          </details>
+          </details>}
         </TabsContent>
         <TabsContent value="comparison" forceMount className="data-[state=inactive]:hidden">
           <HorseComparison horses={data.horses} rolesReady={rolesReady} overallReady={rankingReady} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} league={data.race.league} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
@@ -1301,8 +1379,10 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
 
         </TabsContent>
         <TabsContent value="jockeys">
+          {free ? <FreeLocked title="騎手の成績・お気に入り騎手" text="出走する騎手の条件別成績と、お気に入り騎手の登録は会員版で使えます。" /> : <>
           <FavoriteJockeyPicker league={data.race.league ?? "jra"} horses={data.horses} />
           <JockeyProfiles key={data.race.raceId} title={data.race.title} course={data.race.course} league={data.race.league} horses={data.horses} dateFrom={data.model?.dateFrom} dateTo={data.model?.dateTo} />
+          </>}
         </TabsContent>
         <TabsContent value="review">
           <PopularityResult horses={data.horses} finishers={data.review?.finishers ?? []} finished={data.review?.isFinished ?? false} />
@@ -1388,7 +1468,7 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
         </section>
       )}
           {!data.review?.isFinished && <HeldPanel text="確定結果の取得後に、全着順と保存した予想を比較できます。" />}
-          <PredictionJournal data={data} />
+          {free ? <FreeLocked className="mt-4" title="保存した予想の答え合わせ" text="発走前に保存したREINの予想と確定結果の照合は会員版で見られます。" /> : <PredictionJournal data={data} />}
         </TabsContent>
       </Tabs>
     </div>
@@ -2343,6 +2423,7 @@ function MarketReinPanel({ horse, horses }: { horse: Horse; horses: Horse[] }) {
 }
 
 function HorseDetails({ horse, data }: { horse: Horse; data: Analysis }) {
+  const free = useFreeMode();
   const horses = data.horses;
   const rolesReady = roleReady(data);
   const signed = signedNumber;
@@ -2475,10 +2556,10 @@ function HorseDetails({ horse, data }: { horse: Horse; data: Analysis }) {
         </div>
       </section>
       </details>
-      <details className="mt-4 rounded-xl border border-slate-700 p-4">
+      {!free && <details className="mt-4 rounded-xl border border-slate-700 p-4">
         <summary className="cursor-pointer text-sm font-semibold">この馬のメモ</summary>
         <HorseNotebook horseId={horse.horseId} name={horse.name} />
-      </details>
+      </details>}
       {horse.trainer || horse.pedigree ? (
         <p className="mt-3 text-xs leading-5 text-slate-500">
           調教師：{horse.trainer || "取得中"}

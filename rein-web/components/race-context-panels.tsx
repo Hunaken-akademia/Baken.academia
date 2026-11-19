@@ -4,6 +4,7 @@ import type { Horse } from "@/lib/horse-types";
 import type { RaceContextData } from "@/lib/race-context-types";
 import { daysBetween } from "@/lib/previous-run";
 import { raceSurface, type TrendGroup } from "@/lib/race-day-trends";
+import { useFreeMode } from "@/components/free-mode";
 
 type Race = { raceId: string; league?: "jra" | "nar"; title: string; course: string; condition: string };
 const cached = new Map<string, { until: number; promise: Promise<RaceContextData> }>();
@@ -21,7 +22,10 @@ function requestContext(url: string) {
   return promise;
 }
 export function useRaceContext(race: Race): { data?: RaceContextData; error?: string; loading: boolean; retry: () => void } {
-  const url = `${race.league === "nar" ? "/api/nar" : "/api"}/analyze/context?raceId=${encodeURIComponent(race.raceId)}`;
+  const free = useFreeMode();
+  const url = free
+    ? `/api/free/context?raceId=${encodeURIComponent(race.raceId)}`
+    : `${race.league === "nar" ? "/api/nar" : "/api"}/analyze/context?raceId=${encodeURIComponent(race.raceId)}`;
   const [attempt, setAttempt] = useState(0), [state, setState] = useState<{ url: string; data?: RaceContextData; error?: string; loading: boolean }>({ url, loading: true });
   useEffect(() => {
     let active = true;
