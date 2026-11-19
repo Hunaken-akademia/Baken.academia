@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/rein-live?area=nar",
       "schedule": "5,15,25,35,45,55 23,0-12 * * *"
+    },
+    {
+      "path": "/api/cron/rein-bookers-codes",
+      "schedule": "3 * * * *"
     }
   ],
   "functions": {

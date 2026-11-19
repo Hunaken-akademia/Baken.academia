@@ -1,14 +1,15 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { hasActiveReinAccess, type ReinMembership } from "@/lib/rein-access";
+import { BookersCodeForm } from "./bookers-code-form";
 
 export const dynamic = "force-dynamic";
 
 function messageFor(membership: ReinMembership | null, now: Date) {
   if (!membership) {
     return {
-      title: "CAMPFIRE会員情報を確認できません",
-      body: "CAMPFIREで登録したGoogleアドレスと、現在ログインしているGoogleアカウントが一致しているか確認してください。",
+      title: "利用権を確認できません",
+      body: "BOOKERSでご加入の方は、下の欄に今月の合言葉を入れてください。CAMPFIREでご加入の方は、登録したGoogleアドレスと現在ログインしているGoogleアカウントが一致しているか確認してください。",
     };
   }
   if (membership.status === "paused") {
@@ -27,12 +28,12 @@ function messageFor(membership: ReinMembership | null, now: Date) {
   if (membership.access_ends_at && now >= new Date(membership.access_ends_at)) {
     return {
       title: "利用期間が終了しています",
-      body: "CAMPFIREの会員状態をご確認ください。",
+      body: "BOOKERSでご加入の方は、会員限定記事で今月の合言葉を確かめて、下の欄に入れてください。CAMPFIREでご加入の方は会員状態をご確認ください。",
     };
   }
   return {
     title: "利用権を確認中です",
-    body: "CAMPFIRE側の登録情報とGoogleアカウントの照合をご確認ください。",
+    body: "BOOKERSでご加入の方は、下の欄に今月の合言葉を入れてください。",
   };
 }
 
@@ -72,9 +73,10 @@ export default async function AccessPage() {
           <h1 className="mt-6 text-2xl font-black">{message.title}</h1>
           <p className="mt-3 leading-7 text-slate-300">{message.body}</p>
 
+          <BookersCodeForm />
+
           <div className="mt-6 rounded-2xl border border-slate-700 bg-black/15 p-4 text-sm text-slate-400">
             <p>中央・地方とも会員向け公開中。会員情報の利用期間・プランに従って表示します。</p>
-            <p className="mt-1">CAMPFIRE特典：初月無料（参加した最初の月の参加費が無料）</p>
           </div>
 
           <form action="/auth/signout" method="post" className="mt-6">

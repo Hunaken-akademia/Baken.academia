@@ -4,7 +4,7 @@ import { createApiAbuseGuard, equalSecret } from './api-abuse-guard.mjs';
 const guard = createApiAbuseGuard({ application: 'rein', isTrustedInternal(request: Request) {
   const path = new URL(request.url).pathname;
   const internalPath = ['/api/races', '/api/analyze', '/api/nar/races', '/api/nar/analyze',
-    '/api/cron/rein-live', '/api/internal/history-profile'].includes(path);
+    '/api/cron/rein-live', '/api/cron/rein-bookers-codes', '/api/internal/history-profile'].includes(path);
   return internalPath && equalSecret(request.headers.get('authorization'),
     process.env.CRON_SECRET ? `Bearer ${process.env.CRON_SECRET}` : '');
 } });
