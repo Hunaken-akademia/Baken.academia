@@ -69,6 +69,10 @@ export default async function LoginPage({
 
           <GoogleSignInButton />
 
+          <a href="/free" className="mt-4 flex min-h-11 items-center justify-center rounded-xl border border-cyan-300/30 text-sm font-bold text-cyan-200 hover:bg-cyan-300/10">
+            まずは無料版を見る（ログイン不要・毎日1場）
+          </a>
+
           <p className="mt-5 text-xs leading-5 text-slate-500">
             CAMPFIREでご加入の方は、登録時に申請したGoogleアドレスと同じアカウントでログインしてください。
           </p>

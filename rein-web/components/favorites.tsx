@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Star } from "lucide-react";
 import { jockeyKey, type FavoriteJockey, type FavoriteMatch, type League } from "@/lib/favorites";
+import { useFreeMode } from "@/components/free-mode";
 
 type Saved = { jockeys: FavoriteJockey[]; horses: Array<{ horseId: string; name: string }> };
 type Today = Saved & { date: string; matches: FavoriteMatch[] };
@@ -18,9 +19,12 @@ async function readJson<T>(response: Response) {
 }
 
 export function useFavorites(league: League) {
+  const free = useFreeMode();
   const [saved, setSaved] = useState<Saved | null>(() => shared.get(league)?.value ?? null);
   const [status, setStatus] = useState("");
   useEffect(() => {
+    // 無料版はログイン無しなので、アカウントのお気に入りは読まない。
+    if (free) return;
     const sync = () => setSaved(shared.get(league)?.value ?? null);
     listeners.add(sync);
     const cached = shared.get(league);
@@ -31,7 +35,7 @@ export function useFavorites(league: League) {
         .catch(() => setStatus("お気に入りを読み込めませんでした"));
     }
     return () => { listeners.delete(sync); };
-  }, [league]);
+  }, [league, free]);
   const toggleJockey = useCallback(async (key: string, name: string) => {
     const active = shared.get(league)?.value.jockeys.some((jockey) => jockey.key === key);
     setStatus("保存中…");
