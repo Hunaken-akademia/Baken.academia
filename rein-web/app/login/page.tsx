@@ -38,15 +38,14 @@ export default async function LoginPage({
             </div>
           </div>
 
-          <p className="text-sm font-semibold text-cyan-300">CAMPFIRE MEMBERS ONLY</p>
+          <p className="text-sm font-semibold text-cyan-300">MEMBERS ONLY</p>
           <h1 className="mt-2 text-2xl font-black">Googleログイン</h1>
           <p className="mt-3 text-sm leading-6 text-slate-400">
-            CAMPFIRE登録時に申請したGoogleアドレスと、同じGoogleアカウントでログインしてください。
+            Googleでログインしてください。BOOKERSでご加入の方は、ログイン後に会員限定記事の合言葉を入れると使えるようになります。
           </p>
 
           <div className="my-6 rounded-2xl border border-cyan-400/20 bg-cyan-400/[.06] p-4 text-sm">
             <p className="font-bold text-cyan-200">中央・地方とも会員向け公開中</p>
-            <p className="mt-1 text-slate-300">全3プランでCAMPFIREの「初月無料」をご利用いただけます。参加した最初の月の参加費が無料になります。</p>
           </div>
 
           <div className="mb-6 grid gap-2 text-sm">
@@ -70,7 +69,7 @@ export default async function LoginPage({
           <GoogleSignInButton />
 
           <p className="mt-5 text-xs leading-5 text-slate-500">
-            ログイン後、GoogleアドレスとCAMPFIRE会員情報を照合して利用権を確認します。
+            CAMPFIREでご加入の方は、登録時に申請したGoogleアドレスと同じアカウントでログインしてください。
           </p>
         </section>
       </div>
