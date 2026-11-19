@@ -48,16 +48,17 @@ export default async function LoginPage({
             <p className="font-bold text-cyan-200">中央・地方とも会員向け公開中</p>
           </div>
 
+          <p className="mb-2 text-xs text-slate-400">BOOKERSで加入する（プランを押すと加入ページが開きます）</p>
           <div className="mb-6 grid gap-2 text-sm">
-            <div className="flex items-center justify-between rounded-xl border border-slate-700 bg-black/10 px-4 py-3">
+            <a href="https://bookers.tech/magazine/9aee480f-e4f7-4d14-b4b5-8ae381512a8f/" target="_blank" rel="noreferrer" className="flex items-center justify-between transition hover:bg-white/5 rounded-xl border border-slate-700 bg-black/10 px-4 py-3">
               <span className="font-semibold">地方競馬</span><span className="text-amber-300">月額 800円</span>
-            </div>
-            <div className="flex items-center justify-between rounded-xl border border-slate-700 bg-black/10 px-4 py-3">
+            </a>
+            <a href="https://bookers.tech/magazine/4d1af8db-e934-46fe-b22c-9cfdbeee18b5/" target="_blank" rel="noreferrer" className="flex items-center justify-between transition hover:bg-white/5 rounded-xl border border-slate-700 bg-black/10 px-4 py-3">
               <span className="font-semibold">中央競馬</span><span className="text-cyan-300">月額 800円</span>
-            </div>
-            <div className="flex items-center justify-between rounded-xl border border-cyan-400/25 bg-cyan-400/[.05] px-4 py-3">
+            </a>
+            <a href="https://bookers.tech/magazine/c9b4b8a8-f00f-4097-8cf4-334ec5ba62bd/" target="_blank" rel="noreferrer" className="flex items-center justify-between transition hover:bg-white/5 rounded-xl border border-cyan-400/25 bg-cyan-400/[.05] px-4 py-3">
               <span className="font-semibold">地方＋中央</span><span className="font-bold text-cyan-200">月額 1,000円</span>
-            </div>
+            </a>
           </div>
 
           {oauthError ? (
