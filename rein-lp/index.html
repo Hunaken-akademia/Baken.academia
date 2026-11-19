@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>REIN｜人気とAIのズレで、レースを読む。競馬AI予想｜馬券アカデミア</title>
+<meta name="description" content="競馬（中央・地方）のAI予想・データ分析ツール「REIN」。過去8年のレースデータから全頭を評価し、人気とのズレ、1〜3着の着順適性、7券種の本線・対抗・穴の参考買い目までを1画面に。開発・運営：馬券アカデミア。" />
+<meta name="author" content="馬券アカデミア" />
+<meta name="theme-color" content="#07111f" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="REIN｜人気とAIのズレで、レースを読む。" />
+<meta property="og:description" content="過去8年のデータで全頭を評価し、人気とのズレ・着順適性・7券種の参考買い目までを1画面に。中央・地方に対応。" />
+<meta property="og:url" content="https://rein-lp.vercel.app/" />
+<meta property="og:site_name" content="REIN" />
+<meta property="og:locale" content="ja_JP" />
+<meta property="og:image" content="https://rein-lp.vercel.app/images/og.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="人気とAIのズレで、レースを読む。競馬AI予想REIN" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:site" content="@bakenacademia" />
+<meta name="twitter:title" content="REIN｜人気とAIのズレで、レースを読む。" />
+<meta name="twitter:description" content="過去8年のデータで全頭を評価し、人気とのズレ・着順適性・7券種の参考買い目までを1画面に。中央・地方に対応。" />
+<meta name="twitter:image" content="https://rein-lp.vercel.app/images/og.png" />
+<link rel="canonical" href="https://rein-lp.vercel.app/" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<style>
+:root{
+  --bg:#07111f; --bg2:#0a1626; --card:#0f1f33; --card2:#142840; --line:#1f3a58;
+  --text:#eef4fa; --sub:#a7b9cd; --mute:#7a8ea6;
+  --cyan:#22d3ee; --amber:#fbbf24; --green:#34d399; --rose:#fb7185;
+  --radius:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--text);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,system-ui,sans-serif;line-height:1.75;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;height:auto;display:block}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.nw{display:inline-block}
+
+/* header */
+header{position:sticky;top:0;z-index:20;background:rgba(7,17,31,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid rgba(31,58,88,.6)}
+header .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.18em;font-size:19px}
+.logo i{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--cyan);color:var(--bg);font-style:normal;letter-spacing:0;font-size:17px}
+nav{display:flex;align-items:center;gap:22px;font-size:14px;color:var(--sub)}
+nav a:hover{color:var(--text)}
+.nav-cta{background:var(--cyan);color:#04202a;font-weight:800;padding:8px 14px;border-radius:999px;font-size:13px}
+@media (max-width:760px){nav .hide-sm{display:none}nav{gap:12px}}
+
+/* hero */
+.hero{position:relative;padding:72px 0 56px;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(600px 300px at 85% 10%,rgba(34,211,238,.16),transparent 70%),
+  radial-gradient(500px 300px at 10% 90%,rgba(251,191,36,.10),transparent 70%);pointer-events:none}
+.hero-grid{position:relative;display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:center}
+.eyebrow{color:var(--cyan);font-weight:700;letter-spacing:.2em;font-size:13px}
+h1{font-size:clamp(30px,8.2vw,54px);line-height:1.18;font-weight:900;letter-spacing:.01em;margin:14px 0 20px}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--cyan),#a5f3fc);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{color:var(--sub);font-size:17px;max-width:30em}
+.lead b{color:var(--text)}
+.cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:0 24px;border-radius:14px;font-weight:800;font-size:16px;transition:transform .15s}
+.btn:hover{transform:translateY(-2px)}
+.btn-primary{background:var(--cyan);color:#04202a;box-shadow:0 8px 24px rgba(34,211,238,.22)}
+.btn-ghost{border:1px solid var(--line);color:var(--text);background:rgba(15,31,51,.6)}
+.cta-note{margin-top:12px;font-size:13px;color:var(--mute)}
+.cta-note a{text-decoration:underline}
+@media (max-width:860px){.hero{padding:44px 0 40px}.hero-grid{grid-template-columns:1fr}}
+
+/* mock race card (表示例) */
+.mock{background:linear-gradient(180deg,#10233a,#0b1727);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 30px 60px rgba(0,0,0,.45)}
+.mock-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:12px}
+.mock-head b{font-size:16px}
+.mock-head span{font-size:12px;color:var(--mute)}
+.mock table{width:100%;border-collapse:collapse;font-size:13px}
+.mock th{font-size:11px;color:var(--mute);font-weight:600;text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
+.mock td{padding:7px 6px;border-bottom:1px solid rgba(31,58,88,.55)}
+.mock .no{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#1c3350;font-weight:800;font-size:12px}
+.mock .mk{font-weight:900;font-size:15px;width:22px;text-align:center}
+.mk.a{color:var(--cyan)}.mk.b{color:var(--amber)}.mk.c{color:var(--green)}.mk.d{color:var(--sub)}
+.bar{height:7px;border-radius:99px;background:#1c3350;overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#0891b2,var(--cyan))}
+.gap{font-size:11.5px;font-weight:800;white-space:nowrap}
+.gap.up{color:var(--green)}.gap.dn{color:var(--rose)}.gap.eq{color:var(--mute)}
+.tickets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.tk{background:#0b1a2c;border:1px solid var(--line);border-radius:12px;padding:9px 10px;font-size:12px;color:var(--sub);line-height:1.5}
+.tk b{display:block;font-size:11px;letter-spacing:.08em}
+.tk strong{display:block;color:var(--text);font-size:14px}
+.tk.main b{color:var(--cyan)}.tk.sub b{color:var(--amber)}.tk.ana b{color:var(--rose)}
+@media (max-width:480px){.tk{padding:8px;font-size:11px}.tk strong{font-size:13px}}
+.tk strong{white-space:nowrap}
+.mock-note{margin-top:10px;font-size:11px;color:var(--mute);text-align:right}
+
+/* ticker */
+.ticker{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg2);overflow:hidden;white-space:nowrap}
+.ticker-track{display:inline-flex;gap:40px;padding:12px 0;animation:tick 40s linear infinite;color:var(--mute);font-size:13px}
+.ticker-track b{color:var(--sub);font-weight:600}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.ticker-track{animation:none}}
+
+/* sections */
+section{padding:84px 0}
+.sec-head{margin-bottom:36px}
+.sec-label{color:var(--amber);font-weight:800;letter-spacing:.2em;font-size:12px}
+h2{font-size:clamp(27px,4.4vw,42px);line-height:1.3;font-weight:900;margin-top:8px}
+.sec-sub{color:var(--sub);margin-top:10px;font-size:16px}
+.disclaimer{margin-top:18px;color:var(--mute);font-size:12.5px;border-left:3px solid var(--line);padding-left:12px}
+
+/* problem → answer */
+.contrast{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:stretch}
+.box{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px}
+.box h3{font-size:18px;margin-bottom:12px}
+.box ul{list-style:none;display:grid;gap:8px;color:var(--sub);font-size:15px}
+.box li::before{content:"・";color:var(--mute)}
+.box.answer{border-color:rgba(34,211,238,.5);background:linear-gradient(180deg,#112840,#0f1f33)}
+.box.answer li::before{content:"✓ ";color:var(--cyan);font-weight:900}
+.box.answer li{color:var(--text)}
+.arrow{display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--cyan)}
+@media (max-width:760px){.contrast{grid-template-columns:1fr}.arrow{transform:rotate(90deg);height:24px}}
+
+/* gap section */
+.gap-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start}
+.points{list-style:none;display:grid;gap:14px}
+.points li{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.points b{display:block;font-size:16px;margin-bottom:2px}
+.points span{color:var(--sub);font-size:14px}
+.gap-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.gap-card h3{font-size:15px;color:var(--sub);font-weight:700;margin-bottom:12px}
+.gap-row{display:grid;grid-template-columns:28px 1fr 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(31,58,88,.55);font-size:13px}
+.gap-row:last-child{border-bottom:0}
+.gap-row small{display:block;color:var(--mute);font-size:10.5px}
+.bar.pop i{background:linear-gradient(90deg,#64748b,#94a3b8)}
+@media (max-width:860px){.gap-grid{grid-template-columns:1fr}}
+
+/* features */
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.feat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px}
+.feat .no{font-size:13px;font-weight:800;color:var(--cyan);letter-spacing:.1em}
+.feat h3{font-size:19px;margin:6px 0 8px;line-height:1.45}
+.feat p{color:var(--sub);font-size:14.5px}
+@media (max-width:900px){.features{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:600px){.features{grid-template-columns:1fr}}
+
+/* areas */
+.areas{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.area{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:26px 24px}
+.area .k{font-size:12px;font-weight:800;letter-spacing:.2em}
+.area h3{font-size:24px;margin:4px 0 8px}
+.area p{color:var(--sub);font-size:14.5px}
+.area.jra{border-color:rgba(34,211,238,.45)}.area.jra .k{color:var(--cyan)}
+.area.nar{border-color:rgba(251,191,36,.45)}.area.nar .k{color:var(--amber)}
+@media (max-width:760px){.areas{grid-template-columns:1fr}}
+
+/* steps */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.step{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px 20px}
+.step .circle{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:17px;background:var(--cyan);color:#04202a;margin-bottom:12px}
+.step:nth-child(2) .circle{background:var(--amber);color:#2a1a00}
+.step:nth-child(3) .circle{background:var(--green);color:#03261a}
+.step:nth-child(4) .circle{background:#a5b4fc;color:#11143a}
+.step .when{font-size:12px;color:var(--mute);font-weight:700;letter-spacing:.1em}
+.step h3{font-size:19px;margin:2px 0 8px}
+.step p{color:var(--sub);font-size:14px}
+@media (max-width:900px){.steps{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.steps{grid-template-columns:1fr}}
+
+/* plans */
+.plans{display:grid;grid-template-columns:1fr 1.4fr;gap:16px}
+.plan{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 24px;display:flex;flex-direction:column}
+.plan.pro{border-color:rgba(34,211,238,.55)}
+.plan h3{font-size:22px}
+.plan .what{color:var(--sub);font-size:14.5px;margin:6px 0 16px}
+.plan ul{list-style:none;display:grid;align-content:start;gap:8px;font-size:15px;margin-bottom:22px;flex:1}
+.plan li::before{content:"✓ ";color:var(--green);font-weight:900}
+.plan.pro li::before{color:var(--cyan)}
+.price-list{display:grid;gap:10px;margin-bottom:6px}
+.price{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);background:rgba(0,0,0,.15);border-radius:14px;padding:14px 16px;transition:transform .15s,background .15s}
+.price:hover{transform:translateY(-2px);background:rgba(255,255,255,.04)}
+.price b{font-size:16px}
+.price small{display:block;color:var(--mute);font-size:12px;font-weight:400}
+.price .yen{font-weight:900;font-size:18px;white-space:nowrap}
+.price .yen span{font-size:12px;font-weight:600;color:var(--sub);margin-left:2px}
+.price.nar .yen{color:var(--amber)}.price.jra .yen{color:var(--cyan)}
+.price.all{border-color:rgba(34,211,238,.45);background:rgba(34,211,238,.06)}
+.price.all .yen{color:#a5f3fc}
+.rec{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:rgba(34,211,238,.18);color:var(--cyan);vertical-align:middle}
+.plan .after{color:var(--sub);font-size:13.5px;margin-top:12px}
+@media (max-width:860px){.plans{grid-template-columns:1fr}}
+
+/* faq */
+details{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:10px}
+summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:12px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--cyan);font-size:20px;line-height:1}
+details[open] summary::after{content:"−"}
+details p{color:var(--sub);font-size:14.5px;margin-top:10px}
+
+/* final */
+.final{text-align:center;padding:96px 0;background:radial-gradient(500px 240px at 50% 0%,rgba(34,211,238,.13),transparent 70%)}
+.final h2{font-size:clamp(32px,6vw,54px)}
+.final .cta-row{justify-content:center}
+
+footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--mute);font-size:13px}
+footer .links{display:flex;flex-wrap:wrap;gap:8px 20px;margin-bottom:16px}
+footer a:hover{color:var(--text)}
+.caution{margin-bottom:14px;line-height:1.7}
+.org{margin-bottom:8px;color:var(--sub)}.org a{text-decoration:underline}
+</style>
+<script type="application/ld+json">[{"@context":"https://schema.org","@type":"WebSite","name":"REIN","alternateName":["REIN 競馬AI予想","馬券アカデミア REIN"],"url":"https://rein-lp.vercel.app/","inLanguage":"ja","publisher":{"@id":"https://rein-lp.vercel.app/#org"}},{"@context":"https://schema.org","@type":"Organization","@id":"https://rein-lp.vercel.app/#org","name":"馬券アカデミア","url":"https://rein-lp.vercel.app/","logo":"https://rein-lp.vercel.app/images/og.png","sameAs":["https://x.com/bakenacademia"]},{"@context":"https://schema.org","@type":"WebApplication","name":"REIN","url":"https://rein-lp.vercel.app/","applicationCategory":"SportsApplication","operatingSystem":"Web","inLanguage":"ja","description":"中央競馬・地方競馬のデータをAIが整理し、レース分析を補助するWebツール。","creator":{"@id":"https://rein-lp.vercel.app/#org"},"offers":[{"@type":"Offer","name":"REIN 無料版","price":"0","priceCurrency":"JPY","url":"https://rein-web.vercel.app/free"},{"@type":"Offer","name":"REIN 地方競馬（月額）","price":"800","priceCurrency":"JPY","url":"https://bookers.tech/magazine/9aee480f-e4f7-4d14-b4b5-8ae381512a8f/"},{"@type":"Offer","name":"REIN 中央競馬（月額）","price":"800","priceCurrency":"JPY","url":"https://bookers.tech/magazine/4d1af8db-e934-46fe-b22c-9cfdbeee18b5/"},{"@type":"Offer","name":"REIN オール（地方＋中央・月額）","price":"1000","priceCurrency":"JPY","url":"https://bookers.tech/magazine/c9b4b8a8-f00f-4097-8cf4-334ec5ba62bd/"}]}]</script>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="logo" href="#top"><i>R</i>REIN</a>
+    <nav>
+      <a class="hide-sm" href="#gap">人気とのズレ</a>
+      <a class="hide-sm" href="#features">特長</a>
+      <a class="hide-sm" href="#areas">中央・地方</a>
+      <a class="hide-sm" href="#flow">はじめ方</a>
+      <a class="hide-sm" href="#plans">料金</a>
+      <a class="nav-cta" href="https://rein-web.vercel.app/free">無料で見る</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <!-- HERO -->
+  <div class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">競馬AI予想 REIN ／ 馬券アカデミア</p>
+        <h1><span class="nw">人気とAIのズレで、</span><br><em class="nw">レースを読む。</em></h1>
+        <p class="lead">過去8年のレースデータからAIが全頭を評価し、<b>人気より上か下か</b>をひと目で示します。1〜3着の着順適性、展開、オッズの動き、<b class="nw">7券種の本線・対抗・穴</b>の参考買い目まで、1つの画面に。</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://rein-web.vercel.app/free">無料版で今日のレースを見る →</a>
+          <a class="btn btn-ghost" href="#plans">料金プランを見る</a>
+        </div>
+        <p class="cta-note">中央競馬・地方競馬に対応。スマホのブラウザでそのまま使えます。<br>すでに会員の方は<a href="https://rein-web.vercel.app/login">こちらからログイン</a>。</p>
+      </div>
+      <figure class="mock num" aria-label="REINのレース画面の表示例">
+        <div class="mock-head"><b>11R 芝2000m 良</b><span>全頭評価（表示例）</span></div>
+        <table>
+          <thead><tr><th>印</th><th>馬番</th><th>REIN評価</th><th>人気</th><th>ズレ</th></tr></thead>
+          <tbody>
+            <tr><td class="mk a">◎</td><td><span class="no">7</span></td><td><div class="bar"><i style="width:88%"></i></div></td><td>3</td><td class="gap up">↑ 人気以上</td></tr>
+            <tr><td class="mk b">○</td><td><span class="no">2</span></td><td><div class="bar"><i style="width:80%"></i></div></td><td>1</td><td class="gap eq">人気どおり</td></tr>
+            <tr><td class="mk c">▲</td><td><span class="no">11</span></td><td><div class="bar"><i style="width:69%"></i></div></td><td>8</td><td class="gap up">↑ 人気以上</td></tr>
+            <tr><td class="mk d">△</td><td><span class="no">5</span></td><td><div class="bar"><i style="width:58%"></i></div></td><td>2</td><td class="gap dn">↓ 人気以下</td></tr>
+          </tbody>
+        </table>
+        <div class="tickets">
+          <div class="tk main"><b>本線</b><strong>馬連 2-7</strong>人気どおりの組み立て</div>
+          <div class="tk sub"><b>対抗</b><strong>ワイド 7-11</strong>評価上位の組み合わせ</div>
+          <div class="tk ana"><b>穴</b><strong>3連複 2-7-11</strong>人気以上の馬から</div>
+        </div>
+        <p class="mock-note">※ 画面をもとにした表示例です。実際のレース・数値ではありません。</p>
+      </figure>
+    </div>
+  </div>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track num">
+      <span><b>全頭評価</b> 1〜3着適性</span><span><b>人気</b> × REIN評価</span><span><b>オッズの動き</b> 発走60分前から</span><span><b>馬場</b> 含水率・クッション値</span><span><b>展開</b> 隊列マップ</span><span><b>騎手</b> 場・距離別</span><span><b>重賞</b> 過去の傾向</span><span><b>券種</b> 単勝〜3連複の7券種</span><span><b>答え合わせ</b> 予想を自動保存</span>
+      <span><b>全頭評価</b> 1〜3着適性</span><span><b>人気</b> × REIN評価</span><span><b>オッズの動き</b> 発走60分前から</span><span><b>馬場</b> 含水率・クッション値</span><span><b>展開</b> 隊列マップ</span><span><b>騎手</b> 場・距離別</span><span><b>重賞</b> 過去の傾向</span><span><b>券種</b> 単勝〜3連複の7券種</span><span><b>答え合わせ</b> 予想を自動保存</span>
+    </div>
+  </div>
+
+  <!-- PROBLEM -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="sec-label">WHY REIN</p>
+        <h2><span class="nw">人気だけ見ても、</span><br><span class="nw">人気だけ外しても、</span><span class="nw">勝てない。</span></h2>
+      </div>
+      <div class="contrast">
+        <div class="box">
+          <h3>いつものレース前</h3>
+          <ul>
+            <li>新聞、オッズ、過去成績、馬場を行ったり来たり</li>
+            <li>人気馬を買うか、外すか。決め手がない</li>
+            <li>券種が多すぎて、どれで買えばいいか迷う</li>
+          </ul>
+        </div>
+        <div class="arrow">→</div>
+        <div class="box answer">
+          <h3>REINを使うと</h3>
+          <ul>
+            <li>全頭の評価と判断材料が、1つの画面にまとまる</li>
+            <li>人気より評価が高い馬・低い馬がひと目で分かる</li>
+            <li>7券種それぞれに、本線・対抗・穴の参考買い目</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GAP -->
+  <section id="gap" style="background:var(--bg2)">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="sec-label">REIN × 人気</p>
+        <h2><span class="nw">見るのは、</span><span class="nw">人気とのズレ。</span></h2>
+        <p class="sec-sub">人気はとても強い指標です。REINは人気を無視せず、人気とAIの評価を並べて「どこがズレているか」を見せます。</p>
+      </div>
+      <div class="gap-grid">
+        <ul class="points">
+          <li><b>人気とREINの1着評価を照合</b><span>人気以上・人気どおり・人気以下を、全頭に矢印で表示します。</span></li>
+          <li><b>1着・2着・3着の着順適性</b><span>「勝ち切るタイプ」か「2・3着に来るタイプ」かを分けて評価。軸と相手の選び分けに使えます。</span></li>
+          <li><b>人気帯ごとの評価差</b><span>4番人気以下・6番人気以下・10番人気以下で、評価が高い穴候補を拾います。</span></li>
+          <li><b>上位3頭への評価集中度</b><span>堅いレースか、荒れそうなレースかの目安になります。</span></li>
+        </ul>
+        <div class="gap-card num" aria-label="人気とREIN評価の比較の表示例">
+          <h3>人気とREINの評価差（表示例）</h3>
+          <div class="gap-row"><span class="no" style="display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;background:#1c3350;font-weight:800;font-size:12px">7</span><div><small>人気シェア</small><div class="bar pop"><i style="width:46%"></i></div></div><div><small>REIN評価</small><div class="bar"><i style="width:72%"></i></div></div><span class="gap up">↑ 人気以上</span></div>
+          <div class="gap-row"><span class="no" style="display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;background:#1c3350;font-weight:800;font-size:12px">2</span><div><small>人気シェア</small><div class="bar pop"><i style="width:78%"></i></div></div><div><small>REIN評価</small><div class="bar"><i style="width:76%"></i></div></div><span class="gap eq">人気どおり</span></div>
+          <div class="gap-row"><span class="no" style="display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;background:#1c3350;font-weight:800;font-size:12px">5</span><div><small>人気シェア</small><div class="bar pop"><i style="width:64%"></i></div></div><div><small>REIN評価</small><div class="bar"><i style="width:41%"></i></div></div><span class="gap dn">↓ 人気以下</span></div>
+          <div class="gap-row"><span class="no" style="display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;background:#1c3350;font-weight:800;font-size:12px">11</span><div><small>人気シェア</small><div class="bar pop"><i style="width:14%"></i></div></div><div><small>REIN評価</small><div class="bar"><i style="width:38%"></i></div></div><span class="gap up">↑ 人気以上</span></div>
+        </div>
+      </div>
+      <p class="disclaimer">評価は過去のデータにもとづく参考情報で、今後の的中や回収率を約束するものではありません。図は表示例です。</p>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="sec-label">FEATURES</p>
+        <h2><span class="nw">レース前に見たいものを、</span><span class="nw">全部1画面に。</span></h2>
+      </div>
+      <div class="features">
+        <article class="feat"><p class="no">01</p><h3>7券種の参考買い目</h3><p>単勝・複勝・枠連・馬連・ワイド・馬単・3連複。それぞれに本線・対抗・穴の3通りを用意します。</p></article>
+        <article class="feat"><p class="no">02</p><h3>全頭評価と能力パラメーター</h3><p>総合評価と着順適性に加え、評価の根拠になった要因を馬ごとに確認できます。全頭の全項目を一覧で比べることも。</p></article>
+        <article class="feat"><p class="no">03</p><h3>オッズの動き</h3><p>発走前のオッズを定期的に取り込み、どの馬に票が集まっているかを推移で見られます。</p></article>
+        <article class="feat"><p class="no">04</p><h3>展開と隊列</h3><p>近走の通過順位から、逃げ・先行・差しの並びを隊列マップに。先導役がいるかどうかも分かります。</p></article>
+        <article class="feat"><p class="no">05</p><h3>REIN辞典</h3><p>馬・騎手・厩舎・重賞・コースの条件別成績を検索。重賞は「今年の出走馬 × 過去の傾向」で見られます。</p></article>
+        <article class="feat"><p class="no">06</p><h3>自動保存と答え合わせ</h3><p>発走前の予想を自動で保存し、レース後に印と参考買い目の成績を振り返れます。注目馬の次走メモも。</p></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- AREAS -->
+  <section id="areas" style="background:var(--bg2)">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="sec-label">JRA ／ NAR</p>
+        <h2>中央も、地方も。</h2>
+        <p class="sec-sub">中央競馬と地方競馬で、それぞれ専用に学習した評価を使います。</p>
+      </div>
+      <div class="areas">
+        <div class="area jra"><p class="k">JRA</p><h3>中央競馬</h3><p>開催日の全レースに対応。馬場の含水率・クッション値、重賞の過去傾向、騎手の場・距離別成績まで確認できます。</p></div>
+        <div class="area nar"><p class="k">NAR</p><h3>地方競馬</h3><p>平日も毎日開催。地方専用の評価・着順適性・隊列に、開催場ごとのコースの特徴を合わせて見られます。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FLOW -->
+  <section id="flow">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="sec-label">HOW TO START</p>
+        <h2><span class="nw">加入から、</span><span class="nw">最短数分で使える。</span></h2>
+        <p class="sec-sub">お申し込みはBOOKERSのメンバーシップから。会員限定記事の合言葉を入れると、すぐに使えます。</p>
+      </div>
+      <div class="steps">
+        <div class="step"><div class="circle">1</div><p class="when">BOOKERS</p><h3>プランに加入</h3><p>地方・中央・オールから、見たいプランのメンバーシップに加入します。</p></div>
+        <div class="step"><div class="circle">2</div><p class="when">会員限定記事</p><h3>合言葉を確認</h3><p>加入したプランの会員限定記事「REIN合言葉」に、その月の合言葉が書いてあります。</p></div>
+        <div class="step"><div class="circle">3</div><p class="when">REIN</p><h3>Googleでログイン</h3><p>REINを開き、お使いのGoogleアカウントでログインします。</p></div>
+        <div class="step"><div class="circle">4</div><p class="when">REIN</p><h3>合言葉を入れる</h3><p>合言葉を入力すると、その場でプランが有効になります。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLANS -->
+  <section id="plans" style="background:var(--bg2)">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="sec-label">PLANS</p>
+        <h2>まずは、無料版から。</h2>
+      </div>
+      <div class="plans">
+        <div class="plan">
+          <h3>無料版</h3>
+          <p class="what">ログイン不要・登録なし</p>
+          <ul>
+            <li>毎日、中央1場・地方1場の全レースを公開（重賞のある場を優先）</li>
+            <li>印・1〜3着の適性・馬の比較・展開・結果まで有料版と同じ画面</li>
+            <li>スマホのブラウザでそのまま使える</li>
+          </ul>
+          <a class="btn btn-ghost" href="https://rein-web.vercel.app/free">無料版を見る</a>
+        </div>
+        <div class="plan pro">
+          <h3>有料版</h3>
+          <p class="what">全レース・全機能（BOOKERS・月額800円から）</p>
+          <ul>
+            <li>加入したプランの全場・全レース</li>
+            <li>7券種の本線・対抗・穴の参考買い目</li>
+            <li>オッズの動き一覧・レース検索・明日の予想・過去の開催</li>
+            <li>REIN辞典・お気に入り・メモ</li>
+          </ul>
+          <div class="price-list num">
+            <a class="price nar" href="https://bookers.tech/magazine/9aee480f-e4f7-4d14-b4b5-8ae381512a8f/"><b>地方競馬<small>地方の全場・全レース</small></b><span class="yen">800円<span>/月</span></span></a>
+            <a class="price jra" href="https://bookers.tech/magazine/4d1af8db-e934-46fe-b22c-9cfdbeee18b5/"><b>中央競馬<small>JRAの全場・全レース</small></b><span class="yen">800円<span>/月</span></span></a>
+            <a class="price all" href="https://bookers.tech/magazine/c9b4b8a8-f00f-4097-8cf4-334ec5ba62bd/"><b>オール（地方＋中央）<span class="rec">おすすめ</span><small>両方使えて200円おトク</small></b><span class="yen">1,000円<span>/月</span></span></a>
+          </div>
+          <p class="after">加入後は、会員限定記事の合言葉をREINのログイン後の画面で入力してください。表示価格は税込です。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq">
+    <div class="wrap" style="max-width:820px">
+      <div class="sec-head"><p class="sec-label">FAQ</p><h2>よくある質問</h2></div>
+      <details><summary>アプリのインストールは必要ですか？</summary><p>不要です。スマホやパソコンのブラウザで開くだけで使えます。ログインにはGoogleアカウントを使います。</p></details>
+      <details><summary>無料版と有料版の違いは？</summary><p>無料版は毎日、中央1場・地方1場の全レースを、ログインなしで公開しています（重賞のある場を優先）。印・着順適性・展開・結果は有料版と同じです。有料版では、加入したプランの全場・全レースに加え、参考買い目・オッズの動き一覧・明日の予想・REIN辞典などを使えます。</p></details>
+      <details><summary>合言葉はどこで分かりますか？</summary><p>BOOKERSで加入したプランの会員限定記事に書いてあります。合言葉は毎月1日に新しくなるので、月が変わったら記事で新しい合言葉を確認して入れ直してください。</p></details>
+      <details><summary>CAMPFIREで加入していますが、どうなりますか？</summary><p>CAMPFIREでの販売は2026年12月末で終了し、BOOKERSへ移ります。12月中にCAMPFIREをご解約のうえ、BOOKERSで加入してください。REINには今と同じGoogleアカウントでログインできます。</p></details>
+      <details><summary>必ず当たりますか？</summary><p>いいえ。REINはデータを読み解くための道具で、的中や利益を保証するものではありません。最終的な判断はご自身でお願いします。</p></details>
+      <details><summary>解約はどうすればいいですか？</summary><p>BOOKERSの購入済みメンバーシップ一覧から、いつでも解約できます。</p></details>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section class="final">
+    <div class="wrap">
+      <p class="eyebrow">TODAY'S RACE</p>
+      <h2 style="margin:10px 0 14px">今日のレースを、<br>人気とのズレで見る。</h2>
+      <p class="sec-sub">まずは無料の中央1場・地方1場から。全場と参考買い目まで見るなら有料版へ。</p>
+      <div class="cta-row" style="margin-top:28px">
+        <a class="btn btn-primary" href="https://rein-web.vercel.app/free">無料版で見る →</a>
+        <a class="btn btn-ghost" href="#plans">料金プランを見る</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p class="caution">馬券の購入は20歳になってから。競馬は適度に楽しみましょう。REINは日本中央競馬会（JRA）・地方競馬全国協会（NAR）および各主催者とは関係のない、独自の予想ツールです。</p>
+    <div class="links">
+      <a href="tokushoho.html">特定商取引法に基づく表記</a>
+      <a href="terms.html">利用規約</a>
+      <a href="privacy.html">プライバシーポリシー</a>
+    </div>
+    <p class="org">開発・運営：馬券アカデミア　<a href="https://x.com/bakenacademia" rel="me">X（@bakenacademia）</a></p>
+    <p>© 2026 馬券アカデミア</p>
+  </div>
+</footer>
+</body>
+</html>
