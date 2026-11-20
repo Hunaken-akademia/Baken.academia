@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import FreeFunnelBeacon from "@/components/free-funnel-beacon";
 
 export const metadata: Metadata = {
   title: "REIN 無料版｜馬券アカデミア",
@@ -7,9 +8,9 @@ export const metadata: Metadata = {
 };
 
 const PLANS = [
-  { name: "地方競馬", price: "月額 800円", href: "https://bookers.tech/magazine/9aee480f-e4f7-4d14-b4b5-8ae381512a8f/", tone: "text-amber-300" },
-  { name: "中央競馬", price: "月額 800円", href: "https://bookers.tech/magazine/4d1af8db-e934-46fe-b22c-9cfdbeee18b5/", tone: "text-cyan-300" },
-  { name: "地方＋中央", price: "月額 1,000円", href: "https://bookers.tech/magazine/c9b4b8a8-f00f-4097-8cf4-334ec5ba62bd/", tone: "font-bold text-cyan-200" },
+  { name: "地方競馬", price: "月額 800円", href: "/api/funnel?go=nar", tone: "text-amber-300" },
+  { name: "中央競馬", price: "月額 800円", href: "/api/funnel?go=jra", tone: "text-cyan-300" },
+  { name: "地方＋中央", price: "月額 1,000円", href: "/api/funnel?go=all", tone: "font-bold text-cyan-200" },
 ];
 
 const FREE = ["本命・対抗・穴候補の印", "1着・2着・3着それぞれの適性ランキング", "人気とREINの評価の照合、全頭の適性早見表", "馬の比較・展開シナリオ・馬の詳細", "レース結果と人気別の結果"];
@@ -18,6 +19,7 @@ const MEMBER = ["重賞を含む、その日の全場・全レース", "参考�
 export default function FreeHome() {
   return (
     <main className="min-h-screen bg-[#07111f] px-4 py-8 text-slate-100">
+      <FreeFunnelBeacon page="free" />
       <div className="mx-auto max-w-4xl">
         <header className="mb-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
