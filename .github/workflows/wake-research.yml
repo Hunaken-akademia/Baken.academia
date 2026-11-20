@@ -47,12 +47,14 @@ jobs:
           openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$key" -in .github/wake-research/bundle.enc | tar xz -C work
           echo "MODE=$(cat .github/wake-research/mode.txt)" >> "$GITHUB_ENV"
       - name: Restore official results cache
+        if: "!contains(env.MODE, 'tabrebuild')"
         uses: actions/cache/restore@v4
         with:
           path: work/research/ashi-marks-20261112/data_k
           key: wake-k-v1-${{ github.run_id }}
           restore-keys: wake-k-v1-
       - name: Fetch official results (K files)
+        if: "!contains(env.MODE, 'tabrebuild')"
         run: |
           cd work && mkdir -p research/ashi-marks-20261112 && cp research/bet-modes-20261106/kfetch.py research/ashi-marks-20261112/kfetch.py
           # 公式の公開データ（Kファイル）。時間がかかるので100分で区切り、続きは次の実行で（キャッシュに残る）
@@ -65,7 +67,7 @@ jobs:
           print(f'K_MISSING={miss}'); print('K_OK=' + ('1' if miss <= 5 else '0'))
           PY
       - name: Save official results cache
-        if: always()
+        if: always() && !contains(env.MODE, 'tabrebuild')
         uses: actions/cache/save@v4
         with:
           path: work/research/ashi-marks-20261112/data_k
@@ -145,6 +147,14 @@ jobs:
           node $f/export_t5.mjs 2026-08-01 2026-11-11 > logs/export_t5.log 2>&1
           openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in .github/wake-research/tabstats.enc -out $f/tabstats.py
           python $f/tabstats.py $f/out > logs/tabstats.log 2>&1
+      - name: Rebuild balance / compact tabs with the current engine (late July onward)
+        if: contains(env.MODE, 'tabrebuild')
+        run: |
+          set -euo pipefail
+          # 保存してあった出走表・展示・オッズを今の予想エンジン（暗号化した一式）に通し直す。読み取りだけ。
+          mkdir -p work/tr && openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in .github/wake-research/tabrebuild.enc | gunzip > work/tr/tabrebuild.mjs
+          limit=0; if [[ "$MODE" == *sample* ]]; then limit=400; fi
+          node work/tr/tabrebuild.mjs 2026-07-25 2026-11-19 $limit > logs/tabrebuild.log 2>&1
       - name: Upload encrypted model output
         if: contains(env.MODE, 'tickets')
         uses: actions/upload-artifact@v4
@@ -170,6 +180,8 @@ jobs:
           files = {f'logs/{p.name}': p for p in pathlib.Path('logs').glob('*.log')}
           for n in ('tabstats.json', 'live.txt', 'live_tabs.csv', 'honmei.txt', 'tabs.txt', 'marks.txt', 't5thr.txt', 't5check.txt', 'tickets.txt', 'report.json', 'report_v4r.json', 'analysis.txt', 'analysis.json', 'v4r/wake-probability-model-v4.json', 'v4r/placement-v4-fixtures.json'):
               if (base / n).exists(): files[n] = base / n
+          for p in sorted(pathlib.Path('work/tr/out').glob('*')):
+              if p.suffix in ('.json', '.jsonl'): files[f'tabrebuild/{p.name}'] = p
           for name, p in files.items():
               text = p.read_text(errors='replace')
               if name.startswith('logs/'): text = '\n'.join(text.splitlines()[-400:])

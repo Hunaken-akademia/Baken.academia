@@ -1,1 +1,1 @@
-tabstats
+tabrebuild-sample
