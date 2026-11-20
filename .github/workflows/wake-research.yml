@@ -146,6 +146,22 @@ jobs:
           f=work/research/hit-miss-20261113; [ -f $f/out/races.npz ] || openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/out.enc | tar xz -C $f
           node $f/export_t5.mjs 2026-08-01 2026-11-11 > logs/export_t5.log 2>&1
           openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in .github/wake-research/tabstats.enc -out $f/tabstats.py
+          # 狙い目ナビの過去の判定（研究用の表）。レースごとの判定だけで、数字はログに出さない。
+          python - <<'PY'
+          import os, json, urllib.request, pathlib
+          tok = json.load(urllib.request.urlopen(urllib.request.Request(os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'] + '&audience=wake-research-v1',
+                headers={'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})))['value']
+          out = pathlib.Path('work/research/hit-miss-20261113/data'); out.mkdir(parents=True, exist_ok=True)
+          rows = []; off = 0
+          while True:
+              path = f'wake_research_navi_labels_v1?select=race_date,place_no,race_no,pre,stage,tier&order=race_date,place_no,race_no&limit=1000&offset={off}'
+              r = urllib.request.Request(os.environ['WAKE_BROKER_URL'], data=json.dumps({'action': 'rest', 'path': path}).encode(), method='POST',
+                                         headers={'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json'})
+              page = json.load(urllib.request.urlopen(r)); rows += page; off += 1000
+              if len(page) < 1000: break
+          (out / 'navi.jsonl').write_text(''.join(json.dumps(x) + '\n' for x in rows))
+          print('navi labels fetched')
+          PY
           python $f/tabstats.py $f/out > logs/tabstats.log 2>&1
       - name: Rebuild balance / compact tabs with the current engine (late July onward)
         if: contains(env.MODE, 'tabrebuild')
