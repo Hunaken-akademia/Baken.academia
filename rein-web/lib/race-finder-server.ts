@@ -6,7 +6,7 @@ import { venueOfRace } from "./odds-trend-board";
 import { finderRow, type FinderRow, type League, type RaceFinder } from "./race-finder";
 
 // Reads the cron-refreshed live snapshots; no source site is fetched here.
-const cache = getCache({ namespace: "rein-race-finder-v1" });
+const cache = getCache({ namespace: "rein-race-finder-v2" });
 const pending = new Map<string, Promise<RaceFinder>>();
 const headers = { "cache-control": "private, no-store" };
 

@@ -9,7 +9,7 @@ const caps: Record<string, [number, number, number]> = {
   単勝: [1, 1, 1], 複勝: [1, 1, 1], 枠連: [3, 4, 4], 馬連: [5, 6, 6],
   ワイド: [4, 5, 5], 馬単: [8, 10, 10], 三連複: [10, 12, 12],
 };
-type RoleHorse = TicketHorse & { first: number; second: number; third: number };
+export type RoleHorse = TicketHorse & { first: number; second: number; third: number };
 type Candidate = { selection: number[]; probability: number };
 
 function normalize(values: number[]) {
@@ -18,7 +18,7 @@ function normalize(values: number[]) {
   return safe.map((value) => value / total);
 }
 
-function roleProbabilities(horses: TicketHorse[]): RoleHorse[] {
+export function roleProbabilities(horses: TicketHorse[]): RoleHorse[] {
   const fallback = Math.max(...horses.map((horse) => horse.popularity || 0), horses.length) + 1;
   const market = normalize(horses.map((horse) => 1 / Math.max(horse.popularity || fallback, 1)));
   const learned = {
