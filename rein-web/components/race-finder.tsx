@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { naviBase, naviStat } from "@/lib/bet-tabs";
 import { FINDER_REFERENCE, KIND_ORDER, RACE_KINDS, finderHit, readingGuide, nextRacesToRead, type FinderRow, type League, type RaceFinder as Finder, type RaceKind } from "@/lib/race-finder";
 
 const pct = (n: number, d: number) => d ? `${Math.round(n / d * 1000) / 10}%` : "—";
@@ -63,6 +64,7 @@ export function RaceFinder({ league, onOpen }: { league: League; onOpen: (raceId
         </button></li>)}</ul>
       </details>}
     </div>}
+    {finder && !error && league === "nar" && <TeppanList rows={all} now={now} onOpen={onOpen} />}
     <div role="group" aria-label="レースの区分" className="mt-3 grid grid-cols-3 gap-1 rounded-lg bg-black/20 p-1 text-sm" data-no-swipe>
       {KIND_ORDER.map(k => <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)} className={`rounded-md px-2 py-2 font-bold ${kind === k ? tone[k] : "text-slate-300"}`}>
         {RACE_KINDS[k].label}<span className="ml-1 text-[11px] font-normal">{finder ? all.filter(row => row.kind === k && !closed(row, now)).length : ""}</span>
@@ -112,4 +114,21 @@ export function RaceFinder({ league, onOpen }: { league: League; onOpen: (raceId
       <p>表示中の区分は、その時点の最新オッズによるものです。朝や前日のオッズでは区分が変わることがあります。終了したレースの○✕は、発走前に保存したオッズで分類したレースだけを対象にしています。的中や利益を保証するものではありません。</p>
     </details>
   </section>;
+}
+
+// 狙い目ナビの鉄板（地方）：固めのレースで REIN の本命が1番人気と同じ。終わったレースは1番人気の着順と3連単の配当。
+function TeppanList({ rows, now, onOpen }: { rows: FinderRow[]; now: number; onOpen: (raceId: string) => void }) {
+  const list = rows.filter(row => row.teppan);
+  const s = naviStat("nar", "teppan"), base = naviBase("nar");
+  return <div aria-label="今日の鉄板レース" data-testid="teppan-list" className="mt-3 rounded-xl border border-amber-300/40 bg-amber-300/[.05] p-3">
+    <h3 className="font-bold text-amber-100">◎ 今日の鉄板レース（狙い目ナビ）</h3>
+    <p className="mt-1 text-xs leading-5 text-slate-400">人気が集中していて、REINの本命も1番人気と同じレース。過去{s.races}Rで1番人気の勝率{s.favWin}%・3着内{s.favTop3}%（全体は{base.favWin}%・{base.favTop3}%）。</p>
+    {list.length ? <ul className="mt-2 divide-y divide-slate-700">{list.map(row => { const done = closed(row, now);
+      return <li key={row.raceId}><button type="button" onClick={() => onOpen(row.raceId)} className="flex min-h-12 w-full items-center gap-3 py-2 text-left hover:bg-white/5">
+        <span className="w-11 shrink-0 text-sm font-semibold text-cyan-200">{row.start || "--:--"}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-bold">{row.venue}{row.number}R<span className="ml-2 text-xs font-normal text-slate-400">{row.favorite ? `1番人気 ${row.favorite.odds.toFixed(1)}倍` : ""}</span></span>
+        {done && row.favoriteFinish ? <span className="shrink-0 text-right text-xs"><b className={row.favoriteFinish === 1 ? "text-emerald-300" : row.favoriteFinish <= 3 ? "text-sky-200" : "text-rose-300"}>{row.favoriteFinish}着</b>{row.result && <span className="ml-1 text-slate-300">{yen(row.result.payout)}</span>}</span>
+          : <span className="shrink-0 rounded bg-amber-300 px-2 py-0.5 text-xs font-bold text-[#07111f]">鉄板</span>}
+      </button></li>; })}</ul> : <p className="mt-2 text-sm text-slate-400">今は鉄板のレースはありません（オッズがそろうと判定します）。</p>}
+  </div>;
 }

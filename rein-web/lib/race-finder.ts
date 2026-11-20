@@ -70,6 +70,8 @@ export type FinderRow = {
   kind: RaceKind | null; effective: number | null; field: number; favorite: { name: string; odds: number } | null; oddsAt: string | null;
   // Finished races are judged only when the odds come from the saved prestart forecast.
   result: { payout: number; selection: string; popularity: number | null } | null; verified: boolean;
+  // 狙い目ナビの鉄板（固めで、REIN の本命が1番人気と同じ。地方だけ、lib/bet-tabs.ts）。
+  teppan?: boolean; favoriteFinish?: number | null;
 };
 export type RaceFinder = { date: string; league: League; generatedAt: string; rows: FinderRow[]; error?: string };
 
@@ -78,6 +80,9 @@ export function finderRow(raceId: string, league: League, venue: string, payload
   const race = payload.race ?? {}, horses: Horse[] = Array.isArray(payload.horses) ? payload.horses : [];
   const classified = classifyRace(league, horses.map(h => h.odds));
   const favorite = classified ? horses.reduce<Horse | null>((best, h) => !best || (h.odds as number) < (best.odds as number) ? h : best, null) : null;
+  const main = Number(payload.picks?.main?.number);
+  const teppan = league === "nar" && classified?.kind === "solid" && !!favorite && Number(favorite.number) === main;
+  const finish = Array.isArray(payload.review?.finishers) && favorite ? payload.review.finishers.find((f: { number?: number }) => Number(f?.number) === Number(favorite.number)) : null;
   const prediction = payload.prediction ?? {}, startsAt = typeof race.startsAt === "number" ? race.startsAt : null;
   const verified = prediction.source === "prestart" && startsAt !== null && Date.parse(prediction.generatedAt) < startsAt;
   return {
@@ -87,6 +92,7 @@ export function finderRow(raceId: string, league: League, venue: string, payload
     favorite: favorite ? { name: String(favorite.name ?? ""), odds: favorite.odds as number } : null,
     oddsAt: race.dataTimes?.odds ?? prediction.generatedAt ?? null,
     result: payload.review?.isFinished ? trifectaResult(payload.review.payouts) : null, verified,
+    teppan, favoriteFinish: payload.review?.isFinished && Number.isFinite(Number(finish?.finish)) ? Number(finish.finish) : null,
   };
 }
 

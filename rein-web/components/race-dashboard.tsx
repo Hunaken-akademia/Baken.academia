@@ -49,6 +49,7 @@ import { PredictionDataStatus } from "@/components/prediction-data-status";
 import { OddsTrendPanel } from "@/components/odds-trend-panel";
 import { OddsTrendBoard } from "@/components/odds-trend-board";
 import { RaceFinder } from "@/components/race-finder";
+import { BetTabs, MyPickCheck, RaceNavi } from "@/components/bet-tabs";
 import { GradedTrends } from "@/components/graded-trends";
 import { UpdateNotice } from "@/components/update-notice";
 import { RaceCalendar } from "@/components/race-calendar";
@@ -1164,6 +1165,11 @@ function AnalysisScreenContent({ data, activeHorse, danger, loading, onRetry, on
           <PopularityForecast key={data.race.raceId} horses={data.horses} race={data.race} rolesReady={rolesReady} finished={data.review?.isFinished ?? false} predictionSafe={patternPredictionSafe(data.prediction, data.race.startsAt, data.review?.isFinished ?? false)} onHorse={(horse) => { if (activeHorse?.number !== horse.number) onHorse(horse); changeAnalysisTab("detail"); }} />
           <PickCards data={data} onHorse={onHorse}>
             {free ? <FreeLocked className="mt-3" title="参考買い目（7券種・本線/対抗/穴）" text="REINの評価から作った単勝〜3連単の参考買い目は会員版で見られます。" /> : <TicketSummary data={data} onOpen={openTickets} />}
+            {free ? <FreeLocked className="mt-3" title="狙い目ナビ・買い方タブ・自分の予想チェック" text="レースの型の判定、目的別の買い方と過去の成績、選んだ馬の見落としチェックは会員版で使えます。" /> : <>
+              <RaceNavi league={data.race.league === "nar" ? "nar" : "jra"} horses={data.horses} main={data.picks?.main?.number} />
+              <BetTabs league={data.race.league === "nar" ? "nar" : "jra"} horses={data.horses} main={data.picks?.main?.number} tickets={data.tickets} held={data.evaluation?.tickets === "held"} />
+              <MyPickCheck horses={data.horses} marks={{ main: data.picks?.main?.number, rival: data.picks?.rival?.number, longshot: data.picks?.longshot?.number }} scratched={(data.scratched ?? []).map(s => s.number)} />
+            </>}
           </PickCards>
         <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-3">
           <RaceConfidenceCard confidence={data.confidence} nar={data.race.league === "nar"} reference={data.narReference} />
