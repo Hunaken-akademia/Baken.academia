@@ -272,7 +272,9 @@ class PoliteNarClient:
                         path.parent.mkdir(parents=True, exist_ok=True)
                         path.write_bytes(gzip.compress(payload, 6))
                         return payload
-                    if response.status not in {429, 500, 502, 503, 504}:
+                    # 403 は GitHub の実行環境に一時的に返ることがある（2026-11-20 の日次取得が
+                    # 月間開催ページの 403 1回で止まった）。待って取り直し、続くときだけ止める。
+                    if response.status not in {403, 429, 500, 502, 503, 504}:
                         raise RuntimeError(f"NAR HTTP {response.status}: {url}")
                     retry_after = response.headers.get("Retry-After")
             except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
