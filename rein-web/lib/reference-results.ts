@@ -19,3 +19,11 @@ export function referenceResults(tickets: Ticket[], finished: boolean, payouts: 
 export type ReferenceLine = ReturnType<typeof referenceResults>[number];
 export type ReferenceRace = { raceId: string; title: string; venue: string; number: number; start: string; startsAt: number | null; saved: boolean; finished: boolean; lines: ReferenceLine[] };
 export type ReferenceBoard = { races: ReferenceRace[]; error?: string };
+
+export function filterReferenceRaces(races: ReferenceRace[], filters: { venue: string; type: string; group: string; hitsOnly: boolean }) {
+  return races.filter(race => !filters.venue || race.venue === filters.venue).map(race => ({
+    ...race,
+    lines: race.lines.filter(line => (!filters.type || line.type === filters.type)
+      && (!filters.group || line.group === filters.group) && (!filters.hitsOnly || line.status === "hit")),
+  })).filter(race => race.lines.length > 0 || (!filters.type && !filters.group && !filters.hitsOnly));
+}
