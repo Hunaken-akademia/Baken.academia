@@ -141,6 +141,13 @@ test('NAR references apply only adopted rules, require complete market, and neve
  assert.equal(narReferenceSignals(field.slice(0,5),validation,context).confidence,null);
  assert.equal(narReferenceSignals(field,undefined,context).reference,null);
 });
+test('NAR 妙味馬 = 1着適性3〜8位・4番人気以下・人気順位より上, held without a complete market',()=>{
+ const result=narReferenceSignals(field,validation,context);
+ assert.deepEqual(result.picks.valueHorses.map(h=>[h.number,h.firstRank]),[[3,3],[4,4],[5,5]]);
+ assert.match(result.picks.valueBasis,/地方/);
+ assert.deepEqual(narReferenceSignals(field,undefined,context).picks.valueHorses.map(h=>h.number),[3,4,5]);
+ assert.equal(narReferenceSignals(field.map((h,i)=>i? h:{...h,popularity:0}),validation,context).picks.valueHorses,undefined);
+});
 test('NAR condition routing matches Python boundaries and safe local fallback',()=>{
  assert.equal(narConditionKey({...context,distanceM:1400},'courseDistance'),'船橋|ダート|mile');
  assert.equal(narConditionKey({...context,distanceM:1801},'courseDistance'),'船橋|ダート|long');

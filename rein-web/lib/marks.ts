@@ -37,6 +37,8 @@ export const LONGSHOT_ROLE_RANKS = [3, 6] as const;
 // races) kept a +0.7pt top-3 rate over the same odds band at ~2.4 horses a race; win ROI
 // stayed at the band average, so this is a shortlist, never a bet signal.
 export const VALUE_ROLE_RANKS = [3, 8] as const;
+export const JRA_VALUE_BASIS = "中央の2021〜2025年では、同じくらいのオッズの馬より3着内率がわずかに高い（約0.7pt）一方、単勝回収率は変わりませんでした。";
+export const NAR_VALUE_BASIS = "地方は1着適性の保存がある2026年9〜11月（2,644レース）だけの確認で、同じくらいのオッズの馬より3着内率が約0.8pt高い結果でした。期間が短いため、引き続き確認します。";
 
 export type MarkPick = {
   number: number;
@@ -58,6 +60,7 @@ export type Picks = {
   longshotReason?: string;
   // Absent on older saved picks and on NAR (no market-difference model).
   valueHorses?: MarkPick[];
+  valueBasis?: string;
 };
 
 export function selectPicks(
@@ -118,14 +121,14 @@ export function selectPicks(
   if (longshot) {
     return {
       status: "ready", main, rival, longshot, longshotCandidates,
-      longshotStatus: "selected", valueHorses,
+      longshotStatus: "selected", valueHorses, valueBasis: JRA_VALUE_BASIS,
     };
   }
   return {
     status: "ready", main, rival, longshot: null, longshotCandidates: [],
     longshotStatus: "none",
     longshotReason: "1着適性3〜6位に、4番人気以下かつ1着評価が市場を上回る馬がいません",
-    valueHorses,
+    valueHorses, valueBasis: JRA_VALUE_BASIS,
   };
 }
 
