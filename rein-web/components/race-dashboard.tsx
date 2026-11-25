@@ -2789,12 +2789,47 @@ function PickCards({ data, onHorse, children }: { data: Analysis; onHorse: (hors
       <p className="mt-2 text-[11px] leading-5 text-slate-500">
         本命・対抗・穴候補はREINの参考評価です。
       </p>
+      <ValueHorses data={data} onHorse={onHorse} />
       {children}
       <LongshotRoles data={data} onHorse={onHorse} />
     </>
   );
 }
 
+
+// 妙味馬: 穴候補 widened to 1着適性3〜8位 (JRA only; NAR has no market-difference model).
+function ValueHorses({ data, onHorse }: { data: Analysis; onHorse: (horse: Horse) => void }) {
+  const picks = data.picks;
+  const rows = (picks?.valueHorses ?? []).flatMap((pick) => {
+    const horse = data.horses.find((item) => item.number === pick.number);
+    return horse ? [{ pick, horse }] : [];
+  });
+  if (!rows.length) return null;
+  return (
+    <section aria-label="妙味馬" data-testid="value-horses" className="mt-3 rounded-xl border border-amber-300/30 bg-amber-300/[.05] p-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-bold text-amber-100">妙味馬</h2>
+        <span className="text-[11px] text-slate-400">{rows.length}頭</span>
+      </div>
+      <p className="mt-1 text-[11px] leading-5 text-slate-400">4番人気以下で、REINの評価が世間（オッズ）より高い馬です。1着適性の高い順に並べています。</p>
+      <ul className="mt-2 divide-y divide-slate-800">
+        {rows.map(({ pick, horse }) => (
+          <li key={horse.number}>
+            <button type="button" onClick={() => onHorse(horse)} className="grid min-h-11 w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 py-1.5 text-left text-xs hover:bg-amber-300/[.06]">
+              <span className="grid size-7 place-items-center rounded-md bg-white font-bold text-slate-900">{horse.number}</span>
+              <span className="min-w-0">
+                <span className="block truncate font-semibold text-slate-100">{horse.name}{picks?.longshot?.number === horse.number && <span className="ml-1 text-amber-200">☆</span>}</span>
+                <span className="block text-[11px] text-slate-400">{horse.popularity}番人気・単勝{horse.odds === null ? "未取得" : `${horse.odds}倍`}</span>
+              </span>
+              <span className="text-right font-bold text-cyan-200">1着適性{pick.firstRank}位</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[11px] leading-5 text-slate-500">中央の2021〜2025年では、同じくらいの人気の馬より3着内率がわずかに高い（約0.7pt）一方、単勝回収率は変わりませんでした。買い推奨や期待値ではありません。オッズは公式でご確認ください。</p>
+    </section>
+  );
+}
 
 function TicketSummary({ data, onOpen }: { data: Analysis; onOpen: () => void }) {
   const held = data.evaluation?.tickets === "held";

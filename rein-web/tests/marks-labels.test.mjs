@@ -88,6 +88,25 @@ test('穴候補 is the best-ranked 3〜6th horse that is 4th favourite or lower 
   assert.equal(new Set([picks.main.number, picks.rival.number, picks.longshot.number]).size, 3);
 });
 
+test('妙味馬 widens the 穴候補 rule to 1着適性3〜8位 without moving the saved 穴候補', () => {
+  const horses = [
+    horse(1, .30, 1, .3, .3), horse(2, .20, 2, .2, .2),
+    horse(3, .15, 3, .1, .3), horse(4, .12, 6, .1, .08),
+    horse(5, .10, 8, .04, .06), horse(6, .08, 9, .02, .09),
+    horse(7, .05, 12, .01, .2), horse(8, .04, 10, .02, .03),
+    horse(9, .03, 11, .01, .05), // 9th: outside 3〜8
+  ];
+  const picks = selectPicks(horses, { roleModelReady: true, marketReady: true });
+  assert.equal(picks.longshot.number, 5);
+  assert.deepEqual(picks.longshotCandidates.map((item) => item.number), [5, 6]);
+  assert.deepEqual(picks.valueHorses.map((item) => [item.number, item.firstRank]), [[5, 5], [6, 6], [7, 7], [8, 8]]);
+  const onlyWide = selectPicks([horse(1, .5, 1, .5, .5), horse(2, .3, 2, .3, .3), horse(3, .1, 3, .1, .1), horse(4, .05, 4, .05, .05), horse(5, .03, 5, .03, .03), horse(6, .02, 6, .02, .02), horse(7, .01, 7, .01, .02)], { roleModelReady: true, marketReady: true });
+  assert.equal(onlyWide.longshot, null);
+  assert.equal(onlyWide.longshotStatus, 'none');
+  assert.deepEqual(onlyWide.valueHorses.map((item) => item.number), [7]);
+  assert.equal(selectPicks(horses, { roleModelReady: true, marketReady: false }).valueHorses, undefined);
+});
+
 test('no qualifying horse gives 該当なし; missing market data never forces a pick', () => {
   const horses = [horse(1, .4, 5, .1, .4), horse(2, .3, 6, .1, .3), horse(3, .2, 1, .5, .6), horse(4, .1, 2, .3, .1)];
   const none = selectPicks(horses, { roleModelReady: true, marketReady: true });
