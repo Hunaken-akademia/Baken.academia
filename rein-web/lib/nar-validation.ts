@@ -1,4 +1,4 @@
-import { roleOrder, selectPicks, type MarkHorse, type MarkPick } from "./marks";
+import { NAR_VALUE_BASIS, roleOrder, selectPicks, VALUE_ROLE_RANKS, type MarkHorse, type MarkPick } from "./marks";
 
 type Rate = {samples:number;hits:number;rate:number|null};
 type SignalAudit = Rate & {baseline:number|null;difference:number|null;differenceCI:number[]|null;win:Rate;tenPlus:Rate};
@@ -29,6 +29,14 @@ export function narReferenceSignals(horses:MarkHorse[],validation:NarConditionVa
   // Matching official odds may have the same popularity number. Only absent, out-of-range,
   // or incomplete rankings should stop the reference conditions.
   const marketReady=fullRanking&&new Set(horses.map(h=>h.number)).size===horses.length&&horses.every(h=>Number.isInteger(h.popularity)&&h.popularity>=1&&h.popularity<=horses.length);
+  // 妙味馬 (NAR): no market-difference model, so "REIN above the market" is read as
+  // 1着適性順位 above 人気順位. Checked on 2026-09〜11 live snapshots: +0.8pt top-3 rate
+  // over the same odds band at ~2.6 horses a race, positive in each half-month block.
+  if(marketReady && picks.status==="ready") {
+    const [from,to]=VALUE_ROLE_RANKS;
+    picks.valueHorses=order.flatMap((h,i)=>i+1>=from&&i+1<=to&&h.popularity>=4&&h.popularity>i+1?[{number:h.number,role:"穴候補" as const,firstRank:i+1}]:[]);
+    picks.valueBasis=NAR_VALUE_BASIS;
+  }
   if(!validation || validation.version!=="nar-conditions-v1")return {picks,confidence:null,reference:null};
   const danger=validation.signals.danger,longshot=validation.signals.longshot;
   const dangerNumbers=marketReady&&danger.status==="adopted"&&danger.gap!==null?order.filter((h,i)=>h.popularity<=3&&i+1>=h.popularity+danger.gap!).map(h=>h.number):[];
