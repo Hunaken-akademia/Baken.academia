@@ -117,6 +117,10 @@ export function parseCampfireMembers(bytes) {
   return { members, counts };
 }
 
+// CAMPFIRE のコミュニティは 2026-12-31 で終了する（2026-11-26 オーナー決定）。閉鎖後は会員一覧を取り込めず、
+// 支援中を期限なしで登録すると終了後も使えてしまうため、支援中も 2027-01-01 0時（日本時間）で切れるようにする。
+// BOOKERS の合言葉が切り替わる時刻と同じ。
+export const CAMPFIRE_END_AT = "2026-12-31T15:00:00.000Z";
 const isCampfire = (key) => key.startsWith("campfire:") || key.startsWith("email:");
 const validDate = (value) => typeof value === "string" && Number.isFinite(Date.parse(value));
 
@@ -135,7 +139,7 @@ export function prepareCampfireImport(members, existingRows, now = new Date()) {
     const issue = (s) => issues.push("行" + row.row_number + ": " + s);
     if (existing && owner && existing.member_key !== owner.member_key) { issue("変更先メールは別の会員に登録済みです。"); continue; }
     if (existing && !isCampfire(existing.member_key)) { protectedMembers++; continue; }
-    let end = row.status === "cancelled" ? row.paid_month_end : null;
+    let end = row.status === "cancelled" ? row.paid_month_end : CAMPFIRE_END_AT;
     if (row.status === "cancelled") {
       if (existing?.status === "cancelled" && validDate(existing.access_ends_at))
         end = !end || Date.parse(existing.access_ends_at) < Date.parse(end) ? existing.access_ends_at : end;

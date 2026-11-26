@@ -41,7 +41,8 @@ test('repeat import never extends scheduled end and old file stays expired',()=>
 test('missing paid month blocks new cancellation but preserves existing deadline',()=>{
  assert.throws(()=>record('退会',''));assert.equal(prepare(members('退会',''),[record()],now).records[0].access_ends_at,record().access_ends_at);
 });
-test('rejoin clears scheduled cancellation',()=>{const r=prepare(members('active'),[record()],now).records[0]; assert.equal(r.status,'active');assert.equal(r.access_ends_at,null);});
+test('rejoin clears scheduled cancellation',()=>{const r=prepare(members('active'),[record()],now).records[0]; assert.equal(r.status,'active');assert.equal(r.access_ends_at,'2026-12-31T15:00:00.000Z');});
+test('active CAMPFIRE members end when CAMPFIRE closes',()=>{const r=record('active');assert.equal(r.access_ends_at,'2026-12-31T15:00:00.000Z');assert.equal(hasActiveReinAccess(r,new Date('2026-12-31T14:59:00Z')),true);assert.equal(hasActiveReinAccess(r,new Date('2026-12-31T15:00:00Z')),false);});
 test('manual memberships protected and email change relinks auth identity',()=>{
  const r=record();assert.equal(prepare(members(),[{...r,member_key:'rein-friend-1'}],now).records.length,0);
  const changed=members();changed[0].google_email='new@example.com';const result=prepare(changed,[{...r,auth_user_id:'old-user'}],now).records[0];assert.equal(result.member_key,r.member_key);assert.equal(result.auth_user_id,null);
