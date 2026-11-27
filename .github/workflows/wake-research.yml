@@ -180,6 +180,7 @@ jobs:
           node $f/export_t5.mjs 2026-08-01 2026-11-11 > logs/export_t5.log 2>&1
           openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in .github/wake-research/scan.enc -out $f/scan.py
           python $f/scan.py $f/out > logs/scan.log 2>&1
+          SUBSET=t5 python $f/scan.py $f/out > logs/scan_t5.log 2>&1
       - name: Partner selection by course and kimarite (1 year)
         if: contains(env.MODE, 'partners')
         run: |
@@ -218,7 +219,7 @@ jobs:
               print('token retry', e); time.sleep(5 * (i + 1))
           run = os.environ['GITHUB_RUN_ID']; base = pathlib.Path('work/research/hit-miss-20261113')
           files = {f'logs/{p.name}': p for p in pathlib.Path('logs').glob('*.log')}
-          for n in ('scan.json', 'aitype.txt', 'partners.txt', 'partners.json', 'tabstats.json', 'live.txt', 'live_tabs.csv', 'honmei.txt', 'tabs.txt', 'marks.txt', 't5thr.txt', 't5check.txt', 'tickets.txt', 'report.json', 'report_v4r.json', 'analysis.txt', 'analysis.json', 'v4r/wake-probability-model-v4.json', 'v4r/placement-v4-fixtures.json'):
+          for n in ('scan.json', 'scan_t5.json', 'aitype.txt', 'partners.txt', 'partners.json', 'tabstats.json', 'live.txt', 'live_tabs.csv', 'honmei.txt', 'tabs.txt', 'marks.txt', 't5thr.txt', 't5check.txt', 'tickets.txt', 'report.json', 'report_v4r.json', 'analysis.txt', 'analysis.json', 'v4r/wake-probability-model-v4.json', 'v4r/placement-v4-fixtures.json'):
               if (base / n).exists(): files[n] = base / n
           for p in sorted(pathlib.Path('work/tr/out').glob('*')):
               if p.suffix in ('.json', '.jsonl'): files[f'tabrebuild/{p.name}'] = p
