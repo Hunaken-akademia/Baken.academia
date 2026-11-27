@@ -47,14 +47,14 @@ jobs:
           openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$key" -in .github/wake-research/bundle.enc | tar xz -C work
           echo "MODE=$(cat .github/wake-research/mode.txt)" >> "$GITHUB_ENV"
       - name: Restore official results cache
-        if: "!contains(env.MODE, 'tabrebuild') && !contains(env.MODE, 'partners') && !contains(env.MODE, 'aitype')"
+        if: "!contains(env.MODE, 'tabrebuild') && !contains(env.MODE, 'partners') && !contains(env.MODE, 'aitype') && !contains(env.MODE, 'scan')"
         uses: actions/cache/restore@v4
         with:
           path: work/research/ashi-marks-20261112/data_k
           key: wake-k-v1-${{ github.run_id }}
           restore-keys: wake-k-v1-
       - name: Fetch official results (K files)
-        if: "!contains(env.MODE, 'tabrebuild') && !contains(env.MODE, 'partners') && !contains(env.MODE, 'aitype')"
+        if: "!contains(env.MODE, 'tabrebuild') && !contains(env.MODE, 'partners') && !contains(env.MODE, 'aitype') && !contains(env.MODE, 'scan')"
         run: |
           cd work && mkdir -p research/ashi-marks-20261112 && cp research/bet-modes-20261106/kfetch.py research/ashi-marks-20261112/kfetch.py
           # 公式の公開データ（Kファイル）。時間がかかるので100分で区切り、続きは次の実行で（キャッシュに残る）
@@ -67,13 +67,13 @@ jobs:
           print(f'K_MISSING={miss}'); print('K_OK=' + ('1' if miss <= 5 else '0'))
           PY
       - name: Save official results cache
-        if: always() && !contains(env.MODE, 'tabrebuild') && !contains(env.MODE, 'partners') && !contains(env.MODE, 'aitype')
+        if: always() && !contains(env.MODE, 'tabrebuild') && !contains(env.MODE, 'partners') && !contains(env.MODE, 'aitype') && !contains(env.MODE, 'scan')
         uses: actions/cache/save@v4
         with:
           path: work/research/ashi-marks-20261112/data_k
           key: wake-k-v1-${{ github.run_id }}
       - name: Restore model output (analyze-only mode)
-        if: contains(env.MODE, 'analyze') || contains(env.MODE, 'tickets') || contains(env.MODE, 'marks') || contains(env.MODE, 'tabs') || contains(env.MODE, 'honmei') || contains(env.MODE, 'live') || contains(env.MODE, 'tabstats') || contains(env.MODE, 'partners') || contains(env.MODE, 'aitype')
+        if: contains(env.MODE, 'analyze') || contains(env.MODE, 'tickets') || contains(env.MODE, 'marks') || contains(env.MODE, 'tabs') || contains(env.MODE, 'honmei') || contains(env.MODE, 'live') || contains(env.MODE, 'tabstats') || contains(env.MODE, 'partners') || contains(env.MODE, 'aitype') || contains(env.MODE, 'scan')
         uses: actions/cache/restore@v4
         with:
           path: enc
@@ -171,6 +171,15 @@ jobs:
           node $f/export_t5.mjs 2026-08-01 2026-11-11 > logs/export_t5.log 2>&1
           openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in .github/wake-research/aitype.enc -out $f/aitype.py
           python $f/aitype.py $f/out > logs/aitype.log 2>&1
+      - name: Condition scan for the mantoman guide (1 year)
+        if: contains(env.MODE, 'scan')
+        run: |
+          set -euo pipefail
+          # マンツーマン生向けの取扱説明書：条件の組み合わせを総当たりで調べる（読み取りのみ、数字はログに出さない）
+          f=work/research/hit-miss-20261113; [ -f $f/out/races.npz ] || openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/out.enc | tar xz -C $f
+          node $f/export_t5.mjs 2026-08-01 2026-11-11 > logs/export_t5.log 2>&1
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in .github/wake-research/scan.enc -out $f/scan.py
+          python $f/scan.py $f/out > logs/scan.log 2>&1
       - name: Partner selection by course and kimarite (1 year)
         if: contains(env.MODE, 'partners')
         run: |
@@ -209,7 +218,7 @@ jobs:
               print('token retry', e); time.sleep(5 * (i + 1))
           run = os.environ['GITHUB_RUN_ID']; base = pathlib.Path('work/research/hit-miss-20261113')
           files = {f'logs/{p.name}': p for p in pathlib.Path('logs').glob('*.log')}
-          for n in ('aitype.txt', 'partners.txt', 'partners.json', 'tabstats.json', 'live.txt', 'live_tabs.csv', 'honmei.txt', 'tabs.txt', 'marks.txt', 't5thr.txt', 't5check.txt', 'tickets.txt', 'report.json', 'report_v4r.json', 'analysis.txt', 'analysis.json', 'v4r/wake-probability-model-v4.json', 'v4r/placement-v4-fixtures.json'):
+          for n in ('scan.json', 'aitype.txt', 'partners.txt', 'partners.json', 'tabstats.json', 'live.txt', 'live_tabs.csv', 'honmei.txt', 'tabs.txt', 'marks.txt', 't5thr.txt', 't5check.txt', 'tickets.txt', 'report.json', 'report_v4r.json', 'analysis.txt', 'analysis.json', 'v4r/wake-probability-model-v4.json', 'v4r/placement-v4-fixtures.json'):
               if (base / n).exists(): files[n] = base / n
           for p in sorted(pathlib.Path('work/tr/out').glob('*')):
               if p.suffix in ('.json', '.jsonl'): files[f'tabrebuild/{p.name}'] = p
