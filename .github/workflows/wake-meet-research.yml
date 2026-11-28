@@ -1,8 +1,7 @@
-name: WAKE research meet-st (private bundle)
+name: WAKE research nige-allow (private bundle)
 
-# WAKE（競艇）の研究計算（2026-11-15）：節間ST・節間成績・今日の展示・展示ST の上乗せ効果を1年分で確かめる。
-# 作りは wake-research.yml（claude/project-thread-xrrwrr）と同じ。コードは暗号化して置き（.github/wake-meet/bundle.enc）、
-# 鍵・データの読み取り・結果の保存は Supabase の関数 github-wake-research が GitHub の OIDC で確かめたときだけ。ログには数字を出さない。
+# WAKE（競艇）の研究計算（2026-11-28）：2・3コースの選手の「逃がし率」を予想3連対率（v4）に足して1年分で確かめる。
+# 作りは wake-meet-research.yml と同じ。コードは暗号化して置き、鍵・データ・結果の保存は Supabase の関数 github-wake-research が GitHub の OIDC で確かめたときだけ。
 on:
   push:
     branches: [claude/project-thread-sp0497]
@@ -19,8 +18,8 @@ concurrency:
 
 env:
   WAKE_BROKER_URL: https://dcewdzagnomcnvteokwj.supabase.co/functions/v1/github-wake-research
-  JOB: meet-st-20261115
-  F: work/research/meet-st-20261115
+  JOB: nige-allow-20261128
+  F: work/research/nige-allow-20261128
 
 jobs:
   prep:
@@ -57,11 +56,11 @@ jobs:
         id: k
         run: |
           cd work && mkdir -p research/ashi-marks-20261112 && cp research/bet-modes-20261106/kfetch.py research/ashi-marks-20261112/kfetch.py
-          timeout 230m python research/ashi-marks-20261112/kfetch.py 2021-10-17 2026-11-11 | grep -v "^failed" || true
+          timeout 230m python research/ashi-marks-20261112/kfetch.py 2021-10-17 2026-11-26 | grep -v "^failed" || true
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import datetime as dt, pathlib
           d = pathlib.Path('research/ashi-marks-20261112/data_k'); have = {p.name[:10] for p in d.iterdir()}
-          a = dt.date(2021, 10, 17); b = dt.date(2026, 11, 11); miss = sum((a + dt.timedelta(i)).isoformat() not in have for i in range((b - a).days + 1))
+          a = dt.date(2021, 10, 17); b = dt.date(2026, 11, 26); miss = sum((a + dt.timedelta(i)).isoformat() not in have for i in range((b - a).days + 1))
           print('k_ok=' + ('1' if miss <= 5 else '0'))
           PY
       - name: Save official results cache
@@ -74,15 +73,15 @@ jobs:
         if: steps.k.outputs.k_ok == '1'
         run: |
           set -euo pipefail
-          node $F/export.mjs 2025-06-01 2026-11-11 > logs/export.log 2>&1
-          node $F/export_t5.mjs 2026-08-01 2026-11-11 > logs/export_t5.log 2>&1
+          node $F/export.mjs 2025-06-01 2026-11-26 > logs/export.log 2>&1
+          node $F/export_t5.mjs 2026-08-01 2026-11-26 > logs/export_t5.log 2>&1
           mkdir -p enc && tar cz -C $F data | openssl enc -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -out enc/data.enc
       - uses: actions/upload-artifact@v4
         if: steps.k.outputs.k_ok == '1'
         with: { name: data-enc, path: enc/data.enc, retention-days: 3 }
       - name: Smoke test
         if: steps.k.outputs.k_ok == '1'
-        run: SMOKE=1 VARIANT=ADJ python $F/feat.py > logs/smoke.log 2>&1
+        run: SMOKE=1 VARIANT=NG23 python $F/feat.py > logs/smoke.log 2>&1
       - name: Save logs
         if: always()
         run: python .github/wake-meet/save.py prep logs/*.log
@@ -163,7 +162,7 @@ jobs:
           set -euo pipefail
           openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in enc/data.enc | tar xz -C $F
           for f in enc/out_*.enc; do openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$WAKE_KEY" -in $f | tar xz -C $F; done
-          python $F/preeval.py > logs/eval.log 2>&1
+          python $F/evalv.py > logs/eval.log 2>&1
       - name: Save results
         if: always()
         run: python .github/wake-meet/save.py eval logs/*.log $F/evalv.txt
