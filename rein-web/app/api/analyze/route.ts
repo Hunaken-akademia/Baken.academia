@@ -19,6 +19,7 @@ import {
   isRunnerRow,
   isScratched,
   withdrawnResultNumbers,
+  marketWithdrawnNumbers,
   parseSexAge,
 } from "@/lib/race-card";
 import { selectPicks } from "@/lib/marks";
@@ -381,14 +382,21 @@ async function analyze(request: NextRequest) {
     // Geldings are written 「せん」 on Yahoo. The old 「セ」-only filter silently dropped
     // them, and the popularity sanity check then rejected the whole race.
     const allCardRows = tableRows(card).filter(isRunnerRow);
-    const withdrawn = withdrawnResultNumbers(tableRows(result));
-    const scratchedRows = allCardRows.filter(row => isScratched(row) || withdrawn.has(+row.cells[1]));
-    const cardRows = allCardRows.filter(row => !isScratched(row) && !withdrawn.has(+row.cells[1]));
-    const oddsRows = tableRows(odds, 5).filter(
+    const allOddsRows = tableRows(odds, 5);
+    const oddsRows = allOddsRows.filter(
       (row) =>
         /^\d+$/.test(row.cells[1] || "") &&
         /^\d+(\.\d+)?$/.test(row.cells[3] || ""),
     );
+    const withdrawn = withdrawnResultNumbers(tableRows(result));
+    // Race-day withdrawals that show in the market before the card marks them.
+    for (const number of marketWithdrawnNumbers(
+      allCardRows.filter(row => !isScratched(row) && !withdrawn.has(+row.cells[1])),
+      new Map(oddsRows.map((row) => [+row.cells[1], +row.cells[3]])),
+      allOddsRows,
+    )) withdrawn.add(number);
+    const scratchedRows = allCardRows.filter(row => isScratched(row) || withdrawn.has(+row.cells[1]));
+    const cardRows = allCardRows.filter(row => !isScratched(row) && !withdrawn.has(+row.cells[1]));
     const resultRows = tableRows(result).filter(
       (row) =>
         /^\d+$/.test(row.cells[0] || "") &&
